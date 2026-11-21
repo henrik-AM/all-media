@@ -60,10 +60,13 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.mitteilung_bei_story_markierung() | SUPABASE_SCHEMA_68_storys.sql → SUPABASE_SCHEMA_75_story_markierung_im_chat.sql | **SUPABASE_SCHEMA_75_story_markierung_im_chat.sql** |
 | Funktion public.spendencode_setzen() | SUPABASE_SCHEMA_72_zahlung_spendencode.sql → SUPABASE_SCHEMA_77_spendenpin_doppelt.sql | **SUPABASE_SCHEMA_77_spendenpin_doppelt.sql** |
 | Funktion public.sammlung_inhalt_pruefen() | SUPABASE_SCHEMA_46_sammlungen.sql → SUPABASE_SCHEMA_80_sammlung_nur_eigenes.sql | **SUPABASE_SCHEMA_80_sammlung_nur_eigenes.sql** |
-| Funktion public.feed_rang() | SUPABASE_SCHEMA_51_feed_rang.sql → SUPABASE_SCHEMA_82_feed_lenkung.sql → SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql → SUPABASE_SCHEMA_129_video_negativ.sql | **SUPABASE_SCHEMA_129_video_negativ.sql** (Fassung 122 + Negativfaktor, Freigabe, Blockieren; 122 neu eingespielt → 129 nachziehen) |
+| Funktion public.feed_rang() | SUPABASE_SCHEMA_51_feed_rang.sql → SUPABASE_SCHEMA_82_feed_lenkung.sql → SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql → SUPABASE_SCHEMA_129_video_negativ.sql → SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql | **SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql** (Fassung 129 + nur lesbare Negativquellen) |
 | Funktion public.bunny_medium_referenziert() | SUPABASE_SCHEMA_115_bunny_medienvertrag.sql → SUPABASE_SCHEMA_133_karussell.sql | **SUPABASE_SCHEMA_133_karussell.sql** (Fassung 115 + Medienliste) |
 | Auslöser medienreferenz_pruefen auf posts | SUPABASE_SCHEMA_117_medienreferenz_eigen.sql → SUPABASE_SCHEMA_133_karussell.sql | **SUPABASE_SCHEMA_133_karussell.sql** (zusätzlich `update of medien`) |
 | Auslöser video_beleg_pruefen auf posts | SUPABASE_SCHEMA_132_video_uploadbeleg.sql → SUPABASE_SCHEMA_133_karussell.sql | **SUPABASE_SCHEMA_133_karussell.sql** (zusätzlich `update of medien`) |
+| Funktion public.video_beleg_pruefen() | SUPABASE_SCHEMA_132_video_uploadbeleg.sql → SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql | **SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql** (ohne Datei keine Dauer) |
+| Funktion public.konto_sichtung_messen() | SUPABASE_SCHEMA_130_kontoanalysen.sql → SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql | **SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql** (1 Aufruf/5 Min je Tag) |
+| Regel post_upload_loeschsperre (storage.objects) | SUPABASE_SCHEMA_132_video_uploadbeleg.sql → SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql | **SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql** (alle Beitragsdateien) |
 | Funktion public.impression_vermerken() | SUPABASE_SCHEMA_28_impressionen.sql → SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql | **SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql** (Fassung 28 + still nichts bei unlesbarem Beitrag) |
 | Funktion public.spende_senden() | SUPABASE_SCHEMA_72_zahlung_spendencode.sql → SUPABASE_SCHEMA_101_freigabe_nummer_spende.sql → SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql | **SUPABASE_SCHEMA_122_rpc_nur_sichtbare_beitraege.sql** (Fassung 101 + p_post muss lesbar sein) |
 | Funktion public.interessenbild() | SUPABASE_SCHEMA_51_feed_rang.sql → SUPABASE_SCHEMA_82_feed_lenkung.sql | **SUPABASE_SCHEMA_82_feed_lenkung.sql** (Kasten 24: nur eigenes Bild, Signale erst ab Neustart) |
@@ -723,4 +726,9 @@ Proben in verworfener Transaktion: `node app/test/af-schema-proben.js <n>`.
 
 Entfallen: Entwurf 112 (Startermedien – live bereits korrekt, geprüft 20.11.) und
 114 (Medienumzug – seit Schema 116/28.10. erledigt). Entwurf 107 → Schema 128 (Paket 8).
+
+**134** `paket9_gegenpruefung` (21.11.2026): Befunde Codex R1 — Negativsignale nur aus lesbaren
+Beiträgen, Analysen je Zuschauer/Beitrag/Tag höchstens 1 Aufruf und 5 Minuten, Video ohne Datei
+ohne Dauer, Beitragsdateien für Clients nicht löschbar, `bunny_medium_referenziert` nicht mehr
+direkt aufrufbar. Probe `node app/test/af-schema-proben.js 134`.
 

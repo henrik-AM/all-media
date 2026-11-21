@@ -247,7 +247,7 @@ async function hochladen(client, nutzerId, ordner, datenadresse) {
   const typ = treffer[1];
   const inhalt = Buffer.from(treffer[2], 'base64');
   if (typ.startsWith('video/')) return hochladenVideo(client, nutzerId, ordner, typ, inhalt);
-  if (ordner === 'instants' && (typ !== 'image/jpeg' || inhalt.length > 250*1024)) return {ok:false,error:'Nur Kamera-Fotos als JPEG bis 250 KB.'};
+  if (ordner === 'instants' && (typ !== 'image/jpeg' || inhalt.length > 250*1024 || inhalt[0] !== 0xff || inhalt[1] !== 0xd8)) return {ok:false,error:'Nur Kamera-Fotos als JPEG bis 250 KB.'};
   return ablegen(client, nutzerId, ordner, typ, inhalt);
 }
 
@@ -274,7 +274,7 @@ async function hochladenVideo(client, nutzerId, ordner, mime, inhalt, optionen) 
   if (!Buffer.isBuffer(inhalt)) return { ok: false, error: 'Das ist keine lesbare Aufnahme' };
   const zuGross = StoryRegeln.videoPruefen({ bytes: inhalt.length });
   if (zuGross) return { ok: false, error: zuGross };
-  if (ordner === 'instants' && (typ !== 'image/jpeg' || inhalt.length > 250*1024)) return {ok:false,error:'Nur Kamera-Fotos als JPEG bis 250 KB.'};
+  if (ordner === 'instants' && (typ !== 'image/jpeg' || inhalt.length > 250*1024 || inhalt[0] !== 0xff || inhalt[1] !== 0xd8)) return {ok:false,error:'Nur Kamera-Fotos als JPEG bis 250 KB.'};
   return ablegen(client, nutzerId, ordner, typ, inhalt, optionen);
 }
 
@@ -318,7 +318,7 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt, {signal}={}) {
     contentType: typ,
     upsert: false,
   });
-  if (signal?.aborted && !error) {await client.storage.from('media').remove([pfad]);return {ok:false,error:'Hochladen abgebrochen.'};}
+  if (signal?.aborted && !error) {await (dienst || client).storage.from('media').remove([pfad]);return {ok:false,error:'Hochladen abgebrochen.'};}
   if (error) {
     // Sichtbar machen, nicht verschlucken: das Verschweigen war der Grund,
     // warum der Fehler in der App ein Vierteljahr unbemerkt blieb.
@@ -335,11 +335,17 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt, {signal}={}) {
       });
       if (belegFehler) throw belegFehler;
     } catch (e) {
-      await client.storage.from('media').remove([pfad]);
+      await (dienst || client).storage.from('media').remove([pfad]);
       return { ok: false, error: 'Das Video konnte nicht bestätigt werden. Bitte erneut versuchen.' };
     }
   }
-  if(signal?.aborted){await client.storage.from('media').remove([pfad]);return {ok:false,error:'Hochladen abgebrochen.'};}
+  // Gegenprüfung R1: Beitragsdateien sind für Clients löschgesperrt (Schema 132),
+  // darum entfernt der Dienst; Fehler werden gemeldet, nicht verschluckt.
+  if(signal?.aborted){
+    const {error:wegFehler}=await (dienst || client).storage.from('media').remove([pfad]);
+    if(wegFehler)console.error('Abgebrochener Upload blieb liegen:', pfad.split('/')[0]);
+    return {ok:false,error:'Hochladen abgebrochen.'};
+  }
   const { data } = client.storage.from('media').getPublicUrl(pfad);
   let anzeige = null;
   if (ordner === 'instants') return {ok:true,url:data.publicUrl,anzeige:null,pfad};
@@ -360,6 +366,7 @@ async function hochladenDatei(client, nutzerId, ordner, mime, inhalt, optionen) 
   if (!ORDNER.includes(ordner) || !Buffer.isBuffer(inhalt)) return {ok:false,error:'Unbekannte Aufnahme'};
   const typ=String(mime || '').split(';')[0].toLowerCase();
   if (typ.startsWith('video/')) return hochladenVideo(client,nutzerId,ordner,typ,inhalt,optionen);
+  if (ordner === 'instants' && (typ !== 'image/jpeg' || inhalt.length > 250*1024 || inhalt[0] !== 0xff || inhalt[1] !== 0xd8)) return {ok:false,error:'Nur Kamera-Fotos als JPEG bis 250 KB.'};
   if (!['image/jpeg','image/png','image/webp','audio/mp4'].includes(typ)) return {ok:false,error:'Dieses Dateiformat wird nicht unterstützt.'};
   if (inhalt.length>10*1024*1024 && typ.startsWith('image/')) return {ok:false,error:'Das Bild darf höchstens 10 MB groß sein.'};
   return ablegen(client,nutzerId,ordner,typ,inhalt,optionen);
@@ -496,8 +503,17 @@ async function instantUnterschrift(client,pfad,dienst) {
     const {supabaseUrl}=require('./supabase');
     dienst=createClient(supabaseUrl,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
   }
-  const {data,error}=await dienst.storage.from('media').createSignedUrl(pfad,60);
-  if(error)throw error;return data.signedUrl;
+  /*
+   * Paket 9, Gegenprüfung R1: keine signierte Adresse mehr. Ein 60-s-Link
+   * ist ein Inhaberlink — weitergegeben, nach Öffnen, Blockieren oder
+   * Zurückziehen noch abrufbar. Der Server lädt die (≤ 250 KB) JPEG-Datei
+   * nach der RLS-Prüfung selbst und liefert sie nur an dieses Konto aus.
+   */
+  const {data,error}=await dienst.storage.from('media').download(pfad);
+  if(error||!data)throw new Error('Instant nicht mehr verfügbar');
+  const bytes=Buffer.from(await data.arrayBuffer());
+  if(bytes.length>256000||bytes[0]!==0xff||bytes[1]!==0xd8)throw new Error('Instant nicht mehr verfügbar');
+  return 'data:image/jpeg;base64,'+bytes.toString('base64');
 }
 async function instantsAufraeumen(client) {
   const {data,error}=await client.rpc('instant_loeschkandidaten');if(error)throw error;

@@ -89,6 +89,9 @@ const pfadAus = (url) => String(url || '').split('/storage/v1/object/public/medi
     if (kurzId) beitraege.push(kurzId);
     const { data: r2 } = await A.client.from('posts').select('duration').eq('id', kurzId).maybeSingle();
     pruefe('Clientdauer 18:20 wird durch Bytes-Dauer 0:05 ersetzt', r2?.duration === '0:05', JSON.stringify(r2));
+    const ohneDatei = await A.api('/api/eigene/video', { json: { beschreibung: 'Paket 9 ohne Datei', sekunden: 600, format: 'hoch' } });
+    if (ohneDatei.beitrag?.id) beitraege.push(ohneDatei.beitrag.id);
+    pruefe('Website: Reel ohne Datei abgewiesen', ohneDatei.ok === false, ohneDatei.error);
     const direkt = await A.client.from('posts').insert({ user_id: A.id, kind: 'reel', media_url: URL_ + '/storage/v1/object/public/media/' + zuLang.pfad }).select('id');
     pruefe('Direkter REST-Weg ohne Beleg abgewiesen', !!direkt.error, direkt.error?.message);
 
@@ -124,11 +127,12 @@ const pfadAus = (url) => String(url || '').split('/storage/v1/object/public/medi
     const z7 = (d) => d?.zeitraeume?.[0] || {};
     await B.client.rpc('impression_vermerken', { beitrag: reelId, dauer: 2500, herkunft: 'reels' });
     await B.client.rpc('impression_vermerken', { beitrag: reelId, dauer: 400, herkunft: 'reels' });
+    await B.client.rpc('impression_vermerken', { beitrag: reelId, dauer: 2500, herkunft: 'feed' });
     const nachA = await A.api('/api/kontoanalysen', { methode: 'GET' });
     const pp = (z7(nachA).beitraege || []).find((b) => b.id === reelId);
     pruefe('Analysen liefern 7 und 30 Tage', nachA.zeitraeume?.length === 2 && nachA.zeitraeume[1].tage === 30);
     pruefe('Sichtung von B zählt (≥ 1000 ms), 400 ms nicht', pp && Number(pp.aufrufe) === 1 && Number(pp.reichweite) === 1, JSON.stringify(pp));
-    pruefe('Sichtzeit wächst um 2500 ms', Number(z7(nachA).sichtzeitMs) - Number(z7(vorA).sichtzeitMs) === 2500, `${z7(vorA).sichtzeitMs} → ${z7(nachA).sichtzeitMs}`);
+    pruefe('Wiederholte Meldung: weiter 1 Aufruf, Sichtzeit 5000 ms', Number(pp?.aufrufe) === 1 && Number(z7(nachA).sichtzeitMs) - Number(z7(vorA).sichtzeitMs) === 5000, `${z7(vorA).sichtzeitMs} → ${z7(nachA).sichtzeitMs}`);
     pruefe('Nicht-Follower-Aufteilung gezählt', Number(z7(nachA).nichtFollowerAufrufe) + Number(z7(nachA).followerAufrufe) === Number(z7(nachA).aufrufe));
     const fremdAnalyse = await B.api('/api/kontoanalysen', { methode: 'GET' });
     pruefe('B sieht A\'s Beitrag nicht in den eigenen Analysen', !(z7(fremdAnalyse).beitraege || []).some((b) => b.id === reelId));
@@ -157,6 +161,9 @@ const pfadAus = (url) => String(url || '').split('/storage/v1/object/public/medi
     pruefe('Fremde Medien im Karussell abgewiesen', fremdK.ok === false || fremdK.status >= 400, fremdK.error);
     const weg2 = await A.api('/api/medien/loeschen', { json: { pfad: b2.pfad } });
     pruefe('Drittes Medium ist vor Löschen geschützt (verwendet)', weg2.ok === false, weg2.error);
+    const del = await A.api(`/api/eigene/${karId}/loeschen`, { json: {} });
+    const rest3 = await frage(`select count(*) n from public.medien_objekte where pfad in ('${b1.pfad}','${v1.pfad}','${b2.pfad}')`);
+    pruefe('Karussell gelöscht: alle 3 Dateien entfernt', Array.isArray(rest3) && Number(rest3[0].n) === 0, JSON.stringify({ del: del.ok ?? del.status, rest3 }));
 
     // ------------------------------------------------------------ AF6 --
     console.log('\nAF6 Instants');
@@ -175,7 +182,8 @@ const pfadAus = (url) => String(url || '').split('/storage/v1/object/public/medi
     const { data: mit } = await B.client.from('notifications').select('id').eq('target_type', 'instant').eq('target_id', gesendet.id);
     pruefe('B bekommt eine Mitteilung', (mit || []).length === 1);
     const bild = await fetch(BASIS + `/api/instants/${gesendet.id}/bild`, { headers: { Authorization: 'Bearer ' + (await B.client.auth.getSession()).data.session.access_token } });
-    pruefe('B kann das Bild einmal laden', bild.status === 200 || bild.status === 302, 'HTTP ' + bild.status);
+    const bildJson = await bild.json().catch(() => ({}));
+    pruefe('B bekommt das Bild direkt, kein Inhaberlink', bild.status === 200 && String(bildJson.bild || '').startsWith('data:image/jpeg;base64,'), 'HTTP ' + bild.status);
     const roh6 = await B.client.storage.from('media').createSignedUrl(ib.pfad, 3600);
     pruefe('Direkte Storage-Signatur für B gesperrt', !!roh6.error || !roh6.data?.signedUrl);
     const auf = await B.api(`/api/instants/${gesendet.id}/gesehen`, { json: {} });

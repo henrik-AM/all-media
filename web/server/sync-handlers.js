@@ -1472,14 +1472,15 @@ const handleDeleteContent = handler('Inhalt löschen', async (client, nutzerId, 
   const Medien = require('./medien');
   let medien = null;
   if (art === 'post' && Medien.mitBunny()) {
-    const {data, error} = await client.from('posts').select('media_url, thumbnail_url').eq('id', id).eq('user_id', nutzerId).maybeSingle();
+    // Gegenprüfung R1: auch das zweite bis n-te Medium eines Karussells.
+    const {data, error} = await client.from('posts').select('media_url, thumbnail_url, medien').eq('id', id).eq('user_id', nutzerId).maybeSingle();
     if (error) throw error;
-    medien = data;
+    medien = data ? [data.media_url, data.thumbnail_url, ...(Array.isArray(data.medien) ? data.medien.map((m) => m?.url) : [])] : null;
   }
   const { data: weg, error } = await client.from(tabelle).delete().eq('id', id).eq('user_id', nutzerId).select('id');
   if (error) throw error;
   if (!weg?.length) return {ok:false, error:'Dieser Inhalt ließ sich nicht löschen'};
-  for (const adresse of new Set(Object.values(medien || {}))) {
+  for (const adresse of new Set(medien || [])) {
     if (!Medien.istMedienAdresse(adresse)) continue;
     const pfad = Medien.pfadAus(adresse);
     // Geteilte Dateien bleiben erhalten; Altmedien werden hier nicht entfernt.

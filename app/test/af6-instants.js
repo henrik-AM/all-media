@@ -31,11 +31,12 @@ const t = async (name, fn) => { await fn(); console.log(`OK ${++n} ${name}`); };
     });
     const pfad = 'instants/11111111-1111-4111-8111-111111111111/foto.jpg';
     const leser = erlaubt => ({from:()=>({select(){return this;},eq(){return this;},single:async()=>erlaubt?{data:{bild_pfad:pfad}}:{error:new Error('RLS verweigert')}})});
-    await t('Web prüft RLS und signiert als Dienst nur 60 Sekunden', async () => {
-        let ttl;
-        const dienst = { storage: { from: () => ({ createSignedUrl: async (p, s) => { ttl = s; assert.equal(p, pfad); return { data: { signedUrl: 'lokal' }, error: null }; } }) } };
-        assert.equal(await M.instantUnterschrift(leser(true), pfad, dienst), 'lokal');
-        assert.equal(ttl, 60);
+    await t('Web prüft RLS und liefert das Bild selbst (kein Inhaberlink)', async () => {
+        const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(20)]);
+        const dienst = { storage: { from: () => ({ createSignedUrl() { throw new Error('keine Signatur'); }, download: async (p) => { assert.equal(p, pfad); return { data: new Blob([jpeg]), error: null }; } }) } };
+        const bild = await M.instantUnterschrift(leser(true), pfad, dienst);
+        assert.ok(bild.startsWith('data:image/jpeg;base64,'));
+        assert.ok(!/token=|sign\//.test(bild));
     });
     await t('RLS-Verweigerung erreicht Dienstsignatur niemals', async () => {
         const dienst = {storage:{from(){throw new Error('Darf nicht erreicht werden');}}};

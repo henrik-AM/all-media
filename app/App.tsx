@@ -1789,7 +1789,13 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * Erstellen-Menü und die Kamera, die ihre Aufnahme hierher weiterreicht.
    */
   const beitragBeschreiben = (punkt: 'post' | 'reels' | 'landscape', uri: string, sekunden?: number, medien?:Medium[]) => {
-    if(punkt==='post'&&!medien){setKarussellStart([{url:uri,typ:'image'}]);return;}
+    if (punkt === 'post' && !medien) {
+      // Gegenprüfung R1: auch im Beitragsmodus kann die Kamera ein Video liefern.
+      const video = sekunden != null || /\.(mp4|mov|m4v|webm)(\?|$)/i.test(uri);
+      const mime = !video ? undefined : /\.mov(\?|$)/i.test(uri) ? 'video/quicktime' : /\.webm(\?|$)/i.test(uri) ? 'video/webm' : 'video/mp4';
+      setKarussellStart([{ url: uri, typ: video ? 'video' : 'image', ...(mime ? { mime } : {}), ...(sekunden != null ? { sekunden } : {}) }]);
+      return;
+    }
     const istBild = punkt === 'post';
     const quer = punkt === 'landscape';
     setFormular({

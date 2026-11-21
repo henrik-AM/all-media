@@ -2253,6 +2253,8 @@ app.post('/api/eigene/video', route(async (req) => {
   const beschreibung = String(req.body?.beschreibung || '').trim();
   if (!beschreibung) return { ok: false, error: 'Bitte eine Beschreibung eingeben' };
   const quer = req.body?.format === 'quer';
+  // Gegenprüfung R1: ein Video-Beitrag braucht eine hochgeladene Datei.
+  if (!req.body?.mediaUrl) return { ok: false, error: 'Bitte ein Video auswählen.' };
   const dauerFehler = require('../../gemeinsam/reel').pruefen(req.body?.sekunden);
   if (dauerFehler) return { ok: false, error: dauerFehler };
 
