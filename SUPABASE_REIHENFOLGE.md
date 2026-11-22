@@ -64,7 +64,7 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.bunny_medium_referenziert() | SUPABASE_SCHEMA_115_bunny_medienvertrag.sql → SUPABASE_SCHEMA_133_karussell.sql | **SUPABASE_SCHEMA_133_karussell.sql** (Fassung 115 + Medienliste) |
 | Auslöser medienreferenz_pruefen auf posts | SUPABASE_SCHEMA_117_medienreferenz_eigen.sql → SUPABASE_SCHEMA_133_karussell.sql | **SUPABASE_SCHEMA_133_karussell.sql** (zusätzlich `update of medien`) |
 | Auslöser video_beleg_pruefen auf posts | SUPABASE_SCHEMA_132_video_uploadbeleg.sql → SUPABASE_SCHEMA_133_karussell.sql | **SUPABASE_SCHEMA_133_karussell.sql** (zusätzlich `update of medien`) |
-| Funktion public.video_beleg_pruefen() | SUPABASE_SCHEMA_132_video_uploadbeleg.sql → SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql → SUPABASE_SCHEMA_135_paket9_gegenpruefung2.sql → SUPABASE_SCHEMA_136_paket9_runde3.sql | **SUPABASE_SCHEMA_136_paket9_runde3.sql** (+ Livestream-Ende rechnet Dauer selbst) |
+| Funktion public.video_beleg_pruefen() | SUPABASE_SCHEMA_132_video_uploadbeleg.sql → SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql → SUPABASE_SCHEMA_135_paket9_gegenpruefung2.sql → SUPABASE_SCHEMA_136_paket9_runde3.sql → SUPABASE_SCHEMA_137_livestream_dauer.sql | **SUPABASE_SCHEMA_137_livestream_dauer.sql** (dauerhafte, vollständige Livestream-Dauer) |
 | Funktion public.karussell_pruefen() | SUPABASE_SCHEMA_133_karussell.sql → SUPABASE_SCHEMA_135_paket9_gegenpruefung2.sql | **SUPABASE_SCHEMA_135_paket9_gegenpruefung2.sql** (nur posts/ und beispiel/) |
 | Funktion public.meine_kontoanalysen() | SUPABASE_SCHEMA_130_kontoanalysen.sql → SUPABASE_SCHEMA_135_paket9_gegenpruefung2.sql → SUPABASE_SCHEMA_136_paket9_runde3.sql | **SUPABASE_SCHEMA_136_paket9_runde3.sql** (Aufrufe = Zuschauer-Tage, ohne Nulltupel) |
 | Funktion public.konto_sichtung_messen() | SUPABASE_SCHEMA_130_kontoanalysen.sql → SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql | **SUPABASE_SCHEMA_134_paket9_gegenpruefung.sql** (1 Aufruf/5 Min je Tag) |
@@ -739,3 +739,5 @@ Karussell nur aus `posts/`/`beispiel/`, Analysen zählen Zuschauer-Tage. Probe `
 
 **136** `paket9_runde3` (21.11.2026): Befunde Codex R3, selbst behoben, nicht gegengeprüft — Beitrag ohne Messwert 0 Aufrufe,
 Livestream-Ende rechnet die Aufzeichnungsdauer aus `created_at`. Probe `node app/test/af-schema-proben.js 136`.
+
+**137** `livestream_dauer` (22.11.2026): Livestream-Ende auch bei reiner Formatänderung, Dauer ab 100 Minuten vollständig, keine negativen Werte und stabil bei wiederholtem Speichern.

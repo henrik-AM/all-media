@@ -9,7 +9,7 @@ require('./_ki_belegung').pruefeBelegung('supabase-schema');
 // Beide Belegungen prüfen (der generische Helfer merkt nur die erste Prüfung).
 delete globalThis.__kiBelegungGeprueft;
 require('./_ki_belegung').pruefeBelegung('testbestand');
-const nr=Number(process.argv[2]);if(![129,130,131,132,133,134,135,136].includes(nr))throw Error('Schema 129–136 angeben');
+const nr=Number(process.argv[2]);if(![129,130,131,132,133,134,135,136,137].includes(nr))throw Error('Schema 129–137 angeben');
 // Paket 9: Entwürfe 108/110/111/109/113 heißen auf main 129/130/131/132/133.
 const root=path.resolve(__dirname,'../..');
 const id=n=>`ac260026-0000-4000-8000-${String(n).padStart(12,'0')}`;
@@ -26,16 +26,17 @@ create function pg_temp.pruefe(n text,b boolean) returns void language plpgsql a
  if b is not true then raise exception 'PRUEFFEHLER:%',n;end if;
  perform set_config('probe.erg',current_setting('probe.erg',true)||n||'|',true);end $$;
 `;
-if(nr<=131||nr>=134)sql+=schema(129)+'\n';
-if(nr>=134)sql+=schema(130)+'\n';
+if(nr<=131||(nr>=134&&nr<137))sql+=schema(129)+'\n';
+if(nr>=134&&nr<137)sql+=schema(130)+'\n';
 if(nr===130||nr===131)sql+=schema(130)+'\n';
 if(nr===131)sql+=schema(131)+'\n';
-if(nr>=132)sql+=schema(132)+'\n';
-if(nr>=133)sql+=schema(133)+'\n';
+if(nr>=132&&nr<137)sql+=schema(132)+'\n';
+if(nr>=133&&nr<137)sql+=schema(133)+'\n';
 // Schema 134 ist live: alle Proben laufen mit dem Gegenprüfungsstand.
-if(nr>=134||nr<=130||nr===132||nr===133)sql+=schema(134)+'\n';
-if(nr!==131)sql+=schema(135)+'\n';
-if(nr!==131)sql+=schema(136)+'\n';
+if((nr>=134&&nr<137)||nr<=130||nr===132||nr===133)sql+=schema(134)+'\n';
+if(nr!==131&&nr<137)sql+=schema(135)+'\n';
+if(nr!==131&&nr<137)sql+=schema(136)+'\n';
+if(nr===137&&!process.env.AF_PROBE_LIVE)sql+=schema(137)+'\n';
 // Wegwerfkonten im Rollback: ausdrücklich keine bestehenden Konten ändern.
 for(const [u,name] of [[A,'A'],[B,'B'],[C,'C'],[W,'W']])sql+=`insert into auth.users(id,email,raw_user_meta_data) values('${u}','afprobe-${name}@example.invalid','{"name":"AF Probe ${name}","handle":"@afprobe${name}","geburtsdatum":"1990-01-01","land":"DE"}');update public.konto_alter set status='frei',geburtsdatum='1990-01-01' where user_id='${u}';`;
 sql+=`insert into public.konto_alter(user_id,status,geburtsdatum) values('${W}','wartet','2020-01-01') on conflict(user_id) do update set status='wartet',geburtsdatum='2020-01-01';`;
@@ -85,6 +86,18 @@ if(nr===136){
  sql+=als(A,`j:=public.meine_kontoanalysen();`+check('ohne_messwert_null_aufrufe',`(select (x->>'aufrufe')::int=0 from jsonb_array_elements(j->'zeitraeume'->0->'beitraege') x where x->>'id'='${Q}')`));
  sql+=owner(`insert into public.posts(id,user_id,kind,format,title,created_at) values('${id(90)}','${A}','clip','live','Livestream',now()-interval '125 seconds');`);
  sql+=als(A,`update public.posts set format='standard',title='Livestream-Aufzeichnung',duration='99:99' where id='${id(90)}';`+check('livestream_dauer_aus_start',`(select duration in ('02:05','02:06') from public.posts where id='${id(90)}')`));
+}
+if(nr===137){
+ const ohneMesswert = (fenster) => `(select (x->>'aufrufe')::int=0 and (x->>'reichweite')::int=0 from jsonb_array_elements(j->'zeitraeume'->${fenster}->'beitraege') x where x->>'id'='${Q}')`;
+ sql+=als(A,`j:=public.meine_kontoanalysen();`+check('ohne_messwert_7_tage',ohneMesswert(0))+check('ohne_messwert_30_tage',ohneMesswert(1)));
+ for(const [nummer,sekunden,dauer] of [[90,125,'02:05'],[91,6059,'100:59'],[92,-23,'00:00']]){
+  const stream=id(nummer);
+  sql+=owner(`insert into public.posts(id,user_id,kind,format,title,created_at) values('${stream}','${A}','clip','live','Livestream',now()-make_interval(secs=>${sekunden}));`);
+  sql+=als(A,`update public.posts set format='standard',title='Livestream-Aufzeichnung'${nummer===91?'':",duration='99:99'"} where id='${stream}';`+
+   check('livestream_ende_'+nummer,`(select duration='${dauer}' from public.posts where id='${stream}')`)+
+   `update public.posts set format='standard',duration='88:88' where id='${stream}';`+
+   check('livestream_wiederholung_'+nummer,`(select duration='${dauer}' from public.posts where id='${stream}')`));
+ }
 }
 if(nr===135){
  const st=`stories/${A}-s.jpg`;
@@ -150,7 +163,7 @@ if(process.env.AF_PROBE_SQL){fs.writeFileSync(process.env.AF_PROBE_SQL,sql);proc
  const ok=new Set(match[1].split('|'));for(const c of checks)console.log(`${ok.has(c)?'OK':'FEHL'} ${c}`);
  console.log(`Schema ${nr}: ${checks.filter(c=>ok.has(c)).length}/${checks.length}, verworfen`);
  // Unabhängige SELECT-Verbindung belegt das Rollback der Konten und Schemata.
- const table={129:'post_dislikes',130:'konto_sichtungen',131:'instants',132:'video_upload_belege',133:'video_upload_belege',134:'post_dislikes',135:'post_dislikes',136:'post_dislikes'}[nr];
+ const table={129:'post_dislikes',130:'konto_sichtungen',131:'instants',132:'video_upload_belege',133:'video_upload_belege',134:'post_dislikes',135:'post_dislikes',136:'post_dislikes',137:'posts'}[nr];
  const nach=await query(`select (select count(*) from auth.users where id='${A}') as konten,to_regclass('public.${table}') as tabelle`);
  // Seit 21.11. sind 129–133 live: nur noch die Wegwerfkonten zählen.
  const sauber=Array.isArray(nach)&&Number(nach[0]?.konten)===0;
