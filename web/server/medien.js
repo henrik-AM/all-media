@@ -417,6 +417,22 @@ async function signiereMitBunny(client,daten,sekunden) {
   }
   return ersetze(daten,karte);
 }
+// Nur die Moderationsroute ruft dies nach der Prüfung und dem Vermerk der Meldung auf.
+async function signiereMeldebeleg(client, adresse, sekunden) {
+  if (!MedienAdresse.gespeichert(adresse, Bunny.ORDNER_LESEN, eigeneBasis())) return null;
+  const pfad = Bunny.pfadPruefen(pfadAus(adresse), Bunny.ORDNER_LESEN);
+  if (!pfad || pfad.startsWith('instants/')) return null;
+  if (mitBunny()) {
+    const { data: anbieter, error } = await client.rpc('bunny_medium_anbieter', { p_pfad: pfad });
+    if (error && error.code !== 'PGRST202') return null;
+    if (anbieter === 'bunny') return Bunny.signierteAdresse(pfad, sekunden, { genauerAblauf: true });
+    if (!error && anbieter !== 'supabase') return null;
+  }
+  // Für Bestandsdateien prüft die Storage-Policy gemeldetes_medium mit der Moderationssitzung.
+  const { data, error } = await client.storage.from('media').createSignedUrl(pfad, sekunden);
+  return error ? null : data?.signedUrl || null;
+}
+
 async function unterschreiben(client,pfade) {
   if(!Array.isArray(pfade)||pfade.length>500)return {ok:false,error:'Ungültige Medienliste'};
   const gueltig=p=>!!Bunny.pfadPruefen(p,Bunny.ORDNER_LESEN)&&!p.startsWith('instants/');
@@ -538,4 +554,4 @@ async function instantsAufraeumen(client) {
   const {error:bestaetigung}=await client.rpc('instant_loeschbestaetigen',{p_ids:zeilen.map(z=>z.id).filter(Boolean)});
   if(bestaetigung)throw bestaetigung;return zeilen.length;
 }
-module.exports = { instantUnterschrift, instantsAufraeumen, mitBunny, hochladenDatei, unterschreiben, loeschen, signiereMedien, istMedienAdresse, istFremdeMedienAdresse, ohneFremdeMedien, pfadAus, hochladen, hochladenVideo };
+module.exports = { instantUnterschrift, instantsAufraeumen, mitBunny, hochladenDatei, unterschreiben, loeschen, signiereMedien, signiereMeldebeleg, istMedienAdresse, istFremdeMedienAdresse, ohneFremdeMedien, pfadAus, hochladen, hochladenVideo };

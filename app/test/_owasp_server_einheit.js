@@ -24,7 +24,7 @@ const importe = {
   'express-rate-limit': (optionen) => { bremsen.push(optionen); return (_req, _res, next) => next?.(); },
   './supabase-api': {},
   './sync-handlers': { fuerMenschen: () => neutraleMeldung },
-  './medien': { signiereMedien: async (_db, daten) => daten, mitBunny: () => false },
+  './medien': { signiereMedien: async (_db, daten) => daten, signiereMeldebeleg: (...args) => importe['./medien'].meldeSignatur(...args), mitBunny: () => false },
   './bunny': { konfigurationAus: () => ({ ok: false }) },
   './supabase': { supabaseUrl: 'https://example.invalid', supabaseKey: 'oeffentliche-attrappe', isConfigured: () => true },
   './version': { commit: 'attrappe' },
@@ -111,5 +111,56 @@ async function pruefe(name, fn) { await fn(); anzahl++; console.log('OK ' + name
     assert.equal(res.daten.ok, false);
     assert.equal(res.daten.error, neutraleMeldung);
   });
-  console.log(`${anzahl}/6 Regressionen bestanden`);
+  await pruefe('Follow, Speichern und Repost kommen nach bestätigtem Löschen als aus zurück', async () => {
+    const sync = require('../../web/server/sync-handlers');
+    for (const [methode, tabelle, ausgabe] of [
+      ['handleFollowUser', 'follows', 'folgt'],
+      ['handleSaveContent', 'saves', 'gespeichert'],
+      ['handleRepostContent', 'reposts', 'geteilt'],
+    ]) {
+      const aufrufe = [];
+      const db = { from(name) {
+        assert.equal(name, tabelle);
+        return {
+          select() { aufrufe.push('lesen'); return this; },
+          delete() { aufrufe.push('löschen'); return this; },
+          eq() { return this; },
+          then(resolve) { resolve({ count: 1, error: null }); },
+        };
+      } };
+      assert.deepEqual(await sync[methode](db, 'test', 'zweites-konto'), { ok: true, [ausgabe]: false });
+      assert.deepEqual(aufrufe, ['lesen', 'löschen']);
+    }
+  });
+  await pruefe('Moderation signiert nur nach Berichtprüfung und erfolgreichem Vermerk', async () => {
+    const aufrufe = [];
+    const synthetischerPfad = 'https://example.invalid/storage/v1/object/public/media/messages/test.jpg';
+    const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    let erlaubt = false, vermerkt = false;
+    importe['./sync-handlers'].handleModerationMedium = async (_db, _konto, meldung) => {
+      assert.equal(meldung, id);
+      aufrufe.push('Bericht');
+      return erlaubt ? { ok: true, adresse: synthetischerPfad, typ: 'bild' } : { ok: true, grund: 'nicht_erlaubt' };
+    };
+    importe['./sync-handlers'].handleMediumVermerken = async () => {
+      aufrufe.push('Protokoll');
+      return { ok: true, erledigt: vermerkt };
+    };
+    importe['./medien'].meldeSignatur = async (_db, adresse, sekunden) => {
+      assert.equal(adresse, synthetischerPfad);
+      assert.equal(sekunden, 300);
+      aufrufe.push('Signatur');
+      return 'https://test.b-cdn.net/messages/test.jpg?token=probe';
+    };
+    const aufruf = () => aufrufen('get', '/api/moderation/meldungen/:id/medium', {}, { params: { id } });
+    assert.equal((await aufruf()).daten.url, undefined);
+    assert.deepEqual(aufrufe.splice(0), ['Bericht']);
+    erlaubt = true;
+    assert.equal((await aufruf()).daten.url, undefined);
+    assert.deepEqual(aufrufe.splice(0), ['Bericht', 'Protokoll']);
+    vermerkt = true;
+    assert.ok((await aufruf()).daten.url);
+    assert.deepEqual(aufrufe, ['Bericht', 'Protokoll', 'Signatur']);
+  });
+  console.log(`${anzahl}/8 Regressionen bestanden`);
 })().catch((e) => { console.error(e); process.exitCode = 1; });

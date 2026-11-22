@@ -42,7 +42,7 @@ const Beitritt = require('../../gemeinsam/beitritt');
 // Kästen 28/10.2 und 16: Community und Unterthema erstellen, Einladung (Schema 99).
 const Erstellen = require('../../gemeinsam/erstellen');
 const syncHandlers = require('./sync-handlers');
-const { signiereMedien, hochladen, hochladenVideo } = require('./medien');
+const { signiereMedien, signiereMeldebeleg, hochladen, hochladenVideo } = require('./medien');
 const StoryRegeln = require('../../gemeinsam/story');
 // Medienadressen nur vom eigenen Projekt (Schema 118, Codex-Review 05.11.2026).
 const MedienAdresse = require('../../gemeinsam/medienadresse');
@@ -1858,9 +1858,8 @@ app.post('/api/moderation/meldungen/:id', route(async (req) => {
 /*
  * Gate 2, Fund 7: das gemeldete Foto/Video hinter einem Klick. Die Adresse
  * wird mit der Sitzung des Moderators unterschrieben und gilt nur fünf
- * Minuten; Supabase gibt sie nur heraus, wenn gemeldetes_medium() ja sagt
- * (offene Meldung, nie Kindesmissbrauch). Klappt das Unterschreiben nicht,
- * geht keine Adresse hinaus.
+ * Minuten. Prüfung und Protokollierung sind an die Meldung gebunden.
+ * Beim Supabase-Speicher greift zusätzlich gemeldetes_medium().
  */
 const MEDIUM_SEKUNDEN = 300;
 app.get('/api/moderation/meldungen/:id/medium', route(async (req) => {
@@ -1870,9 +1869,9 @@ app.get('/api/moderation/meldungen/:id/medium', route(async (req) => {
   // Erst ins Protokoll, dann die Adresse — ohne Eintrag keine Ansicht.
   const vermerk = await syncHandlers.handleMediumVermerken(req.db, req.nutzerId, req.params.id);
   if (!vermerk || vermerk.ok === false || !vermerk.erledigt) return { ok: true, grund: (vermerk && vermerk.grund) || 'medium' };
-  const signiert = await signiereMedien(req.db, { url: r.adresse }, MEDIUM_SEKUNDEN);
-  if (!signiert || !signiert.url || signiert.url === r.adresse) return { ok: true, grund: 'medium' };
-  return { ok: true, url: signiert.url, typ: r.typ, sekunden: MEDIUM_SEKUNDEN };
+  const url = await signiereMeldebeleg(req.db, r.adresse, MEDIUM_SEKUNDEN);
+  if (!url) return { ok: true, grund: 'medium' };
+  return { ok: true, url, typ: r.typ, sekunden: MEDIUM_SEKUNDEN };
 }));
 app.post('/api/moderation/meldungen/:id/nachsenden', route(async (req) => {
   if (!MELDE_ID.test(req.params.id)) return { ok: true, erledigt: false, grund: 'meldung' };
