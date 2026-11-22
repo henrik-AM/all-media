@@ -231,7 +231,7 @@ async function teilBC() {
       fetch('/api/hochladen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ordner: 'avatars', aufnahme }) }).then((r) => r.json()), bild);
     if (!hoch.ok) throw new Error('hochladen: ' + (hoch.error || JSON.stringify(hoch)));
     neueUrl = hoch.url;
-    neuerPfad = new URL(hoch.url).pathname.split('/media/').at(-1);
+    neuerPfad = new globalThis.URL(hoch.url).pathname.split('/media/').at(-1);
     const set = await page.evaluate((url) =>
       fetch('/api/eigene/profilbild', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }).then((r) => r.json()), hoch.url);
     if (!set.ok) throw new Error('profilbild: ' + (set.error || JSON.stringify(set)));
