@@ -5516,6 +5516,26 @@ textarea.profilseite__gross { min-height: 160px; }
 .erstellseite__fertig { background: #0A7CEB; color: #fff; border: 0; border-radius: 12px; min-width: 140px; padding: 12px 24px; font: inherit; font-size: 17px; cursor: pointer; }
 .erstellseite__fertig:disabled { opacity: .6; }
 
+/* Abstände und Größen des Unterthema-Frames 928:13446. Die Formularspalte scrollt bei wenig Platz. */
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__kopf { min-height: 78px; padding: 29px 25px 0; }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__inhalt { padding-inline: 18px; }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__pflicht { min-height: 20px; margin-bottom: 38px; padding-left: 14px; gap: 12px; }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__name { padding-left: 12px; }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__name input { height: 73px; padding-block: 0; }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__feld { min-height: 50px; padding-inline: 12px; }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__feld--abstand { margin-top: 43px; }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__schalter { min-height: 60px; margin: 45px -18px 0; padding: 8px 18px 8px 24px; }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__schalterSub { font-size: 11px; }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__einladen { margin-inline: 3px; padding: 4px 12px 4px 37px; }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__qrText { margin-left: 41px; }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__qr { margin-top: 46px; width: min(234px, 100%); height: auto; aspect-ratio: 1; }
+
+@media (max-height: 720px) {
+  .erstellseite[data-erstellseite="unterthema"] .erstellseite__kopf { min-height: 48px; padding-top: 10px; }
+  .erstellseite[data-erstellseite="unterthema"] .erstellseite__pflicht { margin-bottom: 16px; }
+}
+
+
 /* Kopierbestätigung darf den Fertig-Knopf der Erstellen-Seite nicht verdecken. */
 body:has(.erstellseite) .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .reel-position{position:absolute;bottom:4px;left:16px;right:16px;z-index:5;background:rgba(0,0,0,.6);color:white;padding:6px 10px;border-radius:8px;font-size:11px}.reel-position label{display:block}.reel-position output{float:right}.reel-position input{display:block;width:100%;accent-color:white;height:20px}

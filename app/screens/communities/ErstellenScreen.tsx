@@ -133,7 +133,7 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
 
       <ScrollView contentContainerStyle={styles.inhalt} keyboardShouldPersistTaps="handled">
         <View style={styles.pflichtZeile}>
-          <Text style={styles.stern}>✳</Text>
+          <Text style={styles.stern}>{'✳\uFE0E'}</Text>
           <Text style={styles.pflichtText}>{T.pflichtfeld}</Text>
         </View>
 
@@ -148,7 +148,7 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
             accessibilityLabel={istCommunity ? T.communityName : T.unterthemaName}
             testID="erstellen-name"
           />
-          <Text style={[styles.stern, styles.sternEcke]}>✳</Text>
+          <Text style={[styles.stern, styles.sternEcke]}>{'✳\uFE0E'}</Text>
         </View>
 
         {istCommunity && (
@@ -178,7 +178,7 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
                 <ActivityIndicator color={colors.white} />
               </View>
             )}
-            <Text style={[styles.stern, styles.sternEcke]}>✳</Text>
+            <Text style={[styles.stern, styles.sternEcke]}>{'✳\uFE0E'}</Text>
           </Druck>
         )}
 

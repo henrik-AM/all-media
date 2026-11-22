@@ -18829,11 +18829,11 @@ function openErstellenSeite(art, community) {
         <button class="erstellseite__zu" id="esZu" aria-label="${esc(T.schliessen)}">${ICONS.close}</button>
       </div>
       <div class="erstellseite__inhalt scroll">
-        <p class="erstellseite__pflicht"><span class="erstellseite__stern">✳</span> ${esc(T.pflichtfeld)}</p>
+        <p class="erstellseite__pflicht"><span class="erstellseite__stern">✳&#xFE0E;</span> ${esc(T.pflichtfeld)}</p>
         <label class="erstellseite__name">
           <input id="esName" maxlength="${Erstellen.NAME_MAX}" placeholder="${esc(istCommunity ? T.communityName : T.unterthemaName)}"
                  aria-label="${esc(istCommunity ? T.communityName : T.unterthemaName)}" autocomplete="off">
-          <span class="erstellseite__stern erstellseite__stern--ecke">✳</span>
+          <span class="erstellseite__stern erstellseite__stern--ecke">✳&#xFE0E;</span>
         </label>
         ${istCommunity ? `
         <label class="erstellseite__bild" id="esBild" aria-label="${esc(T.bild)}">
@@ -18841,7 +18841,7 @@ function openErstellenSeite(art, community) {
           <span class="erstellseite__bildLeer" id="esBildLeer">${ICONS.image}<span>${esc(T.bild)}</span></span>
           <img id="esBildVorschau" alt="" hidden>
           <span class="erstellseite__bildMarke" id="esBildMarke" hidden>${esc(T.bildAendern)}</span>
-          <span class="erstellseite__stern erstellseite__stern--ecke">✳</span>
+          <span class="erstellseite__stern erstellseite__stern--ecke">✳&#xFE0E;</span>
         </label>` : ''}
         <textarea id="esBio" class="erstellseite__feld erstellseite__feld--abstand" rows="1" maxlength="${Erstellen.BIO_MAX}"
                   placeholder="${esc(T.bio)}" aria-label="${esc(T.bio)}"></textarea>

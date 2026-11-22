@@ -74,7 +74,7 @@ async function figmaImages(nodes) {
 
   if (UNTERTHEMA) {
     execFileSync(process.execPath, [path.join(__dirname, 'k28-erstellen.js')], {
-      env: { ...process.env, BASE: BASIS, BILDER: OUT }, stdio: 'inherit',
+      env: { ...process.env, BASE: BASIS, BILDER: OUT, FIGMA_UNTERTHEMA: '1' }, stdio: 'inherit',
     });
     fs.copyFileSync(path.join(OUT, 'k28-10-unterthema-leer.png'), path.join(OUT, 'unterthema.app.png'));
     console.log('Vergleichsbilder: ' + OUT);

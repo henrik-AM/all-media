@@ -191,7 +191,8 @@ async function teilB() {
 
   const browser = await chromium.launch();
   try {
-    const kontext = await browser.newContext({ viewport: { width: 400, height: 860 } });
+    const viewport = process.env.FIGMA_UNTERTHEMA ? { width: 402, height: 1055 } : { width: 400, height: 860 };
+    const kontext = await browser.newContext({ viewport });
     await kontext.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE });
     const seite = await kontext.newPage();
     const seitenfehler = [];
@@ -321,7 +322,8 @@ async function teilB() {
     const utCode = ((await seite.getAttribute('#esQr', 'alt')).match(/einladung=([a-z2-9]+)/) || [])[1] || '';
     pruefe('10.2 eigener Einladungscode fürs Unterthema', E.istCode(utCode) && utCode !== code);
     if (process.env.BILDER) {
-      await seite.locator('#esQr').evaluate((img) => img.decode());
+      await seite.waitForFunction(() => document.querySelector('#esQr')?.naturalWidth > 0);
+      if (process.env.FIGMA_UNTERTHEMA) await seite.locator('#toast').waitFor({ state: 'hidden' });
       await seite.screenshot({ path: path.join(process.env.BILDER, 'k28-10-unterthema-leer.png'), animations: 'disabled' });
     }
     await seite.fill('#esName', 'Geheim');
