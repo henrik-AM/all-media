@@ -284,6 +284,13 @@ const LAEUFE = [
   ['einwilligung-einheit', '_einwilligung_einheit.js'],
   // Kasten 28 (Feedback 28.09.), eingehängt mit Paket 5 am 09.11.2026.
   // Ohne Supabase: Attrappe bzw. isolierte Renderer.
+  ['k28-profil', 'k28-profil.js'],
+  ['k28-suchen', 'k28-suchen.js'],
+  ['k28-profilseite', 'k28-profilseite.js'],
+  ['k28-chatblase', 'k28-chatblase.js'],
+  ['k28-kommentare', 'k28-kommentare.js'],
+  ['k28-anhaenge', 'k28-anhaenge.js'],
+  ['ortsuche-einheit', '_ortsuche_einheit.js'],
   ['k28-communitys', 'k28-communitys.js'],
   ['k28-kopf-offline', 'k28-kopf-offline.js'],
   ['k28-filter-offline', 'k28-filter-offline.js'],
