@@ -23,6 +23,7 @@
 
 // Das eigene Konto heißt in den Startdaten immer 'me' (supabase-api.js, ladeNutzer).
 const ICH = 'me';
+const { medienEgressSchuetzen } = require('./_medien_egressschutz');
 
 /** Eine Community in der Form, die bootstrapData liefert (supabase-api.js). */
 function community(id, name, felder = {}) {
@@ -104,6 +105,7 @@ function grundantwort(pfad, methode) {
  * Seite geschickt hätte.
  */
 async function attrappe(page, daten, antworten = {}) {
+  await medienEgressSchuetzen(page);
   const aufrufe = [];
   await page.route('**/api/**', (route) => {
     const anfrage = route.request();

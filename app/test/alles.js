@@ -218,6 +218,7 @@ const LAEUFE = [
   // CSS-Bildadressen, Token-Herkunft, Unterschriften je Nutzer — ohne Netz.
   ['paket8-einheit', '_paket8_einheit.js'],
   ['owasp-server', '_owasp_server_einheit.js'],
+  ['egress', '_egress_offline.js'],
   ['paket6-offline', '_paket6_offline.js'],
   ['paket6-opus', '_paket6_opus.cjs'],
   ['paket6-browser', '_paket6_browser_offline.cjs'],
