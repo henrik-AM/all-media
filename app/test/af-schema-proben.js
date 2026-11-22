@@ -26,17 +26,20 @@ create function pg_temp.pruefe(n text,b boolean) returns void language plpgsql a
  if b is not true then raise exception 'PRUEFFEHLER:%',n;end if;
  perform set_config('probe.erg',current_setting('probe.erg',true)||n||'|',true);end $$;
 `;
-if(nr<=131||(nr>=134&&nr<137))sql+=schema(129)+'\n';
-if(nr>=134&&nr<137)sql+=schema(130)+'\n';
-if(nr===130||nr===131)sql+=schema(130)+'\n';
-if(nr===131)sql+=schema(131)+'\n';
-if(nr>=132&&nr<137)sql+=schema(132)+'\n';
-if(nr>=133&&nr<137)sql+=schema(133)+'\n';
-// Schema 134 ist live: alle Proben laufen mit dem Gegenprüfungsstand.
-if((nr>=134&&nr<137)||nr<=130||nr===132||nr===133)sql+=schema(134)+'\n';
-if(nr!==131&&nr<137)sql+=schema(135)+'\n';
-if(nr!==131&&nr<137)sql+=schema(136)+'\n';
-if(nr===137&&!process.env.AF_PROBE_LIVE)sql+=schema(137)+'\n';
+if(nr===137){
+ if(!process.env.AF_PROBE_LIVE)sql+=schema(137)+'\n';
+}else{
+ if(nr<=131||nr>=134)sql+=schema(129)+'\n';
+ if(nr>=134)sql+=schema(130)+'\n';
+ if(nr===130||nr===131)sql+=schema(130)+'\n';
+ if(nr===131)sql+=schema(131)+'\n';
+ if(nr>=132)sql+=schema(132)+'\n';
+ if(nr>=133)sql+=schema(133)+'\n';
+ // Schema 134 ist live: alle Proben laufen mit dem Gegenprüfungsstand.
+ if(nr>=134||nr<=130||nr===132||nr===133)sql+=schema(134)+'\n';
+ if(nr!==131)sql+=schema(135)+'\n';
+ if(nr!==131)sql+=schema(136)+'\n';
+}
 // Wegwerfkonten im Rollback: ausdrücklich keine bestehenden Konten ändern.
 for(const [u,name] of [[A,'A'],[B,'B'],[C,'C'],[W,'W']])sql+=`insert into auth.users(id,email,raw_user_meta_data) values('${u}','afprobe-${name}@example.invalid','{"name":"AF Probe ${name}","handle":"@afprobe${name}","geburtsdatum":"1990-01-01","land":"DE"}');update public.konto_alter set status='frei',geburtsdatum='1990-01-01' where user_id='${u}';`;
 sql+=`insert into public.konto_alter(user_id,status,geburtsdatum) values('${W}','wartet','2020-01-01') on conflict(user_id) do update set status='wartet',geburtsdatum='2020-01-01';`;
