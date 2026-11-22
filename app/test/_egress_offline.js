@@ -17,6 +17,7 @@ function web({ sparen = false } = {}) {
   const videos = Array.from({ length: 8 }, (_, i) => ({
     dataset: { quelle: `https://example.invalid/${i}.mp4` }, quelle: null,
     paused: true, geladen: 0, events: {},
+    closest() { return null; },
     hasAttribute() { return this.quelle !== null; },
     set src(v) { this.quelle = v; },
     removeAttribute() { this.quelle = null; },
@@ -145,10 +146,10 @@ function flaeche(element) {
 }
 for (const [name, optionen, props, erwartet] of [
   ['Start', {}, {}, 0],
-  ['Wischen', { zustaende: { 5: '4' } }, {}, 4],
-  ['Profilziel', { zustaende: { 5: '0' } }, { startBei: '6' }, 6],
+  ['Wischen', { zustaende: { 6: '4' } }, {}, 4],
+  ['Profilziel', { zustaende: { 6: '0' } }, { startBei: '6' }, 6],
   ['Datensparen', { sparen: true }, {}, -1],
-  ['Hintergrund', { zustaende: { 8: false } }, {}, -1],
+  ['Hintergrund', { zustaende: { 10: false } }, {}, -1],
 ]) test(`App-Feed: ${name}, höchstens eine Quelle bei acht Reels`, () => {
   const a = appLaden('app/screens/video/VideoFeedScreen.tsx', optionen);
   const baum = a.exports.VideoFeedScreen(props);
@@ -174,6 +175,32 @@ test('Prüfbrowser: Schutz wird nur einmal registriert', async () => {
   await medienEgressSchuetzen(ziel);
   await medienEgressSchuetzen(ziel);
   assert.equal(anzahl, 1);
+});
+test('Prüfbrowser: Bunny-Zonen und konfigurierter CDN-Host fallen unter die Sperre', () => {
+  const vorher = process.env.BUNNY_PULL_HOST;
+  try {
+    process.env.BUNNY_PULL_HOST = 'https://medien.example.invalid';
+    assert.equal(cloudMedium('https://zone.b-cdn.net/avatars/a.jpg?token=x'), true);
+    assert.equal(cloudMedium('https://zone.b-cdn.net./bild.jpg'), true);
+    assert.equal(cloudMedium('https://medien.example.invalid/film.mp4'), true);
+    assert.equal(cloudMedium('https://zone.b-cdn.net.fremd.invalid/bild.jpg'), false);
+    assert.equal(cloudMedium('https://medien.example.invalid.fremd.invalid/film.mp4'), false);
+  } finally {
+    if (vorher === undefined) delete process.env.BUNNY_PULL_HOST;
+    else process.env.BUNNY_PULL_HOST = vorher;
+  }
+});
+test('Prüfbrowser: Bunny-Ersatz gibt es nur für Beispiele und frische Uploads', () => {
+  const { festesBeispiel, eigenerUploadDiesesLaufs } = require('./_medien_egressschutz');
+  const basis = 'https://zone.b-cdn.net';
+  const signatur = '?token=HS256-beispiel-token&expires=1795370000';
+  const bild = '/avatars/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa-1795369999999-' + 'a'.repeat(32) + '.jpg';
+  assert.equal(festesBeispiel(basis + '/beispiel/reel-01.mp4' + signatur), 'video');
+  assert.equal(festesBeispiel(basis + '/beispiel/reel-01.mp4'), null);
+  assert.equal(festesBeispiel(basis + '/stories/reel-01.mp4' + signatur), null);
+  assert.equal(eigenerUploadDiesesLaufs(basis + bild + signatur, 1795369999998), 'bild');
+  assert.equal(eigenerUploadDiesesLaufs(basis + bild + signatur, 1795370000000), null);
+  assert.equal(eigenerUploadDiesesLaufs(basis + bild, 1795369999998), null);
 });
 test('Prüfbrowser: _konto schützt neue Seiten und Kontexte, Service Worker bleiben aus', async () => {
   const registriert = [];
