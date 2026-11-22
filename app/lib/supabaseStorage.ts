@@ -91,7 +91,6 @@ async function sendeVideodatei(
   const gesamt = datei.size;
   const auftrag = datei.createUploadTask(url, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': typ },
-    mimeType: typ,
     sessionType: 'foreground',
     signal,
   });
@@ -194,8 +193,9 @@ export async function ladeHoch(
     // Sichtbar machen, nicht verschlucken: genau das Verschweigen hat
     // verborgen, dass nie etwas ankam.
     // Gewollter Abbruch ist kein Fehler (sonst roter Entwicklerhinweis).
-    if (fehler?.name !== 'AbortError' && fehler?.message !== 'Hochladen abgebrochen.') console.error('Upload fehlgeschlagen:', fehler?.message ?? fehler);
-    const text = fehler?.message ?? 'Die Aufnahme ließ sich nicht speichern';
+    const abgebrochen = fehler?.name === 'AbortError' || fehler?.message === 'Hochladen abgebrochen.';
+    if (!abgebrochen) console.error('Upload fehlgeschlagen:', fehler?.message ?? fehler);
+    const text = abgebrochen ? 'Hochladen abgebrochen.' : fehler?.message ?? 'Die Aufnahme ließ sich nicht speichern';
     const error = /fetch failed|failed to fetch|network (request|connection)|load failed/i.test(text)
       ? 'Die Aufnahme ließ sich nicht speichern. Bitte erneut versuchen.' : text;
     return { success: false, error, url: null, anzeige: null };

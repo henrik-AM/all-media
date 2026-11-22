@@ -79,7 +79,7 @@ test('Abbruch und Fehler lassen den nächsten nativen Upload zu', async () => {
   const bereit = Promise.withResolvers();
   const app = appUpload([
     (melden, signal) => new Promise((_, reject) => {
-      signal.addEventListener('abort', () => reject(Object.assign(Error('Hochladen abgebrochen.'), {name:'AbortError'})), {once:true});
+      signal.addEventListener('abort', () => reject(Object.assign(Error('The operation was aborted.'), {name:'AbortError'})), {once:true});
       melden({ bytesSent: 310 });
       bereit.resolve();
     }),
