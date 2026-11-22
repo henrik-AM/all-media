@@ -14,11 +14,14 @@
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright-core');
-const { schliesse } = require('./_konto');
+const { execFileSync } = require('node:child_process');
+const BASIS = (process.env.ZIEL || 'http://localhost:3000').replace(/\/$/, '');
 
 const FILE_KEY = 'URfbZmKwzfiHIPt5qtF95u';
 const TOKEN = process.env.FIGMA_TOKEN;
-const OUT = process.argv[2] || path.join(__dirname, '..', '..', '.compare');
+const args = process.argv.slice(2);
+const UNTERTHEMA = args.includes('--unterthema');
+const OUT = path.resolve(args.find((arg) => !arg.startsWith('--')) || path.join(__dirname, '..', '..', '.compare'));
 
 // Prototyp-Frame  ->  Weg durch die App
 const SCREENS = [
@@ -42,7 +45,7 @@ async function figmaImages(nodes) {
   const url = `https://api.figma.com/v1/images/${FILE_KEY}?ids=${nodes.join(',')}&format=png&scale=1`;
   const res = await fetch(url, { headers: { 'X-Figma-Token': TOKEN } });
   const body = await res.json();
-  if (body.err) throw new Error('Figma: ' + body.err);
+  if (!res.ok || body.err) throw new Error('Figma-Bildexport HTTP ' + res.status + ': ' + (body.err || body.message || res.statusText));
   return body.images;
 }
 
@@ -54,21 +57,35 @@ async function figmaImages(nodes) {
 
   fs.mkdirSync(OUT, { recursive: true });
 
-  const images = await figmaImages(SCREENS.map((s) => s.node));
-  for (const screen of SCREENS) {
-    const link = images[screen.node];
+  const screens = UNTERTHEMA ? [{ name: 'unterthema', node: '928:13446' }] : SCREENS;
+  const images = await figmaImages(screens.map((s) => s.node));
+  for (const screen of screens) {
+    const link = images?.[screen.node];
     if (!link) {
+      if (UNTERTHEMA) throw new Error('Kein Figma-Bild für Frame 928:13446');
       console.log('kein Bild fuer', screen.name);
       continue;
     }
-    const png = Buffer.from(await (await fetch(link)).arrayBuffer());
+    const antwort = await fetch(link);
+    if (!antwort.ok) throw new Error('Figma-Bilddownload HTTP ' + antwort.status);
+    const png = Buffer.from(await antwort.arrayBuffer());
     fs.writeFileSync(path.join(OUT, `${screen.name}.figma.png`), png);
   }
 
+  if (UNTERTHEMA) {
+    execFileSync(process.execPath, [path.join(__dirname, 'k28-erstellen.js')], {
+      env: { ...process.env, BASE: BASIS, BILDER: OUT }, stdio: 'inherit',
+    });
+    fs.copyFileSync(path.join(OUT, 'k28-10-unterthema-leer.png'), path.join(OUT, 'unterthema.app.png'));
+    console.log('Vergleichsbilder: ' + OUT);
+    return;
+  }
+
+  const { schliesse } = require('./_konto');
   const browser = await chromium.launch({ channel: 'chromium-headless-shell' });
   const page = await browser.newPage({ viewport: { width: 400, height: 860 } });
-  await page.request.post('http://localhost:3000/api/reset');
-  await page.goto('http://localhost:3000', { waitUntil: 'load' });
+  await page.request.post(BASIS + '/api/reset');
+  await page.goto(BASIS, { waitUntil: 'load' });
   await page.waitForTimeout(500);
 
   for (const screen of SCREENS) {
@@ -84,4 +101,7 @@ async function figmaImages(nodes) {
 
   await schliesse(browser);
   console.log('\nBilder liegen in ' + OUT);
-})();
+})().catch((fehler) => {
+  console.error(fehler.message);
+  process.exitCode = 1;
+});

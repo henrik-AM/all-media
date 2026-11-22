@@ -225,14 +225,16 @@ async function teilBC() {
 
   const bild = 'data:image/png;base64,' + fs.readFileSync(path.join(__dirname, '_testbild.png')).toString('base64');
   let neueUrl = null;
+  let neuerPfad = null;
   await pruefeAsync('1.2 Bild hochladen und als Profilbild setzen (dieselben Wege wie das Blatt)', async () => {
     const hoch = await page.evaluate((aufnahme) =>
       fetch('/api/hochladen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ordner: 'avatars', aufnahme }) }).then((r) => r.json()), bild);
     if (!hoch.ok) throw new Error('hochladen: ' + (hoch.error || JSON.stringify(hoch)));
+    neueUrl = hoch.url;
+    neuerPfad = new URL(hoch.url).pathname.split('/media/').at(-1);
     const set = await page.evaluate((url) =>
       fetch('/api/eigene/profilbild', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }).then((r) => r.json()), hoch.url);
     if (!set.ok) throw new Error('profilbild: ' + (set.error || JSON.stringify(set)));
-    neueUrl = hoch.url;
   });
   await pruefeAsync('1.2 Nach Neuladen steht das Bild im Communitys-Profil', async () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -254,6 +256,16 @@ async function teilBC() {
     if (anderer && meineId) {
       const { data } = await anderer.from('profiles').select('avatar_url').eq('id', meineId).maybeSingle();
       pruefe('Aufräumen: voriges Profilbild wiederhergestellt', (data?.avatar_url ?? null) === vorher, `steht: ${data?.avatar_url}`);
+    }
+    if (neuerPfad?.startsWith('avatars/' + meineId + '-')) {
+      await pruefeAsync('Aufräumen: eigener Upload gelöscht', async () => {
+        const weg = await page.evaluate((pfad) =>
+          fetch('/api/medien/loeschen', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pfad }) }).then((r) => r.json()), neuerPfad);
+        if (!weg.ok) throw new Error('Upload blieb registriert');
+      });
+    } else {
+      pruefe('Aufräumen: eigener Upload gelöscht', false, 'Eigener Pfad konnte nicht bestätigt werden');
     }
   }
 

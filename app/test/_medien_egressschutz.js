@@ -5,7 +5,7 @@
  * Lokale Medien über localhost/Loopback sind weiterhin erlaubt.
  * Keine Antworten aus einem Cache: Rechteprüfungen dürfen nie durch eine
  * früher gültige Unterschrift oder ein anderes Konto umgangen werden.
- * Schützt Browser-Medien, NICHT Node, Server, Simulator oder die Organisationsquote.
+ * Schützt Browser-Medien von Supabase und Bunny. Node, Server und Simulator haben eigene Grenzen.
  *
  * Ausnahme feste Beispielmedien (06.11.2026): Die Starter-Storys (Schema 45)
  * zeigen auf `…/object/public/media/beispiel/story-*.jpg`. Seit dem Umzug
@@ -41,12 +41,22 @@ const net = require('node:net');
 let gesperrt = false;
 process.on('exit', () => { if (gesperrt) process.exitCode = 2; });
 
+function bunnyHost(host) {
+  const normalisiert = host.toLowerCase().replace(/\.$/, '');
+  const pullHost = process.env.BUNNY_PULL_HOST?.trim();
+  const konfiguriert = pullHost && URL.parse(
+    pullHost.includes('://') ? pullHost : `https://${pullHost}`
+  )?.hostname.toLowerCase().replace(/\.$/, '');
+  return normalisiert.endsWith('.b-cdn.net') || normalisiert === konfiguriert;
+}
+
 function cloudMedium(adresse) {
   const url = new URL(adresse);
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
   const lokal = host === 'localhost' || host === '::1' ||
     (net.isIP(host) === 4 && host.startsWith('127.'));
-  return !lokal && /^\/storage\/v1\/(?:object|render\/image)(?:\/|$)/.test(url.pathname);
+  return !lokal && (bunnyHost(host) ||
+    /^\/storage\/v1\/(?:object|render\/image)(?:\/|$)/.test(url.pathname));
 }
 
 // Kleinstes gültiges PNG (1×1, grau) als lokales Ersatzbild.
@@ -63,11 +73,20 @@ function ersatzvideoName(datei) {
   return 'quer-60.mp4';
 }
 
-/** Unsignierte Adresse eines festen Beispielmediums (Schema 43/45)? 'bild', 'video' oder null. */
+function bunnySigniert(url) {
+  return bunnyHost(url.hostname) && !url.hash && url.searchParams.size === 2 &&
+    /^HS256-[A-Za-z0-9_-]+$/.test(url.searchParams.get('token') || '') &&
+    /^\d+$/.test(url.searchParams.get('expires') || '');
+}
+
+/** Festes Beispielmedium (Schema 43/45), mit lokalem Ersatz. */
 function festesBeispiel(adresse) {
   const url = new URL(adresse);
-  if (url.search || url.hash) return null;
-  const treffer = /^\/storage\/v1\/object\/public\/media\/beispiel\/[A-Za-z0-9_-]+\.(jpe?g|png|webp|mp4)$/i.exec(url.pathname);
+  const prefix = '/storage/v1/object/public/media';
+  const pfad = bunnySigniert(url) ? url.pathname
+    : !url.search && !url.hash && url.pathname.startsWith(prefix + '/') && url.pathname.slice(prefix.length);
+  if (!pfad) return null;
+  const treffer = /^\/beispiel\/[A-Za-z0-9_-]+\.(jpe?g|png|webp|mp4)$/i.exec(pfad);
   if (!treffer) return null;
   return treffer[1].toLowerCase() === 'mp4' ? 'video' : 'bild';
 }
@@ -77,7 +96,11 @@ const LAUFSTART = Date.now() - 60 * 1000; // eine Minute Spiel für Uhrabweichun
 /** Vom laufenden Prüflauf selbst hochgeladene Datei? 'bild', 'video' oder null. */
 function eigenerUploadDiesesLaufs(adresse, ab = LAUFSTART) {
   const url = new URL(adresse);
-  const treffer = /^\/storage\/v1\/object\/(?:sign|public)\/media\/(?:messages|stories|avatars|posts|insights)\/[0-9a-f-]{36}-(\d{13})-[a-z0-9]{4,12}\.(jpe?g|png|webp|mp4|mov|webm)$/i.exec(url.pathname);
+  const pfad = bunnySigniert(url)
+    ? url.pathname
+    : /^\/storage\/v1\/object\/(?:sign|public)\/media(\/.*)$/.exec(url.pathname)?.[1];
+  if (!pfad) return null;
+  const treffer = /^\/(?:messages|stories|avatars|posts|insights)\/[0-9a-f-]{36}-(\d{13})-(?:[a-z0-9]{4,12}|[a-f0-9]{32})\.(jpe?g|png|webp|mp4|mov|webm)$/i.exec(pfad);
   if (!treffer || Number(treffer[1]) < ab) return null;
   return /^(mp4|mov|webm)$/i.test(treffer[2]) ? 'video' : 'bild';
 }
@@ -127,7 +150,7 @@ async function medienEgressSchuetzen(ziel) {
     process.exitCode = 2;
     if (!gesperrt) console.error('ABBRUCH: Cloud-Medium im Prüflauf gesperrt; lokale Testmedien verwenden.');
     // Pfad ohne Unterschrift/Abfrage nennen, damit die Quelle auffindbar ist.
-    if (adresse) console.error('  gesperrt: ' + new URL(adresse).pathname);
+    if (adresse) console.error('  gesperrt: ' + new URL(adresse).pathname.replace(/^\/bcdn_token=[^/]*/, ''));
     gesperrt = true;
     await route.abort('blockedbyclient');
   });

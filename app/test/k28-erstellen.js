@@ -320,6 +320,10 @@ async function teilB() {
     pruefe('10.2 kein Bild, keine Unterthemen beim Unterthema', !(await seite.$('#esBild')) && !(await seite.$('#esUnterthemaNeu')));
     const utCode = ((await seite.getAttribute('#esQr', 'alt')).match(/einladung=([a-z2-9]+)/) || [])[1] || '';
     pruefe('10.2 eigener Einladungscode fürs Unterthema', E.istCode(utCode) && utCode !== code);
+    if (process.env.BILDER) {
+      await seite.locator('#esQr').evaluate((img) => img.decode());
+      await seite.screenshot({ path: path.join(process.env.BILDER, 'k28-10-unterthema-leer.png'), animations: 'disabled' });
+    }
     await seite.fill('#esName', 'Geheim');
     await seite.fill('#esBio', 'Nur für Eingeladene');
     await seite.click('label.erstellseite__schalter');

@@ -300,14 +300,20 @@ function avatarOf(chat, size = 54, messenger = istMessengerChat(chat)) {
 /*
  * Ein Personen-Avatar: Profilbild aus der Datenbank, sonst Initialen auf
  * Farbe (Kasten 12.5). Das Bild liegt unter den Initialen nicht darunter,
- * sondern statt ihrer — ein kaputtes Bild blendet sich per onerror aus und
+ * sondern statt ihrer — ein kaputtes Bild blendet sich bei einem Ladefehler aus und
  * gibt die Initialen frei. Gleiche Regel in app/components/Avatar.tsx.
  */
+document.addEventListener('error', (e) => {
+  if (e.target instanceof HTMLImageElement && e.target.hasAttribute('data-bei-bildfehler-entfernen')) {
+    e.target.remove();
+  }
+}, true);
+
 function personenAvatar(u, size, extra = '') {
   const klassen = `avatar avatar--${size}${extra ? ' ' + extra : ''}`;
   const bild = u?.avatar;
   return `<div class="${klassen}" style="background:${farbe(u?.color)}">${esc(u?.initials || '')}${
-    bild ? `<img src="${esc(bild)}" alt="" onerror="this.remove()" />` : ''
+    bild ? `<img src="${esc(bild)}" alt="" data-bei-bildfehler-entfernen />` : ''
   }</div>`;
 }
 
@@ -3010,7 +3016,7 @@ function storyItem(storys, wo = 'messenger') {
   const kern = standbild
     ? `<div class="story__inner" style="background-image:${bildUrl(standbild)};background-size:cover;background-position:center"></div>`
     : `<div class="story__inner" style="background:${farbe(u.color)}">${esc(u.initials)}${
-        profilbild ? `<img class="story__profilbild" src="${esc(profilbild)}" alt="" onerror="this.remove()" />` : ''
+        profilbild ? `<img class="story__profilbild" src="${esc(profilbild)}" alt="" data-bei-bildfehler-entfernen />` : ''
       }</div>`;
 
   // Der dritte Zustand: keine Story, kein Ring. Es gibt ihn nur bei der
@@ -4514,7 +4520,7 @@ function openCall(ziel, art, ort = {}) {
                   .map((id) => avatarForUser(id, 52, state.area === 'messenger'))
                   .join('')}</div>`
               : `<div class="anruf__avatar" style="background:${farbe(u.color)}">${u.initials ? esc(u.initials) : gruppe ? ICONS.people : ''}${
-                  anrufBild ? `<img class="anruf__bild" src="${esc(anrufBild)}" alt="" onerror="this.remove()" />` : ''
+                  anrufBild ? `<img class="anruf__bild" src="${esc(anrufBild)}" alt="" data-bei-bildfehler-entfernen />` : ''
                 }</div>`
           }
           <div class="anruf__name">${esc(u.name)}</div>
