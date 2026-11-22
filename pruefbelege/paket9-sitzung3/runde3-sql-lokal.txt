@@ -1,0 +1,9 @@
+Analysen: 7 und 30 Tage, Nullwerte und Kontrollmessung 8/8
+Dauer 3 02:05 erwartet 02:05
+Dauer 4 100:59 erwartet 100:59
+Dauer 5 00:00 erwartet 00:00
+Dauer 6 00:30 erwartet 00:30
+Dauer 3 02:05 erwartet 02:05
+Dauer 4 100:59 erwartet 100:59
+Dauer 5 00:00 erwartet 00:00
+Dauer 6 00:30 erwartet 00:30
