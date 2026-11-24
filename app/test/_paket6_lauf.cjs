@@ -12,7 +12,8 @@ process.env.ZIEL='http://127.0.0.1:3300';
 process.env.NODE_OPTIONS='--require='+path.join(__dirname,'_bunny_port3300.cjs');
 async function sauber(){
  const {frage}=require('./_aufraeumen');
- const filter="actor_id in (select id from auth.users where email in ('test@all-media.app','all.media.prueflauf@web.de')) or user_id in (select id from auth.users where email in ('test@all-media.app','all.media.prueflauf@web.de'))";
+ const KP=require('./_kontenpool').konten(),PAAR=`'${KP.partner}','${KP.pruef}'`; // Schema 138
+ const filter=`actor_id in (select id from auth.users where email in (${PAAR})) or user_id in (select id from auth.users where email in (${PAAR}))`;
  const x=await frage(`with weg as (delete from notifications where ${filter} returning 1) select count(*) as geloescht from weg`);
  const y=await frage(`select count(*) as anzahl from notifications where ${filter}`);
  console.log('Beide erlaubten Testkonten: Mitteilungen entfernt',x?.[0]?.geloescht,'Rest',y?.[0]?.anzahl);

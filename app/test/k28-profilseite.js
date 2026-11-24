@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Feedback 28.09.2026, Kasten 1.3 — Nachtrag 10.10.2026, Agent „Profilseite“.
  *
@@ -164,7 +165,7 @@ async function teilBC() {
       if (an.error) throw an.error;
       meineId = an.data.user.id;
       anderer = createClient(URL, KEY);
-      const zwei = await anderer.auth.signInWithPassword({ email: 'test@all-media.app', password: TESTKONTO_PASS });
+      const zwei = await anderer.auth.signInWithPassword({ email: KONTENPOOL.partner, password: TESTKONTO_PASS });
       if (zwei.error) throw zwei.error;
       const { data: h } = await anderer.from('profiles').select('handle').eq('id', zwei.data.user.id).maybeSingle();
       fremderHandle = h?.handle || null;

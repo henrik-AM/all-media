@@ -17,14 +17,22 @@
  * Ein neues Testkonto kommt in BEIDE.
  */
 
-const TESTKONTEN = ['test@all-media.app', 'all.media.prueflauf@web.de'];
+const TESTKONTEN = ['test@all-media.app', 'all.media.prueflauf@web.de',
+  // Kontenpool, Schema 138 (24.11.2026)
+  'prueflauf2@all-media.app', 'test2@all-media.app',
+  'prueflauf3@all-media.app', 'test3@all-media.app',
+  'prueflauf4@all-media.app', 'test4@all-media.app'];
+
+// Fast jeder Lauf bildet seine Adresse aus AM_TEST_MAIL, gleich nach dem
+// Laden dieser Datei. Darum setzt der Kontenpool die Umgebung schon hier.
+require('./_kontenpool').platzSetzen();
 
 /** Gibt die Adresse zurück — oder bricht den Lauf ab, wenn sie keinem Testkonto gehört. */
 function nurTestkonto(mail) {
   const m = String(mail || '').trim().toLowerCase();
   if (!TESTKONTEN.includes(m)) {
     console.error(
-      `\nABBRUCH  „${mail}" ist keines der beiden Testkonten (${TESTKONTEN.join(', ')}).\n` +
+      `\nABBRUCH  „${mail}" ist keines der Testkonten (${TESTKONTEN.join(', ')}).\n` +
         '         Prüfläufe und Werkzeuge schreiben nur dort. Echte Konten fasst nur Henrik an.\n'
     );
     process.exit(2);

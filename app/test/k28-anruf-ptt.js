@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Feedback 28.09.2026, Kästen 5 und 8 — Agent „Anruf + PTT".
  *
@@ -174,8 +175,8 @@ async function teilB() {
   };
 
   console.log('\nB  Wirkung mit zwei Konten (setzt Schema 89 + 90 voraus)');
-  const A = await konto('test@all-media.app', TESTKONTO_PASS);
-  const B = await konto('all.media.prueflauf@web.de', PRUEFKONTO_PASS);
+  const A = await konto(KONTENPOOL.partner, TESTKONTO_PASS);
+  const B = await konto(KONTENPOOL.pruef, PRUEFKONTO_PASS);
   // Zweierchat + Kontakt des Testpaars sichern (fehlten am 06.11.2026 im
   // Testbestand) — sonst fällt der Messenger-Teil von 5.x stumm aus.
   const Testpaar = require('./_testpaar');

@@ -1,3 +1,4 @@
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 // Prueft den Teilen-Dialog (Feedback 21.09.2026, Kasten 4).
 //
 // Henrik: oben eine Suchleiste — Kontakte, Communitys, gefolgte Profile und
@@ -34,7 +35,7 @@ const wert = (name) => (UMGEBUNG.match(new RegExp('^' + name + '=(.*)$', 'm')) |
 const SB_URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const SB_KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
-const FREMDER = { email: 'test@all-media.app', passwort: TESTKONTO_PASS, handle: '@test' };
+const FREMDER = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS, handle: KONTENPOOL.partnerHandle };
 const PRUEFER = {
   email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   passwort: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,
@@ -167,7 +168,7 @@ async function abraeumen(a, b) {
     if (koepfe.includes('Weitere Vorschläge')) throw new Error('alle Profile stehen wieder drin');
     const liste = await namen();
     if (!liste.includes('Anna Schmidt')) throw new Error(liste.join(' | '));
-    if (liste.includes('Test Nutzer')) throw new Error('Fremder steht ohne Suche in der Liste');
+    if (liste.includes(KONTENPOOL.partnerName)) throw new Error('Fremder steht ohne Suche in der Liste');
   });
 
   await pruefe('Ohne Auswahl ist Senden aus', async () => {
@@ -198,13 +199,13 @@ async function abraeumen(a, b) {
     await tippen('tes');
     await page.waitForTimeout(800);
     const liste = await namen();
-    if (liste.includes('Test Nutzer')) throw new Error('@test über "tes" gefunden');
+    if (liste.includes(KONTENPOOL.partnerName)) throw new Error('@test über "tes" gefunden');
   });
 
   await pruefe('Der genaue Nutzername findet den Fremden', async () => {
-    await tippen('@test');
+    await tippen(KONTENPOOL.partnerHandle);
     await page.waitForFunction(
-      () => [...document.querySelectorAll('.teilen__name')].some((e) => e.textContent === 'Test Nutzer'),
+      () => [...document.querySelectorAll('.teilen__name')].some((e) => e.textContent === KONTENPOOL.partnerName),
       null, { timeout: 8000 }
     );
     const kopf = await page.$$eval('.teilen__kopf', (els) => els.map((e) => e.textContent));
@@ -399,7 +400,7 @@ async function abraeumen(a, b) {
     await page.waitForSelector('.teilen', { timeout: 8000 });
     const titel = await page.$eval('.sheet__titel-mitte', (e) => e.textContent);
     if (titel !== 'Video teilen') throw new Error(titel);
-    await tippen('@test');
+    await tippen(KONTENPOOL.partnerHandle);
     await page.waitForSelector(`[data-teilen="${fremder.id}"]`, { timeout: 8000 });
     await page.click(`[data-teilen="${fremder.id}"]`);
     await page.click('#teilenSenden');
@@ -429,7 +430,7 @@ async function abraeumen(a, b) {
     await page.waitForSelector('[data-clipact="share"]', { timeout: 10000 });
     await page.click('[data-clipact="share"]');
     await page.waitForSelector('.teilen', { timeout: 8000 });
-    await tippen('@test');
+    await tippen(KONTENPOOL.partnerHandle);
     const kachel = `[data-teilen="${fremder.id}"]`;
     await page.waitForSelector(kachel, { timeout: 8000 });
     const zustand = await page.$eval(kachel, (b) => ({

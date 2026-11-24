@@ -1,3 +1,4 @@
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Storys: Ziel, mehrere hintereinander, Bearbeitung, Markieren — Kasten 11.
  *
@@ -41,7 +42,7 @@ const wert = (name) => (UMGEBUNG.match(new RegExp('^' + name + '=(.*)$', 'm')) |
 const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
-const EIGNER = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
+const EIGNER = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
 const FREMDER = {
   email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   passwort: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,
@@ -223,7 +224,7 @@ async function anmelden(zugang) {
     // a) Wer niemanden markieren lässt, steht nicht in der Liste und lässt sich nicht markieren.
     await fremder.client.from('visibility_settings')
       .upsert({ user_id: fremder.id, bereich: 'markierung', stufe: 'niemand' }, { onConflict: 'user_id,bereich' });
-    const { data: listeNiemand, error: fListe } = await eigner.client.rpc('story_markierbar', { suche: 'prueflauf' });
+    const { data: listeNiemand, error: fListe } = await eigner.client.rpc('story_markierbar', { suche: KONTENPOOL.pruefHandle.slice(1) });
     if (fListe) throw fListe;
     pruefe('„Niemand darf mich markieren": nicht in der Auswahlliste',
       !(listeNiemand || []).some((p) => p.id === fremder.id), `${(listeNiemand || []).length} Treffer`);
@@ -235,7 +236,7 @@ async function anmelden(zugang) {
     // b) Mit Erlaubnis: in der Liste, markierbar, Mitteilung kommt an.
     await fremder.client.from('visibility_settings')
       .upsert({ user_id: fremder.id, bereich: 'markierung', stufe: 'alle' }, { onConflict: 'user_id,bereich' });
-    const { data: listeAlle } = await eigner.client.rpc('story_markierbar', { suche: 'prueflauf' });
+    const { data: listeAlle } = await eigner.client.rpc('story_markierbar', { suche: KONTENPOOL.pruefHandle.slice(1) });
     pruefe('„Alle dürfen mich markieren": in der Auswahlliste', (listeAlle || []).some((p) => p.id === fremder.id),
       `${(listeAlle || []).length} Treffer`);
     const { data: listeSelbst } = await eigner.client.rpc('story_markierbar', { suche: null });

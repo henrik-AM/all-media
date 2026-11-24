@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Feedback 28.09.2026, Kasten 6 — Agent „Anhänge".
  *
@@ -58,7 +59,7 @@ const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 const BASIS = process.env.BASIS || 'http://localhost:3000';
 
-const FREMDER = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
+const FREMDER = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
 const PRUEFER = {
   email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   passwort: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,

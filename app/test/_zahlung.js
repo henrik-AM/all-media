@@ -1,3 +1,4 @@
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Spendencode, Zahlungsmethoden, Kontowechsel, nur Testkonten
  * (Feedback 21.09.2026, Kasten 13).
@@ -59,8 +60,8 @@ const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY
 const OFFLINE = process.argv.includes('--offline');
 
 // Fest, nicht aus der Umgebung: dieser Lauf legt Zahlungsmethoden an.
-const PRUEFKONTO = { email: 'all.media.prueflauf@web.de', passwort: PRUEFKONTO_PASS };
-const TESTKONTO = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
+const PRUEFKONTO = { email: KONTENPOOL.pruef, passwort: PRUEFKONTO_PASS };
+const TESTKONTO = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
 
 let fehler = 0;
 let geprueft = 0;

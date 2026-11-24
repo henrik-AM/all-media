@@ -1,3 +1,4 @@
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * @-Markierungen wirken? — Kasten 25 (Schema 86_markierungen)
  *
@@ -50,7 +51,7 @@ const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
-const A_ZUGANG = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
+const A_ZUGANG = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
 const B_ZUGANG = {
   email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   passwort: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,

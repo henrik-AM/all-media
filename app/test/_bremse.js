@@ -1,3 +1,4 @@
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 // Prueft die Bremse der Nummernsuche (SUPABASE_SCHEMA_38_nummer_bremse.sql).
 //
 // Warum es diesen Test gibt: `finde_per_nummer` uebersetzt eine Telefonnummer
@@ -31,7 +32,7 @@ const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY
 const PROJEKT = (URL.match(/https:\/\/([a-z0-9]+)\.supabase\.co/) || [])[1] || '';
 
 // Das Testkonto aus SUPABASE_SCHEMA_7_testkonto.sql.
-const KONTO = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
+const KONTO = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
 
 // Muss zur Konstanten `grenze` in Schema 38 passen.
 const GRENZE = 40;

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 // Echte, kleine Bunny-Datei unter einem eigenen Testpfad. Moderationsrolle
 // vorübergehend nur für das zweite, sonst unbeteiligte Prüfkonto.
 const assert = require('node:assert/strict');
@@ -49,8 +50,8 @@ async function sql(query) {
 }
 
 (async () => {
-  const a = await anmelden('test@all-media.app', TESTKONTO_PASS, TESTKONTO);
-  const b = await anmelden('all.media.prueflauf@web.de', PRUEFKONTO_PASS, PRUEFKONTO);
+  const a = await anmelden(KONTENPOOL.partner, TESTKONTO_PASS, TESTKONTO);
+  const b = await anmelden(KONTENPOOL.pruef, PRUEFKONTO_PASS, PRUEFKONTO);
   const rolle = await sql(`select count(*)::int as anzahl from public.moderatoren where user_id = '${PRUEFKONTO}'`);
   assert.equal(rolle[0].anzahl, 0, 'Prüfkonto ohne bestehende Moderationsrolle');
   const alterszeile = await sql(`select 1 from public.konto_alter where user_id = '${PRUEFKONTO}'`);

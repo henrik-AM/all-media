@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Paket 9 (20.11.2026): Live-Abnahme mit ZWEI echten Testkonten gegen den
  * lokalen Website-Server (Port 3000, Code dieses Zweigs) und die echte
@@ -59,8 +60,8 @@ const datei = (n) => fs.readFileSync(path.join(MEDIEN, n));
 const pfadAus = (url) => String(url || '').split('/storage/v1/object/public/media/')[1];
 
 (async () => {
-  const A = await konto('all.media.prueflauf@web.de', PRUEFKONTO_PASS);
-  const B = await konto('test@all-media.app', TESTKONTO_PASS);
+  const A = await konto(KONTENPOOL.pruef, PRUEFKONTO_PASS);
+  const B = await konto(KONTENPOOL.partner, TESTKONTO_PASS);
   pruefe('Konten sind das Testpaar', A.id === PRUEFKONTO && B.id === TESTKONTO);
   const beitraege = [], dateien = [];
 

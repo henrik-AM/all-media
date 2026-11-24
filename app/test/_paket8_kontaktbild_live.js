@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Paket 8 / Schema 128 — Zwei-Konten-Beleg gegen die LIVE-Storage-API.
  *
@@ -40,8 +41,8 @@ async function konto(mail, pass) {
 }
 
 (async () => {
-  const A = await konto('all.media.prueflauf@web.de', pw.PRUEFKONTO_PASS);
-  const B = await konto('test@all-media.app', pw.TESTKONTO_PASS);
+  const A = await konto(KONTENPOOL.pruef, pw.PRUEFKONTO_PASS);
+  const B = await konto(KONTENPOOL.partner, pw.TESTKONTO_PASS);
   const name = `${A.id}-p8kontakt-${Date.now()}.jpg`;
   const pfad = `avatars/${name}`;
   // Kleinstes gültiges JPEG.

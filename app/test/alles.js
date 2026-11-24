@@ -50,7 +50,8 @@ const crypto = require('crypto');
  *      die auf wechselndem Grund entstanden ist, ist keine Messung.
  */
 
-const SPERRE = path.join(__dirname, '.gesamtlauf-laeuft.json');
+// Je Prüfplatz eine Sperre (Kontenpool, Schema 138): zwei Plätze dürfen parallel.
+const SPERRE = path.join(__dirname, (() => { const n = require('./_kontenpool').platzSetzen(); return n === 1 ? '.gesamtlauf-laeuft.json' : `.gesamtlauf-laeuft-${n}.json`; })());
 
 /** Läuft der Prozess mit dieser Kennung noch? */
 function lebt(pid) {

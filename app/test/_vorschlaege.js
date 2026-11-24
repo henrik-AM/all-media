@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Kasten 23 — „Personen, die du kennen könntest" (Henrik 06.10.2026: „wie z. B.
  * bei Instagram … nur unter Videos und Communitys").
@@ -73,15 +74,15 @@ const PROJEKT = (URL.match(/https:\/\/([a-z0-9]+)\.supabase\.co/) || [])[1] || '
 const TOKEN = process.env.SUPABASE_TOKEN || '';
 const BASIS = process.env.BASIS || 'http://localhost:3000';
 
-const TESTKONTO = { email: 'test@all-media.app', passwort: TESTKONTO_PASS, rufname: '@test' };
+const TESTKONTO = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS, rufname: KONTENPOOL.partnerHandle };
 const PRUEFKONTO = {
   email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   passwort: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,
-  rufname: '@prueflauf',
+  rufname: KONTENPOOL.pruefHandle,
 };
 
 // Die Testwelt: Claudes Testkonten und die Beispielprofile (Schema 62/7).
-const TESTWELT = new Set(['@test', '@prueflauf', '@anna', '@bob', '@clara', '@david', '@elif', '@finn', '@greta', '@hakan', '@ida']);
+const TESTWELT = new Set([...require('./_kontenpool').POOL_HANDLES, '@anna', '@bob', '@clara', '@david', '@elif', '@finn', '@greta', '@hakan', '@ida']);
 
 let fehler = 0;
 let pruefungen = 0;

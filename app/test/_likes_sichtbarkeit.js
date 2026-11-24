@@ -1,3 +1,4 @@
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Likes-Sichtbarkeit mit zwei Konten: wirkt die Einstellung wirklich?
  *
@@ -49,7 +50,7 @@ const wert = (name) => (UMGEBUNG.match(new RegExp('^' + name + '=(.*)$', 'm')) |
 const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
-const TESTKONTO = { email: 'test@all-media.app', passwort: TESTKONTO_PASS, rufname: 'Testkonto' };
+const TESTKONTO = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS, rufname: 'Testkonto' };
 const PRUEFKONTO = {
   email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   passwort: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,

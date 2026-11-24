@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Schema 126 live mit zwei Konten: „zwei Geräte gleichzeitig“.
  *
@@ -24,8 +25,8 @@ const UMGEBUNG = fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8
 const wert = (n) => (UMGEBUNG.match(new RegExp('^' + n + '=(.*)$', 'm')) || [])[1] || '';
 const URL = wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
-const TEST = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
-const PRUEF = { email: 'all.media.prueflauf@web.de', passwort: PRUEFKONTO_PASS };
+const TEST = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
+const PRUEF = { email: KONTENPOOL.pruef, passwort: PRUEFKONTO_PASS };
 const BEREICH = 'community';
 
 let ok = 0;

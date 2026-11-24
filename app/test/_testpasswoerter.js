@@ -35,7 +35,11 @@ function pflicht(name) {
   return w;
 }
 
-module.exports = {
-  TESTKONTO_PASS: pflicht('AM_TESTKONTO_PASS'),
-  PRUEFKONTO_PASS: pflicht('AM_PRUEFKONTO_PASS'),
-};
+// Kontenpool (Schema 138): Plätze 2–4 haben ein gemeinsames Passwort. Die
+// Namen bleiben, damit kein Lauf etwas ändern muss: TESTKONTO_PASS gehört
+// zum Partnerkonto, PRUEFKONTO_PASS zum Prüfkonto des aktiven Platzes.
+const PLATZ = require('./_kontenpool').platzSetzen();
+
+module.exports = PLATZ === 1
+  ? { TESTKONTO_PASS: pflicht('AM_TESTKONTO_PASS'), PRUEFKONTO_PASS: pflicht('AM_PRUEFKONTO_PASS') }
+  : { TESTKONTO_PASS: pflicht('AM_POOL_PASS'), PRUEFKONTO_PASS: pflicht('AM_POOL_PASS') };

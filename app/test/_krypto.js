@@ -1,3 +1,4 @@
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Ende-zu-Ende-Verschlüsselung — rechnet sie richtig, und hält die Datenbank
  * ihren Teil?
@@ -53,7 +54,7 @@ const wert = (name) => (UMGEBUNG.match(new RegExp('^' + name + '=(.*)$', 'm')) |
 const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
-const EIGNER = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
+const EIGNER = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
 const GEGENUEBER = {
   email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   passwort: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,

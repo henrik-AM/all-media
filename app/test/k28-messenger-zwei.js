@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Kasten 28/12.4 mit zwei Konten und zwei Geräten (10.11.2026).
  *
@@ -38,8 +39,8 @@ const UMGEBUNG = fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8
 const wert = (n) => (UMGEBUNG.match(new RegExp('^' + n + '=(.*)$', 'm')) || [])[1] || '';
 const URL_ = wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
-const APPKONTO = { email: nurTestkonto('test@all-media.app'), passwort: TESTKONTO_PASS };
-const WEBKONTO = { email: nurTestkonto('all.media.prueflauf@web.de'), passwort: PRUEFKONTO_PASS };
+const APPKONTO = { email: nurTestkonto(KONTENPOOL.partner), passwort: TESTKONTO_PASS };
+const WEBKONTO = { email: nurTestkonto(KONTENPOOL.pruef), passwort: PRUEFKONTO_PASS };
 
 let fehler = 0;
 let geprueft = 0;

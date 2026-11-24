@@ -1,3 +1,4 @@
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Testpaar @test ↔ @prueflauf für die Zwei-Konten-Läufe (k28-gruppe, k28-karte,
  * k28-anruf-ptt) und eigene Medien für Prüfläufe.
@@ -17,8 +18,8 @@
  */
 const { frage } = require('./_aufraeumen');
 
-const TESTKONTO = '3baafacd-bbdb-40fb-8ef4-a4e365ae00c4'; // test@all-media.app
-const PRUEFKONTO = '62616c1d-82e2-4ee4-aab9-950e40e438a4'; // all.media.prueflauf@web.de
+const TESTKONTO = KONTENPOOL.partnerId; // test@all-media.app
+const PRUEFKONTO = KONTENPOOL.pruefId; // all.media.prueflauf@web.de
 const KONTEN = new Set([TESTKONTO, PRUEFKONTO]);
 
 function pruefeKonto(id) {

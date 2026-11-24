@@ -1,6 +1,7 @@
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),{EventEmitter}=require('node:events');
 const quelle=process.env.PAKET6_FIX_QUELLE||__dirname;
-const a='3baafacd-bbdb-40fb-8ef4-a4e365ae00c4',b='62616c1d-82e2-4ee4-aab9-950e40e438a4',key='11111111-1111-4111-8111-111111111111',alt='22222222-2222-4222-8222-222222222222',neu='33333333-3333-4333-8333-333333333333',lauf='44444444-4444-4444-8444-444444444444';
+const a=KONTENPOOL.partnerId,b=KONTENPOOL.pruefId,key='11111111-1111-4111-8111-111111111111',alt='22222222-2222-4222-8222-222222222222',neu='33333333-3333-4333-8333-333333333333',lauf='44444444-4444-4444-8444-444444444444';
 const quell=p=>fs.readFileSync(path.join(quelle,p),'utf8');
 const warten=async()=>{for(let i=0;i<15;i++)await new Promise(setImmediate);};
 async function recovery({native=false,baseline=true,bad=false,orphan=false,kuvert=false}={}){

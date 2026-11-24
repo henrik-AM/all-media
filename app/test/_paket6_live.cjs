@@ -1,3 +1,4 @@
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /** Paket 6: echte Zwei-Konten-/App-Logik-/Website-Rundreise, kein Reset/Schema.
  * Nur mit exklusiver Sitzungsbelegung; erzeugt eigene Chat-/Gerätefixtures,
  * protokolliert IDs für Wiederaufnahme, prüft Bereinigung ausdrücklich.
@@ -15,7 +16,7 @@ const W=path.resolve(__dirname,'../..'),OUT=process.env.AM_PAKET6_LIVE_OUT||path
 if(!ZIEL||!/^http:\/\/(127\.0\.0\.1|localhost):3300\/?$/.test(ZIEL))throw new Error('Eigener Paket-6-Server auf 3300 erforderlich');
 const URL=process.env.SUPABASE_URL||process.env.EXPO_PUBLIC_SUPABASE_URL,KEY=process.env.SUPABASE_ANON_KEY||process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 if(!URL||!KEY)throw new Error('Supabase-Konfiguration fehlt');
-const konten=[{id:'3baafacd-bbdb-40fb-8ef4-a4e365ae00c4',email:'test@all-media.app',pass:TESTKONTO_PASS},{id:'62616c1d-82e2-4ee4-aab9-950e40e438a4',email:'all.media.prueflauf@web.de',pass:PRUEFKONTO_PASS}];
+const konten=[{id:KONTENPOOL.partnerId,email:KONTENPOOL.partner,pass:TESTKONTO_PASS},{id:KONTENPOOL.pruefId,email:KONTENPOOL.pruef,pass:PRUEFKONTO_PASS}];
 const lauf=crypto.randomUUID(),manifest={supabaseUrl:URL,kontakteVorher:{},schluesselVorher:{},nachrichten:[],lauf,pid:process.pid,chatId:null,schluessel:[],start:new Date().toISOString()};
 fs.mkdirSync(OUT,{recursive:true});
 const manifestDatei=path.join(OUT,'live-fixtures.json');
