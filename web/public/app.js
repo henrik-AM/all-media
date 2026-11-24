@@ -3240,13 +3240,20 @@ async function openFollowerList(profile, art) {
  * ein neu gezeichnetes Blatt verlor seinen Schliessen-Knopf.
  */
 function sheetKopf(title, mitX) {
+  /*
+   * Einstellungen 16.11., Kasten 1.4 (Henrik, 24.11.2026): ein Blatt aus den
+   * Einstellungen zeigt klein sein Oberthema über dem Titel („Messenger“ über
+   * „Lesebestätigung“). Wie SheetRahmen in der App.
+   */
+  const thema = state.area === 'settings' && state.blattThema && state.blattThema !== title ? state.blattThema : '';
+  const ober = thema ? `<div class="sheet__ober" data-testid="blatt-oberthema">${esc(thema)}</div>` : '';
   return mitX
-    ? `<div class="sheet__kopf">
-         <button class="sheet__x" data-sheet-close aria-label="Zurück">${ICONS.chevron}</button>
-         <div class="sheet__titel-mitte">${esc(title)}</div>
+    ? `<div class="sheet__kopf ${thema ? 'sheet__kopf--thema' : ''}">
+         <button class="sheet__x" data-sheet-close aria-label="Zurück">${ICONS.back}</button>
+         <div class="sheet__titel-mitte">${ober}<span>${esc(title)}</span></div>
        </div>`
     : `<div class="sheet__handle"></div>
-       <div class="sheet__title">${esc(title)}</div>`;
+       ${ober}<div class="sheet__title">${esc(title)}</div>`;
 }
 
 /*
@@ -9349,52 +9356,6 @@ const SETTINGS = [
     ],
   },
   {
-    id: 'speicher',
-    title: 'Speicher',
-    items: [
-      { label: 'Automatischer Download', icon: 'image', wahlKey: 'autoDownload', wahl: ['Nie', 'Nur im WLAN', 'Immer'], standard: 'Nur im WLAN' },
-      { label: 'Speicher verwalten', icon: 'compass', liste: 'speicher' },
-      { label: 'Datensparmodus', icon: 'portrait', toggle: 'datensparen' },
-      { label: 'Medienqualität', icon: 'image', wahlKey: 'medienqualitaet', wahl: ['Standard', 'Hoch'], standard: 'Standard' },
-    ],
-  },
-  {
-    id: 'hilfe',
-    title: 'Hilfe',
-    items: [
-      {
-        label: 'Hilfebereich',
-        icon: 'info',
-        info: 'Fragen und Antworten zu All Media. Bei allem, was hier nicht steht: schreib uns über „Problem melden“ — wir antworten meist innerhalb eines Werktags.',
-      },
-      /*
-       * Kasten RS 3: „Problem melden" meldete „angekommen" und speicherte
-       * nichts. Jetzt inhalt_melden('problem', …) über das Melden-Blatt; die
-       * Antwort kommt als Mitteilung in die Glocke (Schema 102). Darunter
-       * der Stand eigener Meldungen, der Kontostatus (DSA Art. 16, 17, 20)
-       * und — nur für Moderatoren — die Moderation. Gleiche Einträge in der
-       * App (SettingsScreen, Hilfe); die Moderation gibt es nur hier.
-       */
-      { label: 'Problem melden', icon: 'shield', aktion: 'problem' },
-      { label: 'Meine Meldungen', icon: 'flag', aktion: 'meinemeldungen' },
-      { label: 'Kontostatus', icon: 'info', aktion: 'kontostatus' },
-      { label: 'Moderation', icon: 'shield', aktion: 'moderation', nurModerator: true },
-      /*
-       * Kasten RS 1 (24.10.2026): bis hierher je zwei Sätze, die zum Teil
-       * nicht stimmten („ab 13"). Jetzt die vollständigen Texte aus
-       * gemeinsam/rechtstexte.js — dieselben wie in der App
-       * (app/components/RechtstextSheet.tsx).
-       */
-      { label: 'Die Regeln kurz erklärt', icon: 'info', rechtstext: 'kurz_erklaert' },
-      { label: 'Nutzungsbedingungen', icon: 'document', rechtstext: 'nutzungsbedingungen' },
-      { label: 'Community-Richtlinien', icon: 'people', rechtstext: 'community_richtlinien' },
-      { label: 'Datenschutzerklärung', icon: 'lock', rechtstext: 'datenschutz' },
-      { label: 'Für Eltern', icon: 'heart', rechtstext: 'eltern_info' },
-      { label: 'Impressum', icon: 'info', rechtstext: 'impressum' },
-      { label: 'Freunde einladen', icon: 'people', aktion: 'einladen' },
-    ],
-  },
-  {
     id: 'videos',
     title: 'Videos',
     items: [
@@ -9453,6 +9414,60 @@ const SETTINGS = [
       { label: 'Push-to-Talk Benachrichtigung', icon: 'mic', sichtbar: 'ptt' },
       { label: 'Gestummte Communitys', icon: 'mute', liste: 'stummeKanaele' },
       { label: 'Gestummte Profile', icon: 'block', liste: 'stummeProfile' },
+    ],
+  },
+
+  /*
+   * Einstellungen 16.11., Q04 (Kasten 1.3): „Speicher“ und „Hilfe“ als eigene
+   * Oberbegriffe unterhalb von Videos und Communitys. Gleiche Reihenfolge wie
+   * in der App (SECTIONS in SettingsScreen.tsx).
+   */
+  {
+    id: 'speicher',
+    title: 'Speicher',
+    items: [
+      { label: 'Automatischer Download', icon: 'image', wahlKey: 'autoDownload', wahl: ['Nie', 'Nur im WLAN', 'Immer'], standard: 'Nur im WLAN' },
+      { label: 'Speicher verwalten', icon: 'compass', liste: 'speicher' },
+      { label: 'Datensparmodus', icon: 'portrait', toggle: 'datensparen' },
+      { label: 'Medienqualität', icon: 'image', wahlKey: 'medienqualitaet', wahl: ['Standard', 'Hoch'], standard: 'Standard' },
+    ],
+  },
+  {
+    id: 'hilfe',
+    title: 'Hilfe',
+    items: [
+      {
+        label: 'Hilfebereich',
+        icon: 'info',
+        info: 'Fragen und Antworten zu All Media. Bei allem, was hier nicht steht: schreib uns über „Problem melden“ — wir antworten meist innerhalb eines Werktags.',
+      },
+      /*
+       * Kasten RS 3: „Problem melden" meldete „angekommen" und speicherte
+       * nichts. Jetzt inhalt_melden('problem', …) über das Melden-Blatt; die
+       * Antwort kommt als Mitteilung in die Glocke (Schema 102). Darunter
+       * der Stand eigener Meldungen, der Kontostatus (DSA Art. 16, 17, 20)
+       * und — nur für Moderatoren — die Moderation. Gleiche Einträge in der
+       * App (SettingsScreen, Hilfe); die Moderation gibt es nur hier.
+       */
+      { label: 'Problem melden', icon: 'shield', aktion: 'problem' },
+      { label: 'Meine Meldungen', icon: 'flag', aktion: 'meinemeldungen' },
+      { label: 'Kontostatus', icon: 'info', aktion: 'kontostatus' },
+      { label: 'Moderation', icon: 'shield', aktion: 'moderation', nurModerator: true },
+      /*
+       * Kasten RS 1 (24.10.2026): bis hierher je zwei Sätze, die zum Teil
+       * nicht stimmten („ab 13"). Jetzt die vollständigen Texte aus
+       * gemeinsam/rechtstexte.js — dieselben wie in der App
+       * (app/components/RechtstextSheet.tsx).
+       */
+      { label: 'Die Regeln kurz erklärt', icon: 'info', rechtstext: 'kurz_erklaert' },
+      { label: 'Nutzungsbedingungen', icon: 'document', rechtstext: 'nutzungsbedingungen' },
+      { label: 'Community-Richtlinien', icon: 'people', rechtstext: 'community_richtlinien' },
+      { label: 'Datenschutzerklärung', icon: 'lock', rechtstext: 'datenschutz' },
+      { label: 'Für Eltern', icon: 'heart', rechtstext: 'eltern_info' },
+      { label: 'Impressum', icon: 'info', rechtstext: 'impressum' },
+      { label: 'Freunde einladen', icon: 'people', aktion: 'einladen' },
+      // Einstellungen 16.11., Q78 (Kasten 1.3): „Über All Media“ gehört zur Hilfe. Wie in der App.
+      { label: 'Über All Media', icon: 'info', aktion: 'ueber' },
     ],
   },
 ];
@@ -10036,15 +10051,17 @@ function openSichtbarkeit(punkt) {
              ? `<div class="sheet__hint" data-testid="likes-ersteller-hinweis">${esc(window.Sichtbarkeit.LIKES_ERSTELLER_HINWEIS)}</div>`
              : ''
          }
-         ${window.Sichtbarkeit.stufenFuer(bereich).map(
-           (st) => `<button class="item sicht__stufe${st.key === jetzt.stufe ? ' is-active' : ''}" data-stufe="${st.key}">
-             <span class="item__label">
-               <b>${esc(st.label)}</b>
-               <small>${esc(st.hinweis)}</small>
+         <div class="listhead">Wer darf das?</div>
+         <div class="einst-wahl" role="radiogroup" aria-label="${esc(punkt.label)}">${window.Sichtbarkeit.stufenFuer(bereich).map(
+           // Kasten E16-1.5: dasselbe Auswahlmuster wie jede „eine aus mehreren“-Einstellung.
+           (st) => `<button class="einst-wahl__zeile sicht__stufe${st.key === jetzt.stufe ? ' is-active' : ''}" role="radio" aria-checked="${st.key === jetzt.stufe}" data-stufe="${st.key}">
+             <span class="einst-wahl__text">
+               <span class="einst-wahl__label">${esc(st.label)}</span>
+               <span class="einst-wahl__hinweis">${esc(st.hinweis)}</span>
              </span>
-             <span class="sicht__punkt">${st.key === jetzt.stufe ? ICONS.check : ''}</span>
+             <span class="einst-wahl__kreis" aria-hidden="true"></span>
            </button>`
-         ).join('')}
+         ).join('')}</div>
 
          ${
            /*
@@ -10680,14 +10697,15 @@ function openEinstellung(punkt, nachher) {
     const jetzt = einstellung(punkt);
     return openSheet(
       punkt.label,
-      `<div class="sheet__body">${punkt.wahl
+      // Kasten E16-1.5: dasselbe Auswahlmuster wie Sichtbarkeit und App (AuswahlZeile).
+      `<div class="sheet__body"><div class="einst-wahl" role="radiogroup" aria-label="${esc(punkt.label)}">${punkt.wahl
         .map(
-          (w) => `<button class="item" data-wahl="${esc(w)}">
-            <span class="item__label">${esc(w)}</span>
-            ${w === jetzt ? `<span class="item__haken">${ICONS.check}</span>` : ''}
+          (w) => `<button class="einst-wahl__zeile" role="radio" aria-checked="${w === jetzt}" data-wahl="${esc(w)}">
+            <span class="einst-wahl__text"><span class="einst-wahl__label">${esc(w)}</span></span>
+            <span class="einst-wahl__kreis" aria-hidden="true"></span>
           </button>`
         )
-        .join('')}</div>`,
+        .join('')}</div></div>`,
       (sheet, close) => {
         sheet.querySelectorAll('[data-wahl]').forEach((b) =>
           b.addEventListener('click', () => {
@@ -10880,6 +10898,25 @@ function openEinstellung(punkt, nachher) {
   if (punkt.aktion === 'engefreunde') return openEngeFreunde();
 
   if (punkt.aktion === 'datenauskunft') return datenauskunftLaden();
+  // Kasten E16-1.3: „Über All Media“ unter Hilfe — Fassung und ausgelieferter Stand.
+  if (punkt.aktion === 'ueber') {
+    return (async () => {
+      let stand;
+      try {
+        const v = await (await fetch('/api/version')).json();
+        stand = `Version ${v.version} · Stand ${v.commit}`;
+      } catch {
+        stand = 'Version 1.0.0 · Stand gerade nicht abrufbar';
+      }
+      openSheet(
+        'Über All Media',
+        `<div class="sheet__body"><p class="sheet__text" data-testid="ueber-stand">${esc(stand)}</p>
+          <p class="sheet__text">Ein Konto für Messenger, Videos und Communitys. Nutzungsbedingungen, Datenschutzerklärung und Impressum findest du im Abschnitt Hilfe; Fragen und Fehler schickst du über „Problem melden“.</p></div>`,
+        null,
+        { schliessen: true }
+      );
+    })();
+  }
 
   if (punkt.aktion === 'sicherung') {
     const anzahl = state.chats.length;
@@ -11031,10 +11068,10 @@ function renderSettings() {
   const itemHtml = (it, sektionId) => {
     if (it.toggle) {
       const on = it.toggle === 'theme' ? state.theme === 'dark' : schalterAn(it.toggle);
-      return `<div class="item">
+      return `<div class="item einst-zeile">
         <span class="item__icon">${ICONS[it.icon]}</span>
         <span class="item__label">${esc(it.label)}</span>
-        <button class="switch ${on ? 'is-on' : ''}" data-toggle="${it.toggle}" aria-label="${esc(it.label)}"><span class="switch__knob"></span></button>
+        <button class="switch ${on ? 'is-on' : ''}" data-toggle="${it.toggle}" aria-label="${esc(it.label)}" role="switch" aria-checked="${on}"><span class="switch__knob"></span></button>
       </div>`;
     }
     // Bei einer Auswahl steht rechts, was gerade gilt - sonst muesste man
@@ -11048,7 +11085,7 @@ function renderSettings() {
       : it.aktion === 'entsperrcode' && bz.stand
       ? (bz.stand.eigene_art === 'eigen' ? 'Eigener Code' : 'Spenden-PIN')
       : '';
-    return `<button class="item ${it.gefahr ? 'item--danger' : ''}" data-setting="${esc(it.label)}" data-abschnitt="${esc(sektionId)}">
+    return `<button class="item einst-zeile ${it.gefahr ? 'item--danger' : ''}" data-setting="${esc(it.label)}" data-abschnitt="${esc(sektionId)}">
       <span class="item__icon">${ICONS[it.icon]}</span>
       <span class="item__label">${esc(it.label)}</span>
       ${wert ? `<span class="item__value">${esc(wert)}</span>` : ''}
@@ -11058,22 +11095,28 @@ function renderSettings() {
   };
 
   main.innerHTML = `
-    <div class="pagehead">
+    <div class="pagehead einst-kopf">
       ${
         nur
           ? `<div class="pagehead__row">
               <button class="iconbtn" id="settingsNurBack" aria-label="Zurück zu allen Einstellungen">${ICONS.back}</button>
-              <h2 class="pagehead__title">${esc(nur.title)}</h2>
+              <div class="einst-titel"><span class="einst-titel__ober">Einstellungen</span><h2 class="pagehead__title" id="einstThema">${esc(nur.title)}</h2></div>
             </div>`
           : ''
       }
       ${
         // Nur wenn man aus einem Profil kam - wer die Einstellungen ueber die
         // untere Leiste oeffnet, hat kein "zurueck".
-        !nur && state.settingsAus
+        /*
+         * Einstellungen 16.11., Kasten 1.4 (Henrik, 24.11.2026): oben steht
+         * immer, wo man ist. Über dem ersten Abschnitt „Einstellungen“, beim
+         * Blättern der aktuelle Abschnitt (Scroll-Verfolgung weiter unten).
+         * Gleicher Kopf in der App (SettingsScreen.tsx).
+         */
+        !nur
           ? `<div class="pagehead__row">
-              <button class="iconbtn" id="settingsBack" aria-label="Zurück zum Profil">${ICONS.back}</button>
-              <h2 class="pagehead__title">Einstellungen</h2>
+              ${state.settingsAus ? `<button class="iconbtn" id="settingsBack" aria-label="Zurück zum Profil">${ICONS.back}</button>` : ''}
+              <div class="einst-titel"><span class="einst-titel__ober" id="einstOber" hidden>Einstellungen</span><h2 class="pagehead__title" id="einstThema">Einstellungen</h2></div>
             </div>`
           : ''
       }
@@ -11090,6 +11133,7 @@ function renderSettings() {
           color: ich.color || '',
         };
         return `
+        <div class="einst-konto">
         <div class="konto__kopf" id="kontoKopf">
           <span class="avatar avatar--52" style="background:${farbe(aktiv.color)}">${esc(aktiv.initials)}</span>
           <div class="konto__body">
@@ -11100,7 +11144,8 @@ function renderSettings() {
         </div>
         <button class="konto__wechsel" id="kontoWechselBtn">
           ${ICONS.people}<span>Konto wechseln oder hinzufügen</span>
-        </button>`;
+        </button>
+        </div>`;
       })()}
       ${
         nur
@@ -11110,31 +11155,34 @@ function renderSettings() {
       </div>`
       }
     </div>
-    <div class="scroll" id="settingsScroll">
+    <div class="scroll einst" id="settingsScroll">
       ${(nur ? [nur] : SETTINGS).map(
         (sec) => `${
           nur
             ? ''
-            : `<button class="listhead listhead--knopf" id="sec-${sec.id}" data-settingsnur="${sec.id}" aria-label="${esc(sec.title)}, alle anzeigen">${esc(sec.title)} →</button>`
+            : `<button class="listhead listhead--knopf" id="sec-${sec.id}" data-settingsnur="${sec.id}" aria-label="${esc(sec.title)}, alle anzeigen">${esc(sec.title)} <span class="einst-pfeil" aria-hidden="true">${ICONS.chevron}</span></button>`
         }
-          <div class="group">${sec.items
+          <div class="group einst-karte">${sec.items
             .filter((it) => !it.nurEltern || bzKinderZahl() > 0)
             // Kasten RS 3: die Moderation nur, wenn ist_moderator() ja sagt (Bootstrap).
             .filter((it) => !it.nurModerator || state.istModerator === true)
             .map((it) => itemHtml(it, sec.id))
             .join('')}</div>`
       ).join('')}
-      ${nur ? '' : `<div class="group">
-        <button class="item" data-setting="Über All Media">
-          <span class="item__icon">${ICONS.info}</span>
-          <span class="item__label">Über All Media</span>
-          <span class="item__value">1.0.0</span>
-        </button>
-        <button class="item item--danger" data-setting="Abmelden">
+      ${
+        /*
+         * Einstellungen 16.11., Q79 (Kasten 1.3): „Abmelden“ stand direkt unter
+         * Communitys und las sich wie ein Teil davon. Eigener Block mit Satz;
+         * „Über All Media“ steht seitdem unter Hilfe. Wie in der App.
+         */
+        nur ? '' : `<div class="listhead einst-frei">Konto auf diesem Gerät</div>
+      <div class="group einst-karte">
+        <button class="item einst-zeile item--danger" data-setting="Abmelden">
           <span class="item__icon">${ICONS.logout}</span>
           <span class="item__label">Abmelden</span>
         </button>
-      </div>`}
+      </div>
+      <p class="einst-fuss">Meldet nur dieses Konto ab. Weitere Konten in diesem Browser bleiben angemeldet.</p>`}
     </div>`;
 
   main.querySelectorAll('[data-settingsnur]').forEach((b) =>
@@ -11151,14 +11199,46 @@ function renderSettings() {
     document.getElementById('sec-' + abschnitt)?.scrollIntoView({ block: 'start' });
   });
 
-  $('#kontoKopf')?.addEventListener('click', openKontoWechsel);
-  $('#kontoWechselBtn')?.addEventListener('click', openKontoWechsel);
+  const kontoWechsel = () => {
+    state.blattThema = null;
+    openKontoWechsel();
+  };
+  $('#kontoKopf')?.addEventListener('click', kontoWechsel);
+  $('#kontoWechselBtn')?.addEventListener('click', kontoWechsel);
 
   main.querySelectorAll('[data-jump]').forEach((b) =>
     b.addEventListener('click', () => {
       document.getElementById('sec-' + b.dataset.jump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     })
   );
+
+  // Kasten E16-1.4: Kopf und Pille folgen dem Abschnitt, der gerade oben steht.
+  const einstScroll = $('#settingsScroll');
+  if (!nur && einstScroll) {
+    let zuletzt;
+    const verfolgen = () => {
+      const oben = einstScroll.getBoundingClientRect().top;
+      let id = null;
+      for (const sec of SETTINGS) {
+        const el = document.getElementById('sec-' + sec.id);
+        if (el && el.getBoundingClientRect().top - oben <= 12) id = sec.id;
+      }
+      if (id === zuletzt) return;
+      zuletzt = id;
+      const thema = $('#einstThema');
+      if (thema) thema.textContent = id ? SETTINGS.find((x) => x.id === id).title : 'Einstellungen';
+      const ober = $('#einstOber');
+      if (ober) ober.hidden = !id;
+      main.querySelectorAll('[data-jump]').forEach((p) => {
+        const an = p.dataset.jump === id;
+        p.classList.toggle('is-active', an);
+        p.setAttribute('aria-current', an ? 'true' : 'false');
+        if (an) p.parentElement?.scrollTo?.({ left: Math.max(0, p.offsetLeft - 16), behavior: 'smooth' });
+      });
+    };
+    einstScroll.addEventListener('scroll', verfolgen, { passive: true });
+    verfolgen();
+  }
 
   // Aus dem Menü im eigenen Profil kommend: gleich beim richtigen Abschnitt
   // anfangen (Prototyp "VP + Einstellung" / "CP + Einstellung").
@@ -11177,6 +11257,7 @@ function renderSettings() {
       const abschnitt = SETTINGS.find((sec) => sec.id === abschnittId);
       const punkt = abschnitt?.items.find((it) => it.label === state.settingsPunkt);
       state.settingsPunkt = null;
+      state.blattThema = abschnitt?.title || null;
       if (punkt) setTimeout(() => openEinstellung(punkt), 60);
     }
   }
@@ -11240,6 +11321,8 @@ function renderSettings() {
     b.addEventListener('click', () => {
       const abschnitt = SETTINGS.find((sec) => sec.id === b.dataset.abschnitt);
       const punkt = abschnitt?.items.find((it) => it.label === b.dataset.setting);
+      // Kasten E16-1.4: das Blatt zeigt über seinem Titel, wozu es gehört.
+      state.blattThema = abschnitt?.title || null;
       if (punkt) return openEinstellung(punkt);
 
       // Die zwei Punkte ganz unten stehen ausserhalb der Abschnitte.
