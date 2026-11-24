@@ -757,7 +757,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       : undefined;
 
   const spendenweg = useSpendenweg();
-  const oeffne = (item: Item) => {
+  const oeffne = (item: Item, thema?: string) => {
     if (item.aktion === 'profilseite') {
       return onProfilBearbeiten ? onProfilBearbeiten() : onNotice('Profil bearbeiten ist hier nicht verfügbar');
     }
@@ -766,8 +766,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     if (item.aktion === 'meinemeldungen') return setKontostatus('meine');
     if (item.aktion === 'kontostatus') return setKontostatus('kontostatus');
     if (item.aktion === 'kontoLoeschen') return setKontoLoeschenOffen(true);
-    if (item.aktion === 'spendencode') return spendenweg.verwalten('code');
-    if (item.aktion === 'zahlungsmethoden') return spendenweg.verwalten('methoden');
+    if (item.aktion === 'spendencode') return spendenweg.verwalten('code', thema);
+    if (item.aktion === 'zahlungsmethoden') return spendenweg.verwalten('methoden', thema);
     if (item.aktion === 'farbfilter') return setFarbfilterOffen(true);
     if (item.rechtstext) return setRechtstext(item.rechtstext);
     if (item.aktion === 'sicherung') {
@@ -1235,7 +1235,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                       setBlattThema(section.title);
                       if (item.sichtbar) return setSichtOffen(item);
                       if (item.bz) return setBzOffen(item.bz);
-                      oeffne(item);
+                      oeffne(item, section.title);
                     }}
                     accessibilityRole={item.toggle ? 'switch' : 'button'}
                     accessibilityState={item.toggle ? { checked: schalterAn } : undefined}

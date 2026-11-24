@@ -17,6 +17,7 @@
  * Code festlegen oder ändern, Methoden anlegen, Standard wählen, löschen.
  */
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { OberthemaKontext } from '../components/Oberthema';
 import type { SpendenFreigabe } from '../lib/aktionen';
 import { SpendenwegSheet } from '../components/SpendenwegSheet';
 
@@ -34,7 +35,8 @@ interface SpendenwegWert {
   /** Blatt öffnen, fragen was fehlt, spenden. true, wenn die Spende steht. */
   spenden: (anfrage: SpendenAnfrage) => Promise<boolean>;
   /** Blatt aus den Einstellungen öffnen. */
-  verwalten: (bereich?: Verwaltung) => void;
+  /** `oberthema`: Kasten E16-1.4 — Abschnitt der Einstellungen, klein über dem Titel. */
+  verwalten: (bereich?: Verwaltung, oberthema?: string) => void;
   /** Gibt es das Blatt überhaupt (steht ein Provider darüber)? */
   bereit: boolean;
 }
@@ -56,6 +58,7 @@ interface Offen {
   art: 'spende' | 'verwalten';
   anfrage?: SpendenAnfrage;
   bereich?: Verwaltung;
+  oberthema?: string;
   nr: number;
 }
 
@@ -90,10 +93,10 @@ export const SpendenwegProvider = ({ children }: { children: React.ReactNode }) 
     []
   );
 
-  const verwalten = useCallback((bereich?: Verwaltung) => {
+  const verwalten = useCallback((bereich?: Verwaltung, oberthema?: string) => {
     zaehler.current += 1;
     const nr = zaehler.current;
-    setTimeout(() => setOffen({ art: 'verwalten', bereich, nr }), 350);
+    setTimeout(() => setOffen({ art: 'verwalten', bereich, oberthema, nr }), 350);
   }, []);
 
   const wert = useMemo(() => ({ spenden, verwalten, bereit: true }), [spenden, verwalten]);
@@ -101,6 +104,7 @@ export const SpendenwegProvider = ({ children }: { children: React.ReactNode }) 
   return (
     <SpendenwegContext.Provider value={wert}>
       {children}
+      <OberthemaKontext.Provider value={offen?.oberthema ?? null}>
       <SpendenwegSheet
         key={offen?.nr ?? 0}
         visible={Boolean(offen)}
@@ -108,6 +112,7 @@ export const SpendenwegProvider = ({ children }: { children: React.ReactNode }) 
         bereich={offen?.bereich}
         onFertig={schliessen}
       />
+      </OberthemaKontext.Provider>
     </SpendenwegContext.Provider>
   );
 };
