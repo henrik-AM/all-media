@@ -340,7 +340,8 @@ async function haupt() {
   const { token, projekt } = umgebung();
   if (!token || !projekt) throw new Error('ABBRUCH: SUPABASE_TOKEN/Projekt fehlen; Bereinigung wäre unmöglich.');
   const mitteilungen = require('./_lauf_mitteilungen').laufMitteilungen({
-    datei: path.join(__dirname, '.gesamtlauf-bereinigung.json'), projekt, frage,
+    // Je Prüfplatz ein Journal (Kontenpool, Schema 138).
+    datei: path.join(__dirname, (() => { const n = require('./_kontenpool').platzSetzen(); return n === 1 ? '.gesamtlauf-bereinigung.json' : `.gesamtlauf-bereinigung-${n}.json`; })()), projekt, frage,
   });
   const abbruch = new AbortController();
   let signal;

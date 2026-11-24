@@ -6,7 +6,12 @@
  */
 const fs = require('node:fs');
 const crypto = require('node:crypto');
-const { TESTKONTEN } = require('./_nur_testkonten');
+// Kontenpool (Schema 138): nur das Paar des eigenen Prüfplatzes. Bis dahin
+// war TESTKONTEN genau dieses Paar; mit acht Testkonten wartete sonst jeder
+// Platz auf die Mitteilungen der anderen (und räumte sie womöglich weg).
+require('./_nur_testkonten');
+const { pruef: POOL_PRUEF, partner: POOL_PARTNER } = require('./_kontenpool').konten();
+const TESTKONTEN = [POOL_PARTNER, POOL_PRUEF];
 const { gruppeLebt } = require('./_lauf_prozess');
 
 const ZEIT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
