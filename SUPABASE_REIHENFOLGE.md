@@ -86,7 +86,8 @@ Die Spalte „gilt" nennt die Datei, die zuletzt läuft und damit gewinnt.
 | Funktion public.meine_kontaktnummern() | SUPABASE_SCHEMA_23_audit.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql | **SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql** |
 | Funktion public.nummer_frei() | SUPABASE_SCHEMA_34_telefon_pflicht.sql → SUPABASE_SCHEMA_39_anonyme_bremse.sql | **SUPABASE_SCHEMA_39_anonyme_bremse.sql** |
 | Funktion public.on_contact() | SUPABASE_SCHEMA_2.sql → SUPABASE_SCHEMA_44_mitteilungen.sql → SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql | **SUPABASE_SCHEMA_57_messenger_nur_mit_zustimmung.sql** |
-| Funktion public.starter_inhalte() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** (Schema 17, 60 und 62 schreiben sie am Anker um; 62 sperrt echte Konten aus) |
+| Funktion public.ist_testkonto() | SUPABASE_SCHEMA_62_nur_eigene_testkonten.sql → SUPABASE_SCHEMA_138_kontenpool.sql | **SUPABASE_SCHEMA_138_kontenpool.sql** (Kontenpool: 8 Testkonten, Liste gleich in app/test/_nur_testkonten.js) |
+| Funktion public.starter_inhalte() | SUPABASE_SCHEMA_5.sql → SUPABASE_SCHEMA_7_testkonto.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** (Schema 17, 60 und 62 schreiben sie am Anker um; 62 sperrt echte Konten aus; 138 ersetzt die Adressliste beim Testkommentar durch ist_testkonto()) |
 | Funktion public.story_in_videos_zuruecknehmen() | SUPABASE_SCHEMA_30_story_in_videos.sql → SUPABASE_SCHEMA_36_story_getrennt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** |
 | Funktion public.storys_aus_videos_nehmen() | SUPABASE_SCHEMA_36_story_getrennt.sql → SUPABASE_SCHEMA_68_storys.sql | **SUPABASE_SCHEMA_68_storys.sql** |
 | Funktion public.testbestand_profilaufrufe() | SUPABASE_SCHEMA_17_testbestand_statistik.sql → SUPABASE_SCHEMA_23_sicherheit.sql | **SUPABASE_SCHEMA_23_sicherheit.sql** |
