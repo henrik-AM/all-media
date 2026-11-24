@@ -5522,13 +5522,19 @@ textarea.profilseite__gross { min-height: 160px; }
 .erstellseite[data-erstellseite="unterthema"] .erstellseite__pflicht { min-height: 20px; margin-bottom: 38px; padding-left: 14px; gap: 12px; }
 .erstellseite[data-erstellseite="unterthema"] .erstellseite__name { padding-left: 12px; }
 .erstellseite[data-erstellseite="unterthema"] .erstellseite__name input { height: 73px; padding-block: 0; }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__name input::placeholder { color: var(--text); opacity: 1; }
 .erstellseite[data-erstellseite="unterthema"] .erstellseite__feld { min-height: 50px; padding-inline: 12px; }
 .erstellseite[data-erstellseite="unterthema"] .erstellseite__feld--abstand { margin-top: 43px; }
 .erstellseite[data-erstellseite="unterthema"] .erstellseite__schalter { min-height: 60px; margin: 45px -18px 0; padding: 8px 18px 8px 24px; }
 .erstellseite[data-erstellseite="unterthema"] .erstellseite__schalterSub { font-size: 11px; }
-.erstellseite[data-erstellseite="unterthema"] .erstellseite__einladen { margin-inline: 3px; padding: 4px 12px 4px 37px; }
+.erstellseite[data-erstellseite="unterthema"] .schalter { width: 30px; height: 15px; }
+.erstellseite[data-erstellseite="unterthema"] .schalter input:not(:checked) + span { background: color-mix(in srgb, var(--text) 16%, var(--surface)); }
+.erstellseite[data-erstellseite="unterthema"] .schalter input:focus-visible + span { outline: 2px solid var(--text); outline-offset: 3px; }
+.erstellseite[data-erstellseite="unterthema"] .schalter span::before { left: 2px; top: 2px; width: 11px; height: 11px; }
+.erstellseite[data-erstellseite="unterthema"] .schalter input:checked + span::before { transform: translateX(15px); }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__einladen { margin: 23px 3px 0; padding: 4px 12px 4px 37px; }
 .erstellseite[data-erstellseite="unterthema"] .erstellseite__qrText { margin-left: 41px; }
-.erstellseite[data-erstellseite="unterthema"] .erstellseite__qr { margin-top: 46px; width: min(234px, 100%); height: auto; aspect-ratio: 1; }
+.erstellseite[data-erstellseite="unterthema"] .erstellseite__qr { margin-top: 43px; width: min(234px, 100%); height: auto; aspect-ratio: 1; }
 
 @media (max-height: 720px) {
   .erstellseite[data-erstellseite="unterthema"] .erstellseite__kopf { min-height: 48px; padding-top: 10px; }

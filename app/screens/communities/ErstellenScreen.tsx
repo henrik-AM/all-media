@@ -9,6 +9,7 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -62,6 +63,9 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
   const insets = useSafeAreaInsets();
   const { supabase } = useSupabase();
   const istCommunity = art === 'community';
+  const { height, width } = useWindowDimensions();
+  const kompakt = height - insets.top - insets.bottom < 850;
+  const qrGroesse = istCommunity ? 200 : Math.min(kompakt ? 200 : 234, width - 36);
 
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
@@ -125,24 +129,27 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       testID={istCommunity ? 'community-erstellen' : 'unterthema-erstellen'}
     >
-      <View style={[styles.kopf, { paddingTop: insets.top + spacing.sm }]}>
+      <View style={[styles.kopf, !istCommunity && styles.unterthemaKopf, { paddingTop: insets.top + spacing.sm }]}>
         <Druck onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel={T.schliessen} testID="erstellen-zu">
           <Ionicons name="close" size={30} color={colors.text} />
         </Druck>
       </View>
 
-      <ScrollView contentContainerStyle={styles.inhalt} keyboardShouldPersistTaps="handled">
-        <View style={styles.pflichtZeile}>
+      <ScrollView
+        contentContainerStyle={[styles.inhalt, !istCommunity && styles.unterthemaInhalt]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={[styles.pflichtZeile, !istCommunity && styles.unterthemaPflicht]}>
           <Text style={styles.stern}>{'✳\uFE0E'}</Text>
           <Text style={styles.pflichtText}>{T.pflichtfeld}</Text>
         </View>
 
-        <View style={styles.nameFeld}>
+        <View style={[styles.nameFeld, !istCommunity && styles.unterthemaName]}>
           <TextInput
             value={name}
             onChangeText={setName}
             placeholder={istCommunity ? T.communityName : T.unterthemaName}
-            placeholderTextColor={colors.text2}
+            placeholderTextColor={istCommunity ? colors.text2 : colors.text}
             style={styles.nameEingabe}
             maxLength={Erstellen.NAME_MAX}
             accessibilityLabel={istCommunity ? T.communityName : T.unterthemaName}
@@ -187,7 +194,7 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
           onChangeText={setBio}
           placeholder={T.bio}
           placeholderTextColor={colors.text2}
-          style={[styles.feld, styles.feldAbstand]}
+          style={[styles.feld, styles.feldAbstand, !istCommunity && styles.unterthemaBio]}
           multiline
           maxLength={Erstellen.BIO_MAX}
           accessibilityLabel={T.bio}
@@ -198,7 +205,7 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
           onChangeText={setLink}
           placeholder={T.link}
           placeholderTextColor={colors.text2}
-          style={styles.feld}
+          style={[styles.feld, !istCommunity && styles.unterthemaFeld]}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
@@ -252,10 +259,10 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
           </>
         ) : null}
 
-        <View style={styles.schalterZeile}>
+        <View style={[styles.schalterZeile, !istCommunity && styles.unterthemaSchalter]}>
           <View style={{ flex: 1 }}>
             <Text style={styles.schalterTitel}>{istCommunity ? T.privatCommunity : T.privatUnterthema}</Text>
-            <Text style={styles.schalterSub}>{istCommunity ? T.privatCommunitySub : T.privatUnterthemaSub}</Text>
+            <Text style={[styles.schalterSub, !istCommunity && styles.unterthemaSchalterSub]}>{istCommunity ? T.privatCommunitySub : T.privatUnterthemaSub}</Text>
           </View>
           {/* Markenfarbe wie in den Einstellungen. */}
           <Switch
@@ -267,12 +274,16 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
           />
         </View>
 
-        <Druck style={styles.einladen} onPress={teilen} accessibilityRole="button" accessibilityLabel={T.einladen} testID="erstellen-einladen">
+        <Druck style={[styles.einladen, !istCommunity && styles.unterthemaEinladen]} onPress={teilen} accessibilityRole="button" accessibilityLabel={T.einladen} testID="erstellen-einladen">
           <Text style={styles.einladenText}>{T.einladen}</Text>
         </Druck>
-        <Text style={styles.qrText}>{T.qr}</Text>
-        <View style={styles.qr} accessibilityLabel={`QR-Code: ${einladung}`} testID="erstellen-qr">
-          <QrCode text={einladung} groesse={200} />
+        <Text style={[styles.qrText, !istCommunity && styles.unterthemaQrText]}>{T.qr}</Text>
+        <View
+          style={[styles.qr, !istCommunity && !kompakt && styles.unterthemaQr]}
+          accessibilityLabel={`QR-Code: ${einladung}`}
+          testID="erstellen-qr"
+        >
+          <QrCode text={einladung} groesse={qrGroesse} />
         </View>
         <Text style={styles.qrHinweis}>{T.qrHinweis}</Text>
       </ScrollView>
@@ -442,4 +453,16 @@ const styles = themenStyles((c) => ({
     alignItems: 'center' as const,
   },
   fertigText: { fontSize: 17, color: c.white },
+  // Maße aus Figma 928:13446. Die Seite behält den iOS-Sicherheitsabstand und scrollt bei wenig Platz.
+  unterthemaKopf: { paddingHorizontal: 28 },
+  unterthemaInhalt: { paddingHorizontal: 18 },
+  unterthemaPflicht: { paddingLeft: 14, marginBottom: 11, gap: 12 },
+  unterthemaName: { minHeight: 75, paddingLeft: 12, paddingRight: 36 },
+  unterthemaBio: { marginTop: 43, paddingHorizontal: 12 },
+  unterthemaFeld: { paddingHorizontal: 12 },
+  unterthemaSchalter: { minHeight: 60, marginTop: 45, marginHorizontal: -18, paddingLeft: 24, paddingRight: 18, paddingVertical: 8 },
+  unterthemaSchalterSub: { fontSize: 11 },
+  unterthemaEinladen: { marginHorizontal: 3, paddingHorizontal: 12, paddingLeft: 37, paddingVertical: 4 },
+  unterthemaQrText: { marginLeft: 41, fontSize: 15 },
+  unterthemaQr: { marginTop: 46 },
 }));
