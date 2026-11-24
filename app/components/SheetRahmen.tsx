@@ -27,7 +27,9 @@ interface Props {
 export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: Props) => {
   const insets = useSafeAreaInsets();
   // Kasten E16-1.4: Oberthema klein über dem Titel, wenn die Einstellungen es setzen.
-  const oberthema = useOberthema();
+  const thema = useOberthema();
+  // Gleich wie der Titel („Farbfilter“ über „Farbfilter“) sagt es nichts.
+  const oberthema = thema && thema !== title ? thema : null;
   // Paket 9: solange ein Blatt offen ist, zeigt es die Upload-Anzeige selbst.
   useEffect(() => { if (!visible) return; blattOffen(true); return () => blattOffen(false); }, [visible]);
   /*
