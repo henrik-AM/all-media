@@ -31,16 +31,20 @@ const { spawnSync } = require('child_process');
 const PLAETZE = {
   1: { pruef: 'all.media.prueflauf@web.de', pruefId: '62616c1d-82e2-4ee4-aab9-950e40e438a4',
        partner: 'test@all-media.app', partnerId: '3baafacd-bbdb-40fb-8ef4-a4e365ae00c4',
-       pruefHandle: '@prueflauf', partnerHandle: '@test', partnerName: 'Test Nutzer' },
+       pruefHandle: '@prueflauf', partnerHandle: '@test', partnerName: 'Test Nutzer',
+       pruefTelefon: '+49 151 9900110', partnerTelefon: '+49 151 9990001' },
   2: { pruef: 'prueflauf2@all-media.app', pruefId: '5102dc2b-760a-4eab-bfd6-52aad76a62e4',
        partner: 'test2@all-media.app', partnerId: 'cf188d34-1c06-4032-baaa-fddc1962f1e5',
-       pruefHandle: '@prueflauf2', partnerHandle: '@test2', partnerName: 'Test Nutzer 2' },
+       pruefHandle: '@prueflauf2', partnerHandle: '@test2', partnerName: 'Test Nutzer 2',
+       pruefTelefon: '+49 1550 0000221', partnerTelefon: '+49 1550 0000222' },
   3: { pruef: 'prueflauf3@all-media.app', pruefId: '96b4bed8-ef40-4008-a234-9dd9980157cd',
        partner: 'test3@all-media.app', partnerId: '53f6c454-c64d-4c36-900f-199acf22cd71',
-       pruefHandle: '@prueflauf3', partnerHandle: '@test3', partnerName: 'Test Nutzer 3' },
+       pruefHandle: '@prueflauf3', partnerHandle: '@test3', partnerName: 'Test Nutzer 3',
+       pruefTelefon: '+49 1550 0000231', partnerTelefon: '+49 1550 0000232' },
   4: { pruef: 'prueflauf4@all-media.app', pruefId: 'ccafa28b-a34c-458c-87e1-bc1867d15811',
        partner: 'test4@all-media.app', partnerId: 'a97dd738-9f60-4a17-83ae-348d1d187858',
-       pruefHandle: '@prueflauf4', partnerHandle: '@test4', partnerName: 'Test Nutzer 4' },
+       pruefHandle: '@prueflauf4', partnerHandle: '@test4', partnerName: 'Test Nutzer 4',
+       pruefTelefon: '+49 1550 0000241', partnerTelefon: '+49 1550 0000242' },
 };
 
 /** Name der Belegung im Abgleich-Skript. */
@@ -71,9 +75,12 @@ function platzSetzen() {
     process.env.AM_PARTNER_MAIL = process.env.AM_PARTNER_MAIL || PLAETZE[1].partner;
   } else {
     // Plätze 2–4: immer das eigene Paar, sonst setzte der Lauf Platz 1 zurück.
-    process.env.AM_TEST_MAIL = PLAETZE[n].pruef;
-    process.env.AM_PARTNER_MAIL = PLAETZE[n].partner;
-    process.env.TEST_EMAIL = PLAETZE[n].partner;
+    // Feste Adressen aus PLAETZE, kein Lesen der Umgebung.
+    Object.assign(process.env, {
+      AM_TEST_MAIL: PLAETZE[n].pruef,
+      AM_PARTNER_MAIL: PLAETZE[n].partner,
+      TEST_EMAIL: PLAETZE[n].partner,
+    });
   }
   return n;
 }
@@ -85,15 +92,19 @@ function platzSetzen() {
  */
 function konten() {
   const n = platzSetzen();
+  // Erst hier laden: _nur_testkonten.js lädt diese Datei selbst.
+  const { nurTestkonto } = require('./_nur_testkonten');
   return {
     platz: n,
-    pruef: process.env.AM_TEST_MAIL || PLAETZE[n].pruef,
+    pruef: nurTestkonto(process.env.AM_TEST_MAIL || PLAETZE[n].pruef),
     pruefId: PLAETZE[n].pruefId,
-    partner: process.env.AM_PARTNER_MAIL || PLAETZE[n].partner,
+    partner: nurTestkonto(process.env.AM_PARTNER_MAIL || PLAETZE[n].partner),
     partnerId: PLAETZE[n].partnerId,
     pruefHandle: PLAETZE[n].pruefHandle,
     partnerHandle: PLAETZE[n].partnerHandle,
     partnerName: PLAETZE[n].partnerName,
+    pruefTelefon: PLAETZE[n].pruefTelefon,
+    partnerTelefon: PLAETZE[n].partnerTelefon,
   };
 }
 

@@ -201,7 +201,8 @@ async function teilWebsite(a) {
       markierungsEingabe(t);
     });
     await page.click('#markiereingabe');
-    await page.keyboard.type('Hi @' + a.handle.replace(/^@/, '').slice(0, 3));
+    // Ganzer Name: seit dem Kontenpool (Schema 138) gibt es @test, @test2 … @test4.
+    await page.keyboard.type('Hi @' + a.handle.replace(/^@/, ''));
     await page.waitForSelector('.markierliste [data-mwahl]', { timeout: 6000 }).catch(() => null);
     const liste = await page.evaluate(() => [...document.querySelectorAll('.markierliste__namen span')].map((n) => n.textContent));
     pruefe('Beim Tippen von @ steht A in der Liste', liste.includes(a.handle), JSON.stringify(liste));

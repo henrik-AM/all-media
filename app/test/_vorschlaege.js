@@ -273,7 +273,7 @@ const alsKonto = (uid) => `
     const pk = await vorschlaege(P, 'communitys');
     const greta = finde(pv, id['@greta']);
     pruefe('1 @greta bei @prueflauf (Videos)', !!greta, handles(pv));
-    pruefe('1 Begründung „Gefolgt von @test…"', /^Gefolgt von @test( und |$)/.test(greta?.grund || ''), greta?.grund);
+    pruefe('1 Begründung „Gefolgt von @test…"', new RegExp(`^Gefolgt von ${KONTENPOOL.partnerHandle}( und |$)`).test(greta?.grund || ''), greta?.grund);
     pruefe('1 @greta bei @prueflauf (Communitys)', !!finde(pk, id['@greta']), handles(pk));
     pruefe('1 @hakan bei @prueflauf (Videos)', !!finde(pv, id['@hakan']));
     pruefe('1 jede Zeile hat eine Begründung', pv.every((v) => typeof v.grund === 'string' && v.grund.length > 3));
@@ -492,7 +492,7 @@ async function websitePruefen(P, id) {
     const karteGreta = abschnittV.locator(`[data-vorschlag="${id['@greta']}"]`);
     pruefe('12 Videos: Karte @greta', (await karteGreta.count()) === 1);
     const grund = await karteGreta.locator('.vorschlag__grund').textContent().catch(() => '');
-    pruefe('12 Videos: Begründung auf der Karte', /^Gefolgt von @test/.test(grund || ''), grund);
+    pruefe('12 Videos: Begründung auf der Karte', new RegExp(`^Gefolgt von ${KONTENPOOL.partnerHandle}\\b`).test(grund || ''), grund);
     const hdl = await karteGreta.locator('.vorschlag__handle').textContent().catch(() => '');
     pruefe('12 Videos: @handle auf der Karte', hdl === '@greta', hdl);
 

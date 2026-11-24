@@ -223,7 +223,7 @@ function kontowechsel() {
 function nurTestkonten() {
   console.log('\n5. Nur Testkonten (13.4)');
   pruefe('Dieselbe Liste wie ist_testkonto()',
-    TESTKONTEN.every((m) => lies('SUPABASE_SCHEMA_62_nur_eigene_testkonten.sql').includes(`'${m}'`)));
+    TESTKONTEN.every((m) => lies('SUPABASE_SCHEMA_138_kontenpool.sql').includes(`'${m}'`)));
   const offen = [];
   for (const ordner of ['app/test', 'app/tools']) {
     for (const datei of fs.readdirSync(path.join(WURZEL, ordner))) {

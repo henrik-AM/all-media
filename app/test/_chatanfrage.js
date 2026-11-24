@@ -238,7 +238,7 @@ async function anmelden(zugang) {
     if (schonKontakt?.status !== 'friend') {
       // Kontakt nur über die Nummer (Schema 57) — wie ein Mensch es tut.
       const { data: treffer, error: nFehler } = await fremder.client
-        .rpc('finde_per_nummer', { nummer: '+49 151 9990001' });
+        .rpc('finde_per_nummer', { nummer: KONTENPOOL.partnerTelefon });
       if (nFehler) throw nFehler;
       if (treffer?.id !== eigner.id) throw new Error('Nummer des Testkontos führt nicht zum Testkonto');
       const { error: kFehler } = await fremder.client

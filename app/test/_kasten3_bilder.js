@@ -215,14 +215,14 @@ const leisteZeigt = (page, muster) =>
     console.log('\n3.4 Plus → Telefonnummer → Kontakt');
     // Die angenommene Anfrage hat @prueflauf schon zum Kontakt gemacht. Damit
     // das Bild echtes Hinzufügen zeigt, nimmt @test den eigenen Eintrag weg.
-    const weg = await e.evaluate(async () => {
+    const weg = await e.evaluate(async (pruefHandle) => {
       const client = await window.Anmeldung.aufbauen();
       const ich = window.Anmeldung.nutzer().id;
       const { data } = await client.from('contacts').delete().eq('user_id', ich).neq('contact_id', ich)
-        .in('contact_id', (await client.from('profiles').select('id').eq('handle', KONTENPOOL.pruefHandle)).data.map((p) => p.id))
+        .in('contact_id', (await client.from('profiles').select('id').eq('handle', pruefHandle)).data.map((p) => p.id))
         .select('contact_id');
       return (data || []).length;
-    });
+    }, KONTENPOOL.pruefHandle);
     pruefe('Vorher: @prueflauf aus den Kontakten von @test genommen', weg === 1, String(weg));
     await neu(e);
     await e.click('[data-area="messenger"]');
@@ -246,7 +246,7 @@ const leisteZeigt = (page, muster) =>
     pruefe('Unbekannte Nummer: Hinweis sichtbar im Blatt',
       obenauf.sichtbar && /kein Konto/.test(obenauf.text), JSON.stringify(obenauf));
     await bild(e, '15a-web-unbekannte-nummer');
-    await e.fill('#contactHandle', '+49 151 9900110');
+    await e.fill('#contactHandle', KONTENPOOL.pruefTelefon);
     pruefe('Neue Eingabe räumt den Hinweis weg', await e.locator('#contactFehler').isHidden());
     await bild(e, '15-web-nummer-eingeben');
     await e.click('#contactAdd');
@@ -254,11 +254,11 @@ const leisteZeigt = (page, muster) =>
     await bild(e, '16-web-kontakt-angelegt');
     const toastText = await e.locator('.toast').allInnerTexts().then((t) => t.join(' ')).catch(() => '');
     pruefe('Nummer führt zum Kontakt (Rückmeldung)', toastText && !/nicht|Fehler|kommen über|bereits/i.test(toastText), toastText);
-    const drin = await e.evaluate(async () => {
+    const drin = await e.evaluate(async (pruefHandle) => {
       const client = await window.Anmeldung.aufbauen();
       const { data } = await client.from('contacts').select('herkunft, profiles!contacts_contact_id_fkey(handle)').eq('user_id', window.Anmeldung.nutzer().id);
-      return (data || []).filter((k) => k.profiles?.handle === KONTENPOOL.pruefHandle).map((k) => k.herkunft);
-    });
+      return (data || []).filter((k) => k.profiles?.handle === pruefHandle).map((k) => k.herkunft);
+    }, KONTENPOOL.pruefHandle);
     pruefe('Der Kontakt steht in der Datenbank, Herkunft Nummer', drin.length === 1 && drin[0] === 'nummer', JSON.stringify(drin));
   } catch (err) {
     pruefe('Ablauf ohne Abbruch', false, err.message);

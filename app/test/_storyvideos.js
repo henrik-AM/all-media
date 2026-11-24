@@ -191,7 +191,7 @@ function bereichsListen(storys, { kontaktIds, gefolgtIds, ichId }) {
       .maybeSingle();
     if (schonKontakt?.status !== 'friend') {
       const { data: treffer, error: nFehler } = await fremder.client
-        .rpc('finde_per_nummer', { nummer: '+49 151 9990001' });
+        .rpc('finde_per_nummer', { nummer: KONTENPOOL.partnerTelefon });
       if (nFehler) throw nFehler;
       const gefunden = Array.isArray(treffer) ? treffer[0] : treffer;
       if (gefunden?.id !== eigner.id) throw new Error('Nummer des Testkontos führt nicht zum Testkonto');

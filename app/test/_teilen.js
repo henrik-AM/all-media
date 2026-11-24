@@ -205,8 +205,8 @@ async function abraeumen(a, b) {
   await pruefe('Der genaue Nutzername findet den Fremden', async () => {
     await tippen(KONTENPOOL.partnerHandle);
     await page.waitForFunction(
-      () => [...document.querySelectorAll('.teilen__name')].some((e) => e.textContent === KONTENPOOL.partnerName),
-      null, { timeout: 8000 }
+      (name) => [...document.querySelectorAll('.teilen__name')].some((e) => e.textContent === name),
+      KONTENPOOL.partnerName, { timeout: 8000 }
     );
     const kopf = await page.$$eval('.teilen__kopf', (els) => els.map((e) => e.textContent));
     if (!kopf.includes('Nutzername')) throw new Error(kopf.join(' | '));

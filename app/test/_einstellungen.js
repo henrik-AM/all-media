@@ -5,6 +5,7 @@
 
 const { chromium } = require('playwright-core');
 const { anmelden, zuruecksetzen, beenden } = require('./_konto');
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
@@ -302,7 +303,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
    * Unterschied, den die alte Fassung verwischt hat.
    */
   await pruefe('Die Telefonnummer kommt in der Datenbank an', async () => {
-    const nummer = '+49 151 9900110';
+    const nummer = KONTENPOOL.pruefTelefon; // je Prüfplatz eine eigene Nummer
     const antwort = await page.evaluate(async (n) => {
       const res = await fetch('/api/eigene/telefon', {
         method: 'POST',

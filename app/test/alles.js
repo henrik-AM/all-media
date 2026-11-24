@@ -124,6 +124,9 @@ function stempel(pfade = BEOBACHTET) {
     if (eintrag.isFile()) return dateien.push(ort);
     for (const kind of fs.readdirSync(ort, { withFileTypes: true })) {
       if (kind.name === 'node_modules' || kind.name.startsWith('.')) continue;
+      // Ausgaben der Läufe selbst (af-fix-vorher.js schreibt ergebnisse-af-fix/vorher.txt);
+      // zwei Prüfplätze zugleich machten die Messung sonst immer ungültig (Kontenpool).
+      if (kind.isDirectory() && kind.name.startsWith('ergebnisse')) continue;
       sammle(path.join(ort, kind.name));
     }
   };
