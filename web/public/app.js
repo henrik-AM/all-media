@@ -7963,7 +7963,13 @@ function geteiltBinden(liste) {
     b.addEventListener('click', (e) => {
       // Ein Ziehen zum Antworten endet nicht als Klick auf die Karte.
       if (b.closest('[data-gezogen]')) return e.preventDefault();
-      beitragOeffnen(b.dataset.beitragkind, b.dataset.beitrag);
+      const imChatOverlay = overlay.contains(liste);
+      beitragOeffnen(b.dataset.beitragkind, b.dataset.beitrag, () => {
+        // Nach einem Bereichswechsel gehört eine verspätete Antwort nicht mehr hierher.
+        if (!liste.isConnected || (imChatOverlay && overlay.hidden)) return false;
+        if (imChatOverlay) closeChat();
+        return true;
+      });
     })
   );
 }
@@ -13747,9 +13753,8 @@ function mitteilungOeffnen(ziel, text = '') {
  * `kind` ist posts.kind (post, reel, clip). Die Profil-Routen liefern
  * stattdessen `art` (post, clip, video) — `video` heisst dort Reel.
  */
-async function beitragOeffnen(kind, id) {
+async function beitragOeffnen(kind, id, vorOeffnen) {
   if (!id) return;
-  state.einzelBeitragZiel=id;
   if(![...(state.posts||[]),...(state.videos||[]),...(state.clips||[])].some(p=>p.id===id)){
     const konto=window.Anmeldung?.nutzer?.()?.id;
     const r=await fetch(`/api/beitraege/${encodeURIComponent(id)}`).then(r=>r.json()).catch(()=>null);
@@ -13757,6 +13762,8 @@ async function beitragOeffnen(kind, id) {
     if(!r?.beitrag)return toast('Dieser Beitrag ist nicht verfügbar.');
     const b=r.beitrag;const liste=b.kind==='clip'?'clips':b.kind==='reel'?'videos':'posts';state[liste]=[...(state[liste]||[]),{...b,nurEinzeln:true}];
   }
+  if (vorOeffnen && !vorOeffnen()) return;
+  state.einzelBeitragZiel = id;
   if (kind === 'clip') return openClip(id);
   if (kind === 'reel' || kind === 'video') return mitteilungOeffnen({ art: 'video', id });
   return mitteilungOeffnen({ art: 'post', id });
