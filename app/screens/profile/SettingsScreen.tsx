@@ -841,6 +841,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   };
 
   const [sichtOffen, setSichtOffen] = useState<Item | null>(null);
+  const [wahlFehler, setWahlFehler] = useState<string | null>(null);
+  useEffect(() => setWahlFehler(null), [offen]);
   const [farbfilterOffen, setFarbfilterOffen] = useState(false);
   const [rechtstext, setRechtstext] = useState<string | null>(null);
   const { konfig: farbfilter } = useFarbfilter();
@@ -1469,14 +1471,25 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           titel={offen.label}
           wahl={offen.wahl}
           aktuell={wert(offen)}
+          /*
+           * Nach Runde 3 (E16-1.6): erst speichern, dann schließen. Scheitert
+           * es, bleibt das Blatt offen, sagt es und die Auswahl springt zurück
+           * (der EinstellungenContext dreht den Wert selbst zurück).
+           */
           onWahl={(w) => {
-            setOffen(null);
-            if (!offen.wahlKey) return onNotice(`${offen.label}: ${w}`);
+            if (!offen.wahlKey) {
+              setOffen(null);
+              return onNotice(`${offen.label}: ${w}`);
+            }
+            setWahlFehler(null);
             void (async () => {
-              const ok = await einstellungSetzen(offen.wahlKey as string, w);
-              if (ok) onNotice(`${offen.label}: ${w}`);
+              const ok = await setzen(offen.wahlKey as string, w);
+              if (!ok) return setWahlFehler('Das ließ sich gerade nicht speichern. Bitte versuch es noch einmal.');
+              setOffen(null);
+              onNotice(`${offen.label}: ${w}`);
             })();
           }}
+          fehler={wahlFehler}
           zeilen={offen.liste ? listeVon(offen.liste).zeilen : undefined}
           leer={offen.liste ? listeVon(offen.liste).leer : undefined}
           knopf={offen.liste && listeVon(offen.liste).fehler ? 'Erneut versuchen' : undefined}

@@ -170,7 +170,12 @@ export const SichtbarkeitSheet = ({
         {onInVideos && (
           <Druck
             style={styles.zusatz}
-            onPress={() => stufe === 'alle' && onInVideos(!inVideos)}
+            onPress={() => onInVideos(!inVideos)}
+            // Nach Runde 3: eine bedienbare Fläche mit Name, Zustand und echter Sperre.
+            disabled={stufe !== 'alle'}
+            accessibilityRole="switch"
+            accessibilityLabel="Story auch in Videos teilen"
+            accessibilityState={{ checked: !!inVideos && stufe === 'alle', disabled: stufe !== 'alle' }}
           >
             <View style={styles.stufeText}>
               <Text style={[styles.stufeLabel, stufe !== 'alle' && styles.zusatzAus]}>
@@ -183,12 +188,9 @@ export const SichtbarkeitSheet = ({
               </Text>
             </View>
             {/* E16-1.2 (Gegenprüfung R2): derselbe Grau-Grün-Schalter, außerhalb von „Alle“ gesperrt. */}
-            <Schalter
-              value={!!inVideos && stufe === 'alle'}
-              onValueChange={(an) => onInVideos(an)}
-              disabled={stufe !== 'alle'}
-              accessibilityLabel="Story auch in Videos teilen"
-            />
+            <View pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+              <Schalter value={!!inVideos && stufe === 'alle'} onValueChange={() => {}} disabled={stufe !== 'alle'} />
+            </View>
           </Druck>
         )}
 

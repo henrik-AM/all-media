@@ -218,20 +218,100 @@ async function oeffnen(browser, { breite = 400, dunkel = false, schrift = 1 } = 
     pruefe('1.4 Formular zeigt Oberthema „Allgemein“', feld.ober === 'Allgemein', String(feld.ober));
     await seite.keyboard.press('Escape');
 
-    // Gegenprüfung R2: offenes Listenblatt wird nach dem Nachladen aktualisiert.
-    await seite.click('[data-setting="Gelikte Beiträge"]');
-    await seite.waitForSelector('.sheet [data-liste="gelikt"]');
-    await seite.waitForFunction(() => !/Wird geladen/.test(document.querySelector('.sheet [data-liste="gelikt"]')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
-    const gelikt = await seite.evaluate(() => ({ text: document.querySelector('.sheet [data-liste="gelikt"]')?.textContent.trim().slice(0, 60), ober: [...document.querySelectorAll('.sheet')].pop()?.querySelector('[data-testid="blatt-oberthema"]')?.textContent.trim() }));
-    pruefe('1.6 offenes Listenblatt zeigt nach dem Laden nicht mehr „Wird geladen …“', !!gelikt.text && !/Wird geladen/.test(gelikt.text), JSON.stringify(gelikt));
-    pruefe('1.4 nach dem Neuaufbau weiter Oberthema „Videos“', gelikt.ober === 'Videos', String(gelikt.ober));
-    await seite.keyboard.press('Escape');
+    // Nach Runde 3: offenes Listenblatt — erst „Wird geladen …“, dann Fehler + Wiederholen, dann Inhalt, im selben Blatt.
+    // Ein frischer Browser erzwingt das Nachladen bei offenem Blatt.
+    {
+      const s2 = await browser.newPage({ viewport: { width: 400, height: 860 } });
+      let freigeben;
+      let versuch = 0;
+      await attrappe(s2, bestand({ users: { [ICH]: { id: ICH, name: 'Test Konto', handle: 'test', initials: 'TK' } } }), {
+        '/api/einstellungen': { einstellungen: {} },
+      });
+      await s2.route('**/api/gelikt', async (anfrage) => {
+        versuch++;
+        if (versuch === 1) {
+          await new Promise((ok) => (freigeben = ok));
+          return anfrage.fulfill({ status: 500, json: {} });
+        }
+        return anfrage.fulfill({ json: [{ id: 'b1', kind: 'video', titel: 'Sonnenuntergang', wann: '2026-11-20T10:00:00Z' }] });
+      });
+      await s2.goto(BASE, { waitUntil: 'domcontentloaded' });
+      await s2.waitForSelector('[data-area="settings"]', { timeout: 15000 });
+      await s2.click('[data-area="settings"]');
+      await s2.waitForSelector('[data-setting="Gelikte Beiträge"]');
+      await s2.click('[data-setting="Gelikte Beiträge"]');
+      await s2.waitForSelector('.sheet [data-liste="gelikt"]');
+      const t0 = await s2.$eval('.sheet [data-liste="gelikt"]', (e) => e.textContent.trim());
+      pruefe('1.6 Liste zeigt zuerst „Wird geladen …“', /Wird geladen/.test(t0), t0);
+      const blattVorher = await s2.evaluate(() => {
+        document.querySelector('.sheet').dataset.marke = 'x';
+        return document.querySelectorAll('.sheet').length;
+      });
+      while (!freigeben) await s2.waitForTimeout(50);
+      freigeben();
+      await s2.waitForSelector('#listeNochmal', { timeout: 8000 }).catch(() => {});
+      const f = await s2.evaluate(() => ({
+        text: document.querySelector('.sheet [data-liste="gelikt"]')?.textContent.trim(),
+        knopf: !!document.querySelector('#listeNochmal'),
+        gleich: document.querySelector('.sheet')?.dataset.marke === 'x',
+        anzahl: document.querySelectorAll('.sheet').length,
+      }));
+      pruefe('1.6 Ladefehler: Text + „Erneut versuchen“ im selben Blatt', /nicht geladen/.test(f.text || '') && f.knopf && f.gleich && f.anzahl === blattVorher, JSON.stringify(f));
+      await s2.click('#listeNochmal');
+      await s2.waitForFunction(() => /Sonnenuntergang/.test(document.querySelector('.sheet [data-liste="gelikt"]')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+      const g = await s2.evaluate(() => ({
+        text: document.querySelector('.sheet [data-liste="gelikt"]')?.textContent.trim().slice(0, 40),
+        knopf: !!document.querySelector('#listeNochmal'),
+        gleich: document.querySelector('.sheet')?.dataset.marke === 'x',
+        ober: document.querySelector('.sheet [data-testid="blatt-oberthema"]')?.textContent.trim(),
+      }));
+      pruefe('1.6 nach „Erneut versuchen“: Inhalt im selben Blatt, Knopf weg, Oberthema „Videos“', /Sonnenuntergang/.test(g.text || '') && !g.knopf && g.gleich && g.ober === 'Videos', JSON.stringify(g));
+      await s2.keyboard.press('Escape');
+      await s2.waitForTimeout(200);
+      pruefe('1.6 Escape schließt das aktualisierte Blatt', (await s2.$$('.sheet')).length === 0);
+
+      // Schreibreihenfolge: ältere Antwort kommt zuletzt.
+      const posts = [];
+      let ersteFrei;
+      await s2.route('**/api/einstellungen/autoDownload', async (anfrage) => {
+        const wert = JSON.parse(anfrage.request().postData() || '{}').wert;
+        posts.push(wert);
+        if (posts.length === 1) await new Promise((ok) => (ersteFrei = ok));
+        anfrage.fulfill({ json: { ok: true } });
+      });
+      await s2.click('[data-setting="Automatischer Download"]');
+      await s2.click('.sheet [data-wahl="Nie"]');
+      await s2.waitForTimeout(150);
+      await s2.keyboard.press('Escape');
+      await s2.click('[data-setting="Automatischer Download"]');
+      await s2.click('.sheet [data-wahl="Immer"]');
+      await s2.waitForTimeout(300);
+      const zwischen = posts.length;
+      while (!ersteFrei) await s2.waitForTimeout(50);
+      ersteFrei();
+      await s2.waitForTimeout(800);
+      const stand = await s2.evaluate(() => state.einstellungen.autoDownload);
+      pruefe('1.6 zweite Wahl wartet auf die erste, die letzte gewinnt (Server + Anzeige)', zwischen === 1 && posts.join() === 'Nie,Immer' && stand === 'Immer', JSON.stringify({ zwischen, posts, stand }));
+
+      // Navigation: verspätetes Blatt nach Wechsel Messenger → Einstellungen.
+      await s2.keyboard.press('Escape');
+      await s2.route('**/api/version', async (anfrage) => {
+        await new Promise((ok) => setTimeout(ok, 900));
+        anfrage.fulfill({ json: { version: '1.0.0', commit: 'abc1234' } });
+      });
+      await s2.click('[data-setting="Über All Media"]');
+      await s2.click('[data-area="messenger"]');
+      await s2.click('[data-area="settings"]');
+      await s2.waitForTimeout(1400);
+      pruefe('1.4 nach Wechsel Messenger → Einstellungen öffnet sich kein verspätetes Blatt', !(await s2.$('[data-testid="ueber-stand"]')));
+      await s2.close();
+    }
 
     // Gegenprüfung R2: „Story auch in Videos teilen“ als gesperrter Grau-Grün-Schalter außerhalb von „Alle“.
     await seite.click('[data-setting="Story-Sichtbarkeit"][data-abschnitt="messenger"]');
     await seite.waitForSelector('.sheet [data-invideos]');
-    const story = await seite.$eval('.sheet [data-invideos] .switch', (e) => ({ rolle: e.getAttribute('role'), farbe: getComputedStyle(e).backgroundColor }));
-    pruefe('1.2 Story-in-Videos ist ein grauer Schalter (aus)', story.rolle === 'switch' && story.farbe === 'rgb(211, 214, 222)', JSON.stringify(story));
+    const story = await seite.$eval('.sheet [data-invideos]', (b) => ({ rolle: b.getAttribute('role'), aria: b.getAttribute('aria-checked'), innen: b.querySelector('.switch').getAttribute('role'), farbe: getComputedStyle(b.querySelector('.switch')).backgroundColor }));
+    pruefe('1.2/1.6 Story-in-Videos: Knopf ist der Schalter (role, aria-checked), Anzeige grau', story.rolle === 'switch' && story.aria === 'false' && story.innen === null && story.farbe === 'rgb(211, 214, 222)', JSON.stringify(story));
     await seite.keyboard.press('Escape');
 
     // Blatt außerhalb der Einstellungen: kein Oberthema

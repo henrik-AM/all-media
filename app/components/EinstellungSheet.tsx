@@ -47,6 +47,8 @@ interface Props {
   /** Nachfrage vor etwas Endgültigem. */
   bestaetigen?: string;
   onBestaetigt?: () => void;
+  /** Fehler beim Speichern einer Auswahl — steht im Blatt, nicht dahinter. */
+  fehler?: string | null;
   onClose: () => void;
 }
 
@@ -67,6 +69,7 @@ export const EinstellungSheet = ({
   infoScroll,
   bestaetigen,
   onBestaetigt,
+  fehler,
   onClose,
 }: Props) => (
   <SheetRahmen
@@ -92,6 +95,11 @@ export const EinstellungSheet = ({
     */}
     {wahl && (
       <ScrollView contentContainerStyle={styles.inhalt}>
+        {!!fehler && (
+          <Text style={styles.fehler} accessibilityRole="alert">
+            {fehler}
+          </Text>
+        )}
         <Karte>
           {wahl.map((w, i) => (
             <AuswahlZeile key={w} label={w} gewaehlt={w === aktuell} onPress={() => onWahl?.(w)} letzte={i === wahl.length - 1} />
@@ -185,5 +193,16 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
   gefahr: { backgroundColor: colors.danger },
+  fehler: {
+    ...typography.small,
+    fontWeight: '600',
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    borderRadius: radius.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
   knopfText: { ...typography.name, color: colors.white },
 }));

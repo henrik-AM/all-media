@@ -1632,6 +1632,8 @@ let renderLaufListe = 0;
 
 function render() {
   renderLauf++;
+  // E16-1.4 (nach Runde 3): jede Navigation macht ausstehende Einstellungsblätter ungültig.
+  state.blattAufruf = (state.blattAufruf || 0) + 1;
   renderLaufListe = renderLauf;
   // Die Kamera laeuft weiter, solange niemand sie abschaltet — auch dann,
   // wenn ihre Seite laengst weggezeichnet ist. Am Handy bliebe das Licht an.
@@ -9109,7 +9111,7 @@ function renderSettingsWert() {
  */
 (function schalterZugaenglich() {
   const setze = (el) => {
-    if (!el.classList?.contains('switch')) return;
+    if (!el.classList?.contains('switch') || el.classList.contains('einst-anzeige')) return;
     if (el.getAttribute('role') !== 'switch') el.setAttribute('role', 'switch');
     const an = String(el.classList.contains('is-on'));
     if (el.getAttribute('aria-checked') !== an) el.setAttribute('aria-checked', an);
@@ -10079,7 +10081,7 @@ function openSichtbarkeit(punkt) {
             * Datenbank selbst (Schema 30), nicht hier.
             */
            bereich === 'story'
-             ? `<button class="item sicht__stufe${jetzt.stufe !== 'alle' ? ' is-aus' : ''}" data-invideos="1"${
+             ? `<button class="item sicht__stufe${jetzt.stufe !== 'alle' ? ' is-aus' : ''}" data-invideos="1" role="switch" aria-checked="${!!(jetzt.inVideos && jetzt.stufe === 'alle')}" aria-label="Story auch in Videos teilen"${
                  jetzt.stufe !== 'alle' ? ' disabled' : ''
                }>
                   <span class="item__label">
@@ -10090,7 +10092,7 @@ function openSichtbarkeit(punkt) {
                         : 'Nur bei „Alle" möglich.'
                     }</small>
                   </span>
-                  <span class="switch ${jetzt.inVideos && jetzt.stufe === 'alle' ? 'is-on' : ''}" role="switch" aria-checked="${!!(jetzt.inVideos && jetzt.stufe === 'alle')}" aria-disabled="${jetzt.stufe !== 'alle'}" aria-label="Story auch in Videos teilen"><span class="switch__knob"></span></span>
+                  <span class="switch einst-anzeige ${jetzt.inVideos && jetzt.stufe === 'alle' ? 'is-on' : ''}" aria-hidden="true"><span class="switch__knob"></span></span>
                 </button>`
              : ''
          }
@@ -10409,23 +10411,35 @@ function einstellung(punkt) {
   return gespeichert && (!punkt.wahl || punkt.wahl.includes(gespeichert)) ? gespeichert : punkt.standard || '';
 }
 
-// Kasten E16-1.6 (Gegenprüfung R2): je Schlüssel zählt nur der jüngste Schreibvorgang.
+// Kasten E16-1.6 (Gegenprüfung R2/R3): je Schlüssel zählt nur der jüngste Schreibvorgang;
+// Schreibvorgänge laufen nacheinander, beide Privatprofil-Schalter teilen sich die Reihe.
 const einstellungSchreibNr = {};
-async function einstellungSetzen(punkt, wert) {
+const einstellungReihe = {};
+const einstellungBestaetigt = {};
+function einstellungSetzen(punkt, wert) {
   const schluessel = einstellungsSchluessel(punkt);
-  const vorher = state.einstellungen ? state.einstellungen[schluessel] : undefined;
-  const nr = (einstellungSchreibNr[schluessel] || 0) + 1;
-  einstellungSchreibNr[schluessel] = nr;
-
-  // Sofort umlegen, damit es sich nicht zaeh anfuehlt.
+  const reihe = schluessel === 'videoPrivate' || schluessel === 'commPrivate' ? 'privat' : schluessel;
+  const nr = (einstellungSchreibNr[reihe] || 0) + 1;
+  einstellungSchreibNr[reihe] = nr;
+  if (!(schluessel in einstellungBestaetigt)) einstellungBestaetigt[schluessel] = state.einstellungen ? state.einstellungen[schluessel] : undefined;
+  // Sofort anzeigen; geschrieben wird der Reihe nach.
   state.einstellungen = { ...(state.einstellungen || {}), [schluessel]: wert };
+  const lauf = (einstellungReihe[reihe] || Promise.resolve()).then(() => einstellungSchreiben(punkt, wert, reihe, nr));
+  einstellungReihe[reihe] = lauf.catch(() => false);
+  return lauf;
+}
+async function einstellungSchreiben(punkt, wert, reihe, nr) {
+  const schluessel = einstellungsSchluessel(punkt);
+  // Eine neuere Wahl steht schon an: diese gar nicht erst schreiben.
+  if (einstellungSchreibNr[reihe] !== nr) return true;
 
   const antwort = await api(`/api/einstellungen/${encodeURIComponent(schluessel)}`, { wert });
+  if (antwort?.ok) einstellungBestaetigt[schluessel] = wert;
   // Inzwischen wurde neu gewählt: diese Antwort darf nichts mehr zurückdrehen.
-  if (einstellungSchreibNr[schluessel] !== nr) return !!antwort?.ok;
+  if (einstellungSchreibNr[reihe] !== nr) return !!antwort?.ok;
   if (!antwort?.ok) {
-    // Zurueckdrehen. Eine Einstellung, die anders aussieht, als sie
-    // gespeichert ist, ist schlimmer als eine, die sich nicht setzen laesst.
+    // Zurück auf den zuletzt BESTÄTIGTEN Wert, nicht auf einen Zwischenstand.
+    const vorher = einstellungBestaetigt[schluessel];
     if (vorher === undefined) delete state.einstellungen[schluessel];
     else state.einstellungen[schluessel] = vorher;
     toast(antwort?.error || 'Nicht gespeichert');
@@ -10662,6 +10676,47 @@ function einstellungsListe(art) {
 
 /** `nachher` wird gerufen, wenn sich etwas geaendert hat - damit die
  *  aufrufende Seite ihren neuen Stand zeigen kann. */
+/* E16-1.6: Zeilen eines Listenblatts — beim Öffnen und beim Nachladen im offenen Blatt. */
+function listenZeilenHtml(zeilen, leer) {
+  return (
+
+           zeilen.length
+             ? zeilen
+                 .map((z) =>
+                   /*
+                    * Zwischenueberschrift statt Eintrag. Die Profilstatistik
+                    * hat zwoelf Zeilen; ohne Gliederung sieht "Profilaufrufe
+                    * (7 Tage)" so wichtig aus wie "Follower gesamt", obwohl
+                    * das eine eine Entwicklung ist und das andere ein Stand.
+                    */
+                   z.kopf
+                     ? `<div class="sheet__gruppe">${esc(z.text)}</div>`
+                     : z.ziel
+                     ? // Verlauf, Gelikte, Kommentare: zum Beitrag (Kasten 10.1).
+                       `<button class="item" data-ziel-kind="${esc(z.ziel.kind || '')}" data-ziel-id="${esc(z.ziel.id)}">
+                     <span class="item__label">${esc(z.text)}</span>
+                     <span class="item__value item__value--zeit">${esc(z.neben || '')}</span>
+                     <span class="item__chevron">${ICONS.chevron}</span>
+                   </button>`
+                     : `<div class="item">
+                     <span class="item__label">${esc(z.text)}</span>
+                     <span class="item__value">${esc(z.neben || '')}</span>
+                   </div>`
+                 )
+                 .join('')
+             : `<div class="sheet__hint">${esc(leer)}</div>`
+         
+  );
+}
+function listenZeilenBinden(sheet, close) {
+  sheet.querySelectorAll('[data-ziel-id]').forEach((b) =>
+    b.addEventListener('click', () => {
+      close();
+      beitragOeffnen(b.dataset.zielKind, b.dataset.zielId);
+    })
+  );
+}
+
 function openEinstellung(punkt, nachher) {
   /*
    * Kasten E16-1.4 (Gegenprüfung 24.11.): das Oberthema gehört zum Aufruf.
@@ -10872,56 +10927,21 @@ function openEinstellung(punkt, nachher) {
     return openSheet(
       punkt.label,
       `<div class="sheet__body" data-liste="${esc(punkt.liste)}" data-thema="${esc(punkt._thema || '')}">
-         ${
-           zeilen.length
-             ? zeilen
-                 .map((z) =>
-                   /*
-                    * Zwischenueberschrift statt Eintrag. Die Profilstatistik
-                    * hat zwoelf Zeilen; ohne Gliederung sieht "Profilaufrufe
-                    * (7 Tage)" so wichtig aus wie "Follower gesamt", obwohl
-                    * das eine eine Entwicklung ist und das andere ein Stand.
-                    */
-                   z.kopf
-                     ? `<div class="sheet__gruppe">${esc(z.text)}</div>`
-                     : z.ziel
-                     ? // Verlauf, Gelikte, Kommentare: zum Beitrag (Kasten 10.1).
-                       `<button class="item" data-ziel-kind="${esc(z.ziel.kind || '')}" data-ziel-id="${esc(z.ziel.id)}">
-                     <span class="item__label">${esc(z.text)}</span>
-                     <span class="item__value item__value--zeit">${esc(z.neben || '')}</span>
-                     <span class="item__chevron">${ICONS.chevron}</span>
-                   </button>`
-                     : `<div class="item">
-                     <span class="item__label">${esc(z.text)}</span>
-                     <span class="item__value">${esc(z.neben || '')}</span>
-                   </div>`
-                 )
-                 .join('')
-             : `<div class="sheet__hint">${esc(leer)}</div>`
-         }
+         ${listenZeilenHtml(zeilen, leer)}
        </div>
        ${knopf ? `<div class="sheet__footer"><button class="prof__btn is-primary" id="listenKnopf">${esc(knopf)}</button></div>` : ''}
        ${ladeFehler ? `<div class="sheet__footer"><button class="prof__btn is-primary" id="listeNochmal">Erneut versuchen</button></div>` : ''}`,
       (sheet, close) => {
         // Kasten E16-1.6: nach einem Ladefehler sofort neu fragen statt 30 s zu warten.
-        sheet.querySelector('#listeNochmal')?.addEventListener('click', () => {
-          einstellungNachgeladen[nachladeName] = undefined;
-          const body = sheet.querySelector('[data-liste]');
-          if (body) body.innerHTML = '<div class="sheet__hint">Wird geladen …</div>';
-          sheet.querySelector('#listeNochmal')?.closest('.sheet__footer')?.remove();
-          const pfade = { statistik: ['/api/statistik', (d) => d?.statistik || null], gelikt: ['/api/gelikt', (d) => (Array.isArray(d) ? d : null)], kommentiert: ['/api/kommentiert', (d) => (Array.isArray(d) ? d : null)] };
-          einstellungNachladen(nachladeName, ...pfade[nachladeName]);
-        });
+        sheet.querySelector('#listeNochmal')?.addEventListener('click', () => listeNochmal(nachladeName, sheet));
         sheet.querySelector('#listenKnopf')?.addEventListener('click', () => {
           close();
           toast(knopfText);
         });
-        sheet.querySelectorAll('[data-ziel-id]').forEach((b) =>
-          b.addEventListener('click', () => {
-            close();
-            beitragOeffnen(b.dataset.zielKind, b.dataset.zielId);
-          })
-        );
+        listenZeilenBinden(sheet, close);
+        // Für das Nachladen im offenen Blatt (einstellungNachladen).
+        const body = sheet.querySelector('[data-liste]');
+        if (body) body._zu = close;
       },
       { schliessen: true, hoch: zeilen.length > 4 }
     );
@@ -11072,12 +11092,30 @@ function einstellungNachladen(name, pfad, auswerten) {
       const liste = NACHLADE_LISTE[name];
       const offen = liste && document.querySelector(`.sheet [data-liste="${liste}"]`);
       if (offen) {
-        const thema = offen.dataset.thema || null;
-        offen.closest('.sheet-backdrop')?.remove();
-        const punkt = SETTINGS.flatMap((x) => x.items).find((it) => it.liste === liste);
-        if (punkt) openEinstellung({ ...punkt, _thema: thema });
+        // Nach Runde 3: im vorhandenen Blatt aktualisieren — Platz, Fokus und Schließen bleiben.
+        const { zeilen, leer } = einstellungsListe(liste);
+        const scroll = offen.scrollTop;
+        offen.innerHTML = listenZeilenHtml(zeilen, leer);
+        offen.scrollTop = scroll;
+        listenZeilenBinden(offen, offen._zu || (() => offen.closest('.sheet-backdrop')?.remove()));
+        const sheet = offen.closest('.sheet');
+        const fehler = !state[name] && einstellungNachgeladen[name] && einstellungNachgeladen[name] !== 'laeuft';
+        const fuss = sheet?.querySelector('#listeNochmal')?.closest('.sheet__footer');
+        if (!fehler) fuss?.remove();
+        else if (!fuss && sheet) {
+          sheet.insertAdjacentHTML('beforeend', '<div class="sheet__footer"><button class="prof__btn is-primary" id="listeNochmal">Erneut versuchen</button></div>');
+          sheet.querySelector('#listeNochmal').addEventListener('click', () => listeNochmal(name, sheet));
+        }
       }
     });
+}
+function listeNochmal(name, sheet) {
+  einstellungNachgeladen[name] = undefined;
+  const body = sheet.querySelector('[data-liste]');
+  if (body) body.innerHTML = '<div class="sheet__hint">Wird geladen …</div>';
+  sheet.querySelector('#listeNochmal')?.closest('.sheet__footer')?.remove();
+  const pfade = { statistik: ['/api/statistik', (d) => d?.statistik || null], gelikt: ['/api/gelikt', (d) => (Array.isArray(d) ? d : null)], kommentiert: ['/api/kommentiert', (d) => (Array.isArray(d) ? d : null)] };
+  einstellungNachladen(name, ...pfade[name]);
 }
 // Welche Liste in den Einstellungen an welchem Nachladen hängt.
 const NACHLADE_LISTE = { statistik: 'insights', gelikt: 'gelikt', kommentiert: 'kommentiert' };
@@ -11335,7 +11373,9 @@ function renderSettings() {
       const punkt = abschnitt?.items.find((it) => it.label === state.settingsPunkt);
       state.settingsPunkt = null;
       state.blattThema = abschnitt?.title || null;
-      if (punkt) setTimeout(() => openEinstellung(punkt), 60);
+      state.blattAufruf = (state.blattAufruf || 0) + 1;
+      const aufruf = state.blattAufruf;
+      if (punkt) setTimeout(() => state.area === 'settings' && state.blattAufruf === aufruf && openEinstellung(punkt), 60);
     }
   }
 
