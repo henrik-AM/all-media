@@ -279,13 +279,13 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
         </Druck>
         <Text style={[styles.qrText, !istCommunity && styles.unterthemaQrText]}>{T.qr}</Text>
         <View
-          style={[styles.qr, !istCommunity && !kompakt && styles.unterthemaQr]}
+          style={[styles.qr, !istCommunity && (kompakt ? styles.unterthemaQrKompakt : styles.unterthemaQr)]}
           accessibilityLabel={`QR-Code: ${einladung}`}
           testID="erstellen-qr"
         >
           <QrCode text={einladung} groesse={qrGroesse} />
         </View>
-        <Text style={styles.qrHinweis}>{T.qrHinweis}</Text>
+        <Text style={[styles.qrHinweis, !istCommunity && kompakt && styles.unterthemaHinweisKompakt]}>{T.qrHinweis}</Text>
       </ScrollView>
 
       <View style={[styles.fuss, { paddingBottom: insets.bottom + spacing.md }]}>
@@ -465,4 +465,6 @@ const styles = themenStyles((c) => ({
   unterthemaEinladen: { marginHorizontal: 3, paddingHorizontal: 12, paddingLeft: 37, paddingVertical: 4 },
   unterthemaQrText: { marginLeft: 41, fontSize: 15 },
   unterthemaQr: { marginTop: 46 },
+  unterthemaQrKompakt: { marginTop: 8 },
+  unterthemaHinweisKompakt: { marginTop: 4 },
 }));
