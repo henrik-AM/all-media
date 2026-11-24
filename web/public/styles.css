@@ -60,6 +60,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   --hairline: #F2F3F7;
   --danger: #E5484D;
   --success: #12A150;
+  --schalter-aus: #D3D6DE;
   --online: #22C55E;
   /*
    * Schatten immer zweilagig: ein enger Kontaktschatten zeichnet die Kante,
@@ -110,6 +111,8 @@ ul { margin: 0; padding: 0; list-style: none; }
     --hairline: #16181D;
     --danger: #F26D70;
     --success: #2DD07C;
+  --schalter-aus: #3A3F4A;
+    --schalter-aus: #3A3F4A;
     --shadow-sm: 0 1px 2px rgba(0,0,0,.6);
     --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 28px rgba(0,0,0,.6);
     --shadow-lg: 0 2px 6px rgba(0,0,0,.6), 0 24px 56px rgba(0,0,0,.7);
@@ -960,23 +963,29 @@ ul { margin: 0; padding: 0; list-style: none; }
 .copt__trenner { height: 8px; background: var(--surface-2); }
 
 .switch {
+  /* Einstellungen 16.11., Kasten 1.2: grau (aus) ↔ grün (an), nie lila;
+     gleiche Maße wie app/components/Schalter.tsx (51 × 31). */
   flex: 0 0 auto;
-  width: 44px; height: 26px;
-  border-radius: 13px;
-  background: var(--surface-3);
-  padding: 3px;
+  align-self: center;
+  width: 51px; height: 31px;
+  border-radius: 16px;
+  background: var(--schalter-aus);
+  padding: 2px;
+  border: 0;
+  cursor: pointer;
   transition: background .18s;
 }
 .switch__knob {
-  width: 20px; height: 20px;
+  display: block;
+  width: 27px; height: 27px;
   border-radius: 50%;
   background: #fff;
-  border: 1px solid rgba(16,24,40,.12);
-  box-shadow: 0 1px 3px rgba(0,0,0,.22);
+  box-shadow: 0 2px 4px rgba(0,0,0,.2);
   transition: transform .18s;
 }
-.switch.is-on { background: var(--brand-grad); }
-.switch.is-on .switch__knob { transform: translateX(18px); }
+.switch.is-on { background: var(--success); }
+.switch.is-on .switch__knob { transform: translateX(20px); }
+.switch:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /* ---------- User profile ---------- */
 .prof__top { display: flex; align-items: center; gap: 20px; padding: 18px 16px 12px; }

@@ -9088,6 +9088,27 @@ function renderSettingsWert() {
   });
 }
 
+/*
+ * Einstellungen 16.11., Kasten 1.6: jeder .switch ist für Bildschirmleser ein
+ * Schalter mit Zustand. Die Handler schalten nur die Klasse is-on um; dieser
+ * Beobachter hält role und aria-checked dazu passend, überall in der Seite.
+ */
+(function schalterZugaenglich() {
+  const setze = (el) => {
+    if (!el.classList?.contains('switch')) return;
+    if (el.getAttribute('role') !== 'switch') el.setAttribute('role', 'switch');
+    const an = String(el.classList.contains('is-on'));
+    if (el.getAttribute('aria-checked') !== an) el.setAttribute('aria-checked', an);
+  };
+  const beobachter = new MutationObserver((liste) => {
+    for (const m of liste) {
+      if (m.type === 'attributes') setze(m.target);
+      else m.addedNodes.forEach((n) => n.nodeType === 1 && (setze(n), n.querySelectorAll?.('.switch').forEach(setze)));
+    }
+  });
+  beobachter.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+})();
+
 /* ---------------------------------------------------------- settings */
 /*
  * Prototyp-Frame "Einstellungen": vier Abschnitte (Allgemein, Messenger,

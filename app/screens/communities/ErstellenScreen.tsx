@@ -6,12 +6,12 @@ import {
   Platform,
   ScrollView,
   Share,
-  Switch,
   Text,
   TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Schalter } from '../../components/Schalter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ExpoCrypto from 'expo-crypto';
@@ -267,12 +267,10 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
             <Text style={styles.schalterTitel}>{istCommunity ? T.privatCommunity : T.privatUnterthema}</Text>
             <Text style={styles.schalterSub}>{istCommunity ? T.privatCommunitySub : T.privatUnterthemaSub}</Text>
           </View>
-          {/* Grau aus, Grün an wie bei den All-Media-Schaltern. */}
-          <Switch
+          {/* Gleicher Schalter wie in den Einstellungen (grau ↔ grün, E16-1.2). */}
+          <Schalter
             value={privat}
             onValueChange={setPrivat}
-            trackColor={{ true: colors.success, false: colors.surface3 }}
-            ios_backgroundColor={colors.surface3}
             accessibilityLabel={istCommunity ? T.privatCommunity : T.privatUnterthema}
             testID="erstellen-privat"
           />

@@ -18,7 +18,8 @@
  */
 
 import React, { useState } from 'react';
-import { StyleSheet, Switch, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Schalter } from './Schalter';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Druck } from './Druck';
 import { SheetRahmen } from './SheetRahmen';
@@ -131,11 +132,10 @@ export const CommunityOptionenSheet = ({
             <Text style={[styles.textBlock, styles.label]}>Benachrichtigungen</Text>
             {/* Markenfarbe wie in den Einstellungen — der Grundzustand des
                 iOS-Schalters ist gruen und faellt sonst aus der App heraus. */}
-            <Switch
+            <Schalter
               value={!stumm}
               onValueChange={umschalten}
               disabled={laeuft}
-              trackColor={{ true: colors.brand, false: colors.surface3 }}
             />
           </View>
         )}
@@ -149,12 +149,11 @@ export const CommunityOptionenSheet = ({
               <Text style={styles.label}>Push-to-Talk-Benachrichtigung</Text>
               <Text style={styles.neben}>„Push to Talk beitreten?“, wenn hier jemand zu sprechen beginnt</Text>
             </View>
-            <Switch
+            <Schalter
               value={ptt}
               onValueChange={pttUmschalten}
               disabled={pttLaeuft}
               accessibilityLabel="Push-to-Talk-Benachrichtigung"
-              trackColor={{ true: colors.brand, false: colors.surface3 }}
             />
           </View>
         )}

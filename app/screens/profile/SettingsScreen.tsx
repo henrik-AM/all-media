@@ -1,7 +1,8 @@
 import {EngeFreundeSheet} from '../../components/InstantsBereich';
 import * as Analyse from '../../../gemeinsam/analyse';
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View, type ScrollViewInstance } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
+import { Schalter } from '../../components/Schalter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -1126,7 +1127,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                   <Ionicons name={item.icon} size={20} color={item.gefahr ? colors.danger : colors.text2} />
                   <Text style={[styles.itemLabel, item.gefahr && styles.danger]} numberOfLines={1}>{item.label}</Text>
                   {item.toggle ? (
-                    <Switch
+                    <Schalter
                       value={item.toggle === 'theme' ? isDark : schalter(item.toggle)}
                       onValueChange={(next) => {
                         if (item.toggle === 'theme') {
@@ -1164,7 +1165,6 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                         // der Datenbank, und beide Seiten schreiben dasselbe.
                         void einstellungSetzen(item.toggle as string, next ? 'an' : 'aus');
                       }}
-                      trackColor={{ true: colors.brand, false: colors.surface3 }}
                     />
                   ) : (
                     <>
