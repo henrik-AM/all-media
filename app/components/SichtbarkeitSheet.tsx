@@ -253,7 +253,7 @@ const styles = themenStyles((colors) => ({
   stufeText: { flex: 1 },
   stufeLabel: { ...typography.body, color: colors.text },
   stufeLabelAn: { fontWeight: '600', color: colors.brand },
-  stufeHinweis: { ...typography.tiny, color: colors.text3 },
+  stufeHinweis: { ...typography.small, fontWeight: '400', color: colors.text3, marginTop: 2 },
   erstellerHinweis: { ...typography.small, fontWeight: '400', color: colors.text2, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   zusatz: {
     marginHorizontal: spacing.lg,
