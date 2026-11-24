@@ -189,6 +189,7 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
             <Schalter
               value={lesebestaetigung}
               onValueChange={(an) => void lesebestaetigungSetzen(an)}
+              accessibilityLabel="Lesebestätigung"
             />
           )}
         </View>

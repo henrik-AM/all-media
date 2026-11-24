@@ -10090,9 +10090,7 @@ function openSichtbarkeit(punkt) {
                         : 'Nur bei „Alle" möglich.'
                     }</small>
                   </span>
-                  <span class="sicht__punkt">${
-                    jetzt.inVideos && jetzt.stufe === 'alle' ? ICONS.check : ''
-                  }</span>
+                  <span class="switch ${jetzt.inVideos && jetzt.stufe === 'alle' ? 'is-on' : ''}" role="switch" aria-checked="${!!(jetzt.inVideos && jetzt.stufe === 'alle')}" aria-disabled="${jetzt.stufe !== 'alle'}" aria-label="Story auch in Videos teilen"><span class="switch__knob"></span></span>
                 </button>`
              : ''
          }
@@ -10411,14 +10409,20 @@ function einstellung(punkt) {
   return gespeichert && (!punkt.wahl || punkt.wahl.includes(gespeichert)) ? gespeichert : punkt.standard || '';
 }
 
+// Kasten E16-1.6 (Gegenprüfung R2): je Schlüssel zählt nur der jüngste Schreibvorgang.
+const einstellungSchreibNr = {};
 async function einstellungSetzen(punkt, wert) {
   const schluessel = einstellungsSchluessel(punkt);
   const vorher = state.einstellungen ? state.einstellungen[schluessel] : undefined;
+  const nr = (einstellungSchreibNr[schluessel] || 0) + 1;
+  einstellungSchreibNr[schluessel] = nr;
 
   // Sofort umlegen, damit es sich nicht zaeh anfuehlt.
   state.einstellungen = { ...(state.einstellungen || {}), [schluessel]: wert };
 
   const antwort = await api(`/api/einstellungen/${encodeURIComponent(schluessel)}`, { wert });
+  // Inzwischen wurde neu gewählt: diese Antwort darf nichts mehr zurückdrehen.
+  if (einstellungSchreibNr[schluessel] !== nr) return !!antwort?.ok;
   if (!antwort?.ok) {
     // Zurueckdrehen. Eine Einstellung, die anders aussieht, als sie
     // gespeichert ist, ist schlimmer als eine, die sich nicht setzen laesst.
@@ -10664,7 +10668,9 @@ function openEinstellung(punkt, nachher) {
    * Verspätete Antworten (Verlauf, Analysen, Version) zeigen sonst das Thema
    * eines inzwischen angetippten anderen Punkts.
    */
-  if (!('_thema' in punkt)) punkt = { ...punkt, _thema: state.area === 'settings' ? state.blattThema : null };
+  if (!('_thema' in punkt)) punkt = { ...punkt, _thema: state.area === 'settings' ? state.blattThema : null, _aufruf: state.blattAufruf };
+  // Späte Antwort (Verlauf, Analysen): inzwischen woanders oder ein anderer Punkt geöffnet → verwerfen.
+  if (punkt._frisch && (state.area !== 'settings' || punkt._aufruf !== state.blattAufruf)) return;
   state.blattThema = punkt._thema;
   // Sichtbarkeit hat ein eigenes Blatt: vier Stufen plus Ausnahmeliste.
   if (punkt.sichtbar) return openSichtbarkeit(punkt);
@@ -10861,9 +10867,11 @@ function openEinstellung(punkt, nachher) {
     const { zeilen, leer, knopf, knopfText } = punkt._zeilen
       ? { zeilen: punkt._zeilen, leer: '', knopf: null, knopfText: '' }
       : einstellungsListe(punkt.liste);
+    const nachladeName = Object.keys(NACHLADE_LISTE).find((k) => NACHLADE_LISTE[k] === punkt.liste);
+    const ladeFehler = nachladeName && !state[nachladeName] && einstellungNachgeladen[nachladeName] && einstellungNachgeladen[nachladeName] !== 'laeuft';
     return openSheet(
       punkt.label,
-      `<div class="sheet__body">
+      `<div class="sheet__body" data-liste="${esc(punkt.liste)}" data-thema="${esc(punkt._thema || '')}">
          ${
            zeilen.length
              ? zeilen
@@ -10892,8 +10900,18 @@ function openEinstellung(punkt, nachher) {
              : `<div class="sheet__hint">${esc(leer)}</div>`
          }
        </div>
-       ${knopf ? `<div class="sheet__footer"><button class="prof__btn is-primary" id="listenKnopf">${esc(knopf)}</button></div>` : ''}`,
+       ${knopf ? `<div class="sheet__footer"><button class="prof__btn is-primary" id="listenKnopf">${esc(knopf)}</button></div>` : ''}
+       ${ladeFehler ? `<div class="sheet__footer"><button class="prof__btn is-primary" id="listeNochmal">Erneut versuchen</button></div>` : ''}`,
       (sheet, close) => {
+        // Kasten E16-1.6: nach einem Ladefehler sofort neu fragen statt 30 s zu warten.
+        sheet.querySelector('#listeNochmal')?.addEventListener('click', () => {
+          einstellungNachgeladen[nachladeName] = undefined;
+          const body = sheet.querySelector('[data-liste]');
+          if (body) body.innerHTML = '<div class="sheet__hint">Wird geladen …</div>';
+          sheet.querySelector('#listeNochmal')?.closest('.sheet__footer')?.remove();
+          const pfade = { statistik: ['/api/statistik', (d) => d?.statistik || null], gelikt: ['/api/gelikt', (d) => (Array.isArray(d) ? d : null)], kommentiert: ['/api/kommentiert', (d) => (Array.isArray(d) ? d : null)] };
+          einstellungNachladen(nachladeName, ...pfade[nachladeName]);
+        });
         sheet.querySelector('#listenKnopf')?.addEventListener('click', () => {
           close();
           toast(knopfText);
@@ -10950,8 +10968,8 @@ function openEinstellung(punkt, nachher) {
       } catch {
         stand = 'Version 1.0.0 · Stand gerade nicht abrufbar';
       }
-      // Inzwischen woanders hin gewechselt: kein Blatt mehr aufmachen.
-      if (state.area !== 'settings') return;
+      // Inzwischen woanders hin gewechselt oder etwas anderes geöffnet: kein Blatt mehr aufmachen.
+      if (state.area !== 'settings' || punkt._aufruf !== state.blattAufruf) return;
       openSheet(
         'Über All Media',
         `<div class="sheet__body"><p class="sheet__text" data-testid="ueber-stand">${esc(stand)}</p>
@@ -11046,8 +11064,23 @@ function einstellungNachladen(name, pfad, auswerten) {
     })
     .finally(() => {
       if (state.area === 'settings') renderSettings();
+      /*
+       * Gegenprüfung R2: ein schon offenes Blatt dieser Liste zeigte weiter
+       * „Wird geladen …“. Es wird mit dem neuen Stand (oder dem Fehler) neu
+       * geöffnet — mit demselben Oberthema.
+       */
+      const liste = NACHLADE_LISTE[name];
+      const offen = liste && document.querySelector(`.sheet [data-liste="${liste}"]`);
+      if (offen) {
+        const thema = offen.dataset.thema || null;
+        offen.closest('.sheet-backdrop')?.remove();
+        const punkt = SETTINGS.flatMap((x) => x.items).find((it) => it.liste === liste);
+        if (punkt) openEinstellung({ ...punkt, _thema: thema });
+      }
     });
 }
+// Welche Liste in den Einstellungen an welchem Nachladen hängt.
+const NACHLADE_LISTE = { statistik: 'insights', gelikt: 'gelikt', kommentiert: 'kommentiert' };
 /** Leertext einer nachgeladenen Liste: noch unterwegs oder gescheitert. */
 function nachladenLeer(name) {
   return einstellungNachgeladen[name] && einstellungNachgeladen[name] !== 'laeuft'
@@ -11367,6 +11400,8 @@ function renderSettings() {
       const punkt = abschnitt?.items.find((it) => it.label === b.dataset.setting);
       // Kasten E16-1.4: das Blatt zeigt über seinem Titel, wozu es gehört.
       state.blattThema = abschnitt?.title || null;
+      // Gegenprüfung R2: jeder Aufruf bekommt eine Nummer; späte Antworten älterer Aufrufe öffnen nichts mehr.
+      state.blattAufruf = (state.blattAufruf || 0) + 1;
       if (punkt) return openEinstellung(punkt);
 
       // Die zwei Punkte ganz unten stehen ausserhalb der Abschnitte.
@@ -11522,7 +11557,7 @@ function renderFriendMap() {
             <div class="standort__sub">${esc(standortText())}</div>
           </div>
           <label class="schalter">
-            <input type="checkbox" id="standortAn" ${standortAn() ? 'checked' : ''} />
+            <input type="checkbox" id="standortAn" aria-label="Deinen Standort teilen" ${standortAn() ? 'checked' : ''} />
             <span></span>
           </label>
         </div>
@@ -13838,7 +13873,8 @@ function mitteilungOeffnen(ziel, text = '') {
    * den Hinweis auf den Kontostatus, wer gemeldet hat, auf „Meine Meldungen" —
    * so steht es im Satz der Datenbank (meldung_entscheiden).
    */
-  if (ziel.art === 'meldung') return openKontostatus(/Kontostatus/.test(text) ? 'kontostatus' : 'meine');
+  // E16-1.4: auch der Direktweg aus der Mitteilung zeigt „Hilfe“ als Oberthema.
+  if (ziel.art === 'meldung') return openKontostatus(/Kontostatus/.test(text) ? 'kontostatus' : 'meine', 'Hilfe');
   if (ziel.art === 'profile') return openProfile(ziel.id);
   if (ziel.art === 'community') return openChat(ziel.id);
   // Kasten 8.3: „Push to Talk beitreten?" führt ins Unterthema — dort sitzt
@@ -14360,7 +14396,7 @@ function openKontoLoeschen() {
  * Daten; leer → Leertext; ohne Schema 102 → ehrlicher Hinweis statt einer
  * leeren Liste. Gegenstück in der App: components/KontostatusSheet.tsx.
  */
-async function openKontostatus(ansicht) {
+async function openKontostatus(ansicht, oberthema) {
   const M = window.Meldung;
   const titel = ansicht === 'meine' ? 'Meine Meldungen' : 'Kontostatus';
   const pfad = ansicht === 'meine' ? '/api/meldungen/meine' : '/api/meldungen/kontostatus';
@@ -14463,7 +14499,7 @@ async function openKontostatus(ansicht) {
       };
       laden();
     },
-    { schliessen: true, hoch: true }
+    { schliessen: true, hoch: true, ...(oberthema ? { oberthema } : {}) }
   );
 }
 

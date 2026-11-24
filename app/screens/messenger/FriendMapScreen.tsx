@@ -203,6 +203,7 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
           <Schalter
             value={sichtbar}
             onValueChange={schalten}
+            accessibilityLabel="Deinen Standort teilen"
           />
         </View>
 

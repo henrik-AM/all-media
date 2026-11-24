@@ -49,6 +49,7 @@ async function oeffnen(browser, { breite = 400, dunkel = false, schrift = 1 } = 
     '/api/einstellungen': { einstellungen: { lesebestaetigung: 'an', toene: 'aus' } },
     '/api/version': { version: '1.0.0', commit: 'abc1234' },
     '/api/einstellungen/toene': { ok: true },
+    '/api/gelikt': [],
   });
   if (dunkel) await seite.addInitScript(() => localStorage.setItem('am-theme', 'dark'));
   await seite.goto(BASE, { waitUntil: 'domcontentloaded' });
@@ -171,14 +172,22 @@ async function oeffnen(browser, { breite = 400, dunkel = false, schrift = 1 } = 
     pruefe('1.3 „Über All Media“ zeigt Version und Stand', /1\.0\.0/.test(stand) && /abc1234/.test(stand), stand);
     await seite.keyboard.press('Escape');
 
-    // Gegenprüfung R1: verspätete Antwort darf kein fremdes Oberthema zeigen.
+    // Gegenprüfung R1/R2: verspätete Antwort öffnet nichts über einem inzwischen gewählten Punkt.
     await seite.route('**/api/version', async (r) => { await new Promise((ok) => setTimeout(ok, 700)); r.fulfill({ json: { version: '1.0.0', commit: 'abc1234' } }); });
     await seite.click('[data-setting="Über All Media"]');
-    await seite.click('[data-setting="Medienqualität"]').catch(() => {});
+    await seite.click('[data-setting="Medienqualität"]');
+    await seite.waitForTimeout(1200);
+    const spaet = await seite.evaluate(() => ({
+      ueber: !!document.querySelector('[data-testid="ueber-stand"]'),
+      oben: [...document.querySelectorAll('.sheet')].pop()?.querySelector('[data-testid="blatt-oberthema"]')?.textContent.trim(),
+    }));
+    pruefe('1.4 verspätetes „Über All Media“ öffnet sich nicht über „Medienqualität“ (Oberthema „Speicher“)', !spaet.ueber && spaet.oben === 'Speicher', JSON.stringify(spaet));
     await seite.keyboard.press('Escape');
+    await seite.waitForTimeout(200);
+    await seite.click('[data-setting="Über All Media"]');
     await seite.waitForSelector('[data-testid="ueber-stand"]', { timeout: 5000 });
     const ueberThema = await seite.evaluate(() => [...document.querySelectorAll('.sheet')].pop()?.querySelector('[data-testid="blatt-oberthema"]')?.textContent.trim());
-    pruefe('1.4 verspätetes „Über All Media“ zeigt „Hilfe“, nicht den zuletzt angetippten Abschnitt', ueberThema === 'Hilfe', String(ueberThema));
+    pruefe('1.4 „Über All Media“ allein geöffnet zeigt „Hilfe“', ueberThema === 'Hilfe', String(ueberThema));
     await seite.keyboard.press('Escape');
     await seite.unroute('**/api/version');
 
@@ -207,6 +216,22 @@ async function oeffnen(browser, { breite = 400, dunkel = false, schrift = 1 } = 
     const feld = await seite.evaluate(() => ({ wert: document.querySelector('#f_art').value, kreise: document.querySelectorAll('.sheet .einst-wahl [data-feldwahl]').length, ober: document.querySelector('.sheet [data-testid="blatt-oberthema"]')?.textContent.trim() }));
     pruefe('1.5 Formular-Auswahl: Kreiszeilen setzen den Wert', feld.wert === 'Eigener Code' && feld.kreise === 2, JSON.stringify(feld));
     pruefe('1.4 Formular zeigt Oberthema „Allgemein“', feld.ober === 'Allgemein', String(feld.ober));
+    await seite.keyboard.press('Escape');
+
+    // Gegenprüfung R2: offenes Listenblatt wird nach dem Nachladen aktualisiert.
+    await seite.click('[data-setting="Gelikte Beiträge"]');
+    await seite.waitForSelector('.sheet [data-liste="gelikt"]');
+    await seite.waitForFunction(() => !/Wird geladen/.test(document.querySelector('.sheet [data-liste="gelikt"]')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+    const gelikt = await seite.evaluate(() => ({ text: document.querySelector('.sheet [data-liste="gelikt"]')?.textContent.trim().slice(0, 60), ober: [...document.querySelectorAll('.sheet')].pop()?.querySelector('[data-testid="blatt-oberthema"]')?.textContent.trim() }));
+    pruefe('1.6 offenes Listenblatt zeigt nach dem Laden nicht mehr „Wird geladen …“', !!gelikt.text && !/Wird geladen/.test(gelikt.text), JSON.stringify(gelikt));
+    pruefe('1.4 nach dem Neuaufbau weiter Oberthema „Videos“', gelikt.ober === 'Videos', String(gelikt.ober));
+    await seite.keyboard.press('Escape');
+
+    // Gegenprüfung R2: „Story auch in Videos teilen“ als gesperrter Grau-Grün-Schalter außerhalb von „Alle“.
+    await seite.click('[data-setting="Story-Sichtbarkeit"][data-abschnitt="messenger"]');
+    await seite.waitForSelector('.sheet [data-invideos]');
+    const story = await seite.$eval('.sheet [data-invideos] .switch', (e) => ({ rolle: e.getAttribute('role'), farbe: getComputedStyle(e).backgroundColor }));
+    pruefe('1.2 Story-in-Videos ist ein grauer Schalter (aus)', story.rolle === 'switch' && story.farbe === 'rgb(211, 214, 222)', JSON.stringify(story));
     await seite.keyboard.press('Escape');
 
     // Blatt außerhalb der Einstellungen: kein Oberthema

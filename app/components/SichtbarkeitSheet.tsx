@@ -31,6 +31,7 @@ import { Avatar } from './Avatar';
 import { Druck } from './Druck';
 import { SearchBar } from './SearchBar';
 import { SheetRahmen } from './SheetRahmen';
+import { Schalter } from './Schalter';
 import { AuswahlZeile, Gruppentitel, Karte } from './EinstellungBausteine';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 import { useDaten } from '../contexts/DatenContext';
@@ -181,10 +182,12 @@ export const SichtbarkeitSheet = ({
                   : 'Nur bei „Alle" möglich.'}
               </Text>
             </View>
-            <Ionicons
-              name={inVideos && stufe === 'alle' ? 'checkbox' : 'square-outline'}
-              size={21}
-              color={stufe === 'alle' ? (inVideos ? colors.brand : colors.border) : colors.border}
+            {/* E16-1.2 (Gegenprüfung R2): derselbe Grau-Grün-Schalter, außerhalb von „Alle“ gesperrt. */}
+            <Schalter
+              value={!!inVideos && stufe === 'alle'}
+              onValueChange={(an) => onInVideos(an)}
+              disabled={stufe !== 'alle'}
+              accessibilityLabel="Story auch in Videos teilen"
             />
           </Druck>
         )}
