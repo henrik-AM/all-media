@@ -5,7 +5,8 @@ Claude und Codex arbeiten beide an All Media. `H` = `~/Library/CloudStorage/OneD
 und liest `H/AGENTS.md` deshalb nicht von selbst: zuerst `H/AGENTS.md` lesen, dann
 `bash H/Claude/Uebergabe/ki-abgleich.sh start <ki>`. Verbindlich:
 `H/2.Gehirn.md/04 Ressourcen/KI-Zusammenarbeit/Zusammenarbeit.md`. Prüfläufe gegen Supabase
-nur nach `ki-abgleich.sh belegen <ki> testbestand "<zweck>"`, sonst Abbruch mit Code 2.
+nur nach `ki-abgleich.sh platz <ki> "<zweck>"` (Kontenpool, Schema 138: eigener von vier
+Prüfplätzen, Platz 1 = `testbestand`), sonst Abbruch mit Code 2.
 
 ## graphify
 
