@@ -136,7 +136,7 @@ function teilA() {
   pruefe('7.3 App: Karte öffnet den Beitrag (onOpenBeitrag → kachelOeffnen)',
     /onOpenBeitrag=\{\(b\) => kachelOeffnen\(b\)\}/.test(appTsx) && /onOpenBeitrag\(\{ id: g\.id, kind: g\.kind/.test(chat));
   pruefe('7.3 Website: Karte öffnet den Beitrag in Chat und Unterthema',
-    /beitragOeffnen\(b\.dataset\.beitragkind, b\.dataset\.beitrag\)/.test(web) && (web.match(/geteiltBinden\(/g) || []).length >= 2);
+    /beitragOeffnen\(b\.dataset\.beitragkind, b\.dataset\.beitrag[,)]/.test(web) && (web.match(/geteiltBinden\(/g) || []).length >= 2);
   pruefe('7.1 Großes Vorschaubild auf beiden Seiten', /geteiltBild: \{ width: 248, height: 310 \}/.test(chat) && /\.msg__geteiltRahmen \{[^}]*aspect-ratio: 4 \/ 5/.test(css));
 
   pruefe('Baustein in UMD_BAUSTEINE', /\['chatblase', 'Chatblase'\]/.test(lies('app/test/_modulquelle.js')));
@@ -338,12 +338,14 @@ async function teilBC() {
           const breite = await page.locator(`[data-beitrag="${beitrag.id}"]`).evaluate((el) => el.getBoundingClientRect().width);
           if (breite < 200) throw new Error('Breite ' + breite);
         });
-        await pruefeAsync('7.3 Klick auf die Karte öffnet den Beitrag', async () => {
+        await pruefeAsync('7.3 Klick zeigt genau den geteilten Beitrag ohne Chat davor', async () => {
           await page.locator(`[data-beitrag="${beitrag.id}"]`).click();
-          await page.waitForTimeout(800);
-          const ort = await page.evaluate(() => ({ area: state.area, kanal: !!document.querySelector('#commMsgs') }));
-          // Beitrag/Reel → Bereich Videos; Querformat → Player über dem Kanal.
-          if (ort.area !== 'videos' && ort.kanal) throw new Error(JSON.stringify(ort));
+          const zielBeitrag = page.locator(`#post-${beitrag.id}`);
+          await zielBeitrag.waitFor({ state: 'visible', timeout: 10000 });
+          await page.locator('#overlay').waitFor({ state: 'hidden', timeout: 5000 });
+          const inhalt = await zielBeitrag.innerText();
+          if (!inhalt.includes(beitrag.description)) throw new Error('Beschreibung am Zielbeitrag fehlt');
+          if (process.env.BILDER) await page.screenshot({ path: path.join(process.env.BILDER, 'k28-7.3-beitrag-sichtbar.png') });
         });
       }
     } catch (e) {
