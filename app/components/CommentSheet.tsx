@@ -245,9 +245,11 @@ export const CommentSheet = ({ targetId, onClose, onCountChange, springeZu }: Pr
           bereich="videos"
         />
         <View style={styles.commentBody}>
-          {/* Kasten 25.3: @-Namen im Kommentar führen zum Profil. */}
+          {/* Kasten 25.3: @-Namen führen zum Profil. Unverlinkter Text muss
+              auf iOS ebenfalls den Zug an den umgebenden PanResponder weitergeben. */}
           <MarkierterText
             style={styles.commentText}
+            onStartShouldSetResponder={Platform.OS === 'ios' ? () => true : undefined}
             davor={<><Text style={styles.bold}>{author?.name}</Text>{' '}</>}
             text={item.text}
           />
