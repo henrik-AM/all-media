@@ -31,6 +31,7 @@ import { Avatar } from './Avatar';
 import { Druck } from './Druck';
 import { SearchBar } from './SearchBar';
 import { SheetRahmen } from './SheetRahmen';
+import { AuswahlZeile, Gruppentitel, Karte } from './EinstellungBausteine';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 import { useDaten } from '../contexts/DatenContext';
 import { SichtbarkeitStufe } from '../lib/aktionen';
@@ -143,22 +144,21 @@ export const SichtbarkeitSheet = ({
         {istLikes && (
           <Text style={styles.erstellerHinweis}>{Sichtbarkeit.LIKES_ERSTELLER_HINWEIS}</Text>
         )}
-        {stufen.map((st) => {
-          const an = st.key === stufe;
-          return (
-            <Druck key={st.key} style={styles.stufe} onPress={() => onStufe(st.key)}>
-              <View style={styles.stufeText}>
-                <Text style={[styles.stufeLabel, an && styles.stufeLabelAn]}>{st.label}</Text>
-                <Text style={styles.stufeHinweis}>{st.hinweis}</Text>
-              </View>
-              <Ionicons
-                name={an ? 'radio-button-on' : 'radio-button-off'}
-                size={21}
-                color={an ? colors.brand : colors.border}
-              />
-            </Druck>
-          );
-        })}
+        {/* Kasten E16-1.5: dasselbe Auswahlmuster wie jede andere „eine aus mehreren“-Einstellung. */}
+        <Gruppentitel>Wer darf das?</Gruppentitel>
+        <Karte>
+          {stufen.map((st, nr) => (
+            <AuswahlZeile
+              key={st.key}
+              label={st.label}
+              hinweis={st.hinweis}
+              gewaehlt={st.key === stufe}
+              onPress={() => onStufe(st.key)}
+              letzte={nr === stufen.length - 1}
+              testID={`stufe-${st.key}`}
+            />
+          ))}
+        </Karte>
 
         {/*
           * Der Zusatz zur Stufe „Jeder". Er steht auch dann da, wenn eine
@@ -245,14 +245,15 @@ export const SichtbarkeitSheet = ({
 };
 
 const styles = themenStyles((colors) => ({
-  inhalt: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+  inhalt: { paddingBottom: spacing.xl },
   stufe: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: 11 },
   stufeText: { flex: 1 },
   stufeLabel: { ...typography.body, color: colors.text },
   stufeLabelAn: { fontWeight: '600', color: colors.brand },
   stufeHinweis: { ...typography.tiny, color: colors.text3 },
-  erstellerHinweis: { ...typography.tiny, color: colors.text2, paddingBottom: spacing.sm },
+  erstellerHinweis: { ...typography.small, fontWeight: '400', color: colors.text2, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   zusatz: {
+    marginHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
@@ -263,13 +264,14 @@ const styles = themenStyles((colors) => ({
   },
   zusatzAus: { color: colors.text3 },
   listeTitel: {
+    marginHorizontal: spacing.lg,
     ...typography.small,
     color: colors.text2,
     marginTop: spacing.md,
     marginBottom: spacing.xs,
   },
-  sucheFeld: { marginBottom: spacing.sm },
-  leer: { ...typography.small, color: colors.text3 },
-  person: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: 8 },
+  sucheFeld: { marginBottom: spacing.sm, marginHorizontal: spacing.lg },
+  leer: { ...typography.small, color: colors.text3, marginHorizontal: spacing.lg },
+  person: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: 8, marginHorizontal: spacing.lg },
   personName: { flex: 1, ...typography.name, color: colors.text },
 }));

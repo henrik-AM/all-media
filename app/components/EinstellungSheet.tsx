@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SheetRahmen } from './SheetRahmen';
+import { AuswahlZeile, Karte } from './EinstellungBausteine';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 
 export interface ListenZeile {
@@ -85,50 +86,62 @@ export const EinstellungSheet = ({
       ) : undefined
     }
   >
+    {/*
+      Kasten E16-1.1/1.5: Auswahl und Liste als Karte im selben Muster wie die
+      Einstellungsseite und das Sichtbarkeitsblatt (EinstellungBausteine).
+    */}
     {wahl && (
-      <ScrollView>
-        {wahl.map((w) => (
-          <Druck
-            key={w}
-            style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
-            onPress={() => onWahl?.(w)}
-          >
-            <Text style={styles.label}>{w}</Text>
-            {w === aktuell && <Ionicons name="checkmark" size={19} color={colors.brand} />}
-          </Druck>
-        ))}
+      <ScrollView contentContainerStyle={styles.inhalt}>
+        <Karte>
+          {wahl.map((w, i) => (
+            <AuswahlZeile key={w} label={w} gewaehlt={w === aktuell} onPress={() => onWahl?.(w)} letzte={i === wahl.length - 1} />
+          ))}
+        </Karte>
       </ScrollView>
     )}
 
     {zeilen &&
       (zeilen.length === 0 ? (
-        <Text style={styles.hinweis}>{leer}</Text>
+        <View style={styles.leerBox} accessibilityLiveRegion="polite">
+          <Ionicons name="file-tray-outline" size={30} color={colors.text3} />
+          <Text style={styles.hinweis}>{leer}</Text>
+        </View>
       ) : (
-        <ScrollView>
-          {zeilen.map((z, i) =>
-            z.kopf ? (
-              <Text key={`${i}-${z.text}`} style={styles.gruppe}>
-                {z.text}
-              </Text>
-            ) : z.onPress ? (
+        <ScrollView contentContainerStyle={styles.inhalt}>
+          {zeilen.map((z, i) => {
+            const letzte = i === zeilen.length - 1 || !!zeilen[i + 1]?.kopf;
+            const erste = i === 0 || !!zeilen[i - 1]?.kopf;
+            if (z.kopf) {
+              return (
+                <Text key={`${i}-${z.text}`} style={styles.gruppe} accessibilityRole="header">
+                  {z.text}
+                </Text>
+              );
+            }
+            const ecken = [erste && styles.oben, letzte && styles.unten];
+            return z.onPress ? (
               <Druck
                 key={`${i}-${z.schluessel ?? z.text}`}
-                style={({ pressed }) => [styles.zeile, pressed && styles.gedrueckt]}
+                style={({ pressed }) => [styles.zeile, ...ecken, pressed && styles.gedrueckt]}
                 onPress={z.onPress}
                 accessibilityRole="button"
-                accessibilityLabel={z.text}
+                accessibilityLabel={z.neben ? `${z.text}, ${z.neben}` : z.text}
               >
-                <Text style={styles.label}>{z.text}</Text>
-                <Text style={styles.neben}>{z.neben}</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.text3} />
+                <View style={[styles.zeileInnen, !letzte && styles.trenner]}>
+                  <Text style={styles.label}>{z.text}</Text>
+                  {!!z.neben && <Text style={styles.neben} numberOfLines={1}>{z.neben}</Text>}
+                  <Ionicons name="chevron-forward" size={16} color={colors.text3} />
+                </View>
               </Druck>
             ) : (
-              <View key={`${i}-${z.schluessel ?? z.text}`} style={styles.zeile}>
-                <Text style={styles.label}>{z.text}</Text>
-                <Text style={styles.neben}>{z.neben}</Text>
+              <View key={`${i}-${z.schluessel ?? z.text}`} style={[styles.zeile, ...ecken]}>
+                <View style={[styles.zeileInnen, !letzte && styles.trenner]}>
+                  <Text style={styles.label}>{z.text}</Text>
+                  {!!z.neben && <Text style={styles.neben} numberOfLines={1}>{z.neben}</Text>}
+                </View>
               </View>
-            )
-          )}
+            );
+          })}
         </ScrollView>
       ))}
 
@@ -143,32 +156,29 @@ export const EinstellungSheet = ({
 );
 
 const styles = themenStyles((colors) => ({
-  zeile: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 13,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  gedrueckt: { backgroundColor: colors.surface2 },
+  inhalt: { paddingTop: spacing.sm, paddingBottom: spacing.lg },
+  zeile: { marginHorizontal: spacing.lg, paddingLeft: spacing.lg, backgroundColor: colors.surface2 },
+  oben: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
+  unten: { borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, marginBottom: spacing.sm },
+  zeileInnen: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 50, paddingVertical: 10, paddingRight: spacing.lg },
+  trenner: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  gedrueckt: { backgroundColor: colors.surface3 },
   label: { flex: 1, ...typography.body, color: colors.text },
-  neben: { ...typography.preview, color: colors.text3 },
+  neben: { ...typography.preview, color: colors.text3, maxWidth: '50%', textAlign: 'right' },
   /* Wie die Abschnittsüberschriften der Einstellungsseite selbst. */
   gruppe: {
-    ...typography.tiny,
+    ...typography.overline,
     color: colors.text3,
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xs,
+    paddingHorizontal: spacing.lg + spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
-  hinweis: { ...typography.message, color: colors.text2, padding: spacing.lg },
-  text: { ...typography.message, color: colors.text, padding: spacing.lg, lineHeight: 21 },
+  leerBox: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl, paddingHorizontal: spacing.lg },
+  hinweis: { ...typography.message, color: colors.text2, textAlign: 'center' },
+  text: { ...typography.message, color: colors.text, padding: spacing.lg, lineHeight: 22 },
   knopf: {
-    height: 44,
+    height: 48,
     borderRadius: radius.md,
     backgroundColor: colors.brand,
     alignItems: 'center',

@@ -203,11 +203,13 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
 const styles = themenStyles((colors) => ({
   inhalt: { paddingVertical: spacing.sm },
   feld: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
-  label: { ...typography.small, color: colors.text2, marginBottom: 6 },
+  label: { ...typography.small, fontWeight: '600', color: colors.text2, marginBottom: 6 },
   eingabe: {
-    minHeight: 44,
+    minHeight: 48,
     borderRadius: radius.md,
     backgroundColor: colors.surface2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     color: colors.text,
@@ -235,5 +237,16 @@ const styles = themenStyles((colors) => ({
     justifyContent: 'center',
   },
   knopfText: { ...typography.name, color: colors.white },
-  fehler: { ...typography.small, fontWeight: '600', color: colors.danger, paddingHorizontal: spacing.lg, paddingTop: 4 },
+  // Kasten E16-1.6: Fehler als eigener Kasten, nicht als roter Halbsatz.
+  fehler: {
+    ...typography.small,
+    fontWeight: '600',
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    borderRadius: radius.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
 }));
