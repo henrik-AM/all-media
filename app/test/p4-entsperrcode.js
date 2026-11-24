@@ -101,7 +101,7 @@ async function teilB() {
     await seite.waitForTimeout(600);
     await seite.click('[data-setting="Sicherheits-/Entsperrcode"]');
     await seite.waitForSelector('#f_code');
-    await seite.selectOption('#f_art', 'Eigener Code');
+    await seite.click('[data-feldwahl="art"][data-wert="Eigener Code"]'); // E16-1.5: Kreiszeilen
     const typen = await seite.$$eval('#f_code, #f_wdh, #f_bisher', (els) => els.map((e) => e.type));
     pruefe('Einstellungen: drei Felder verdeckt (password)', typen.length === 3 && typen.every((t) => t === 'password'), typen.join(','));
     const label = await seite.evaluate(() => document.querySelector('#f_code')?.closest('.sheet__field')?.textContent || '');

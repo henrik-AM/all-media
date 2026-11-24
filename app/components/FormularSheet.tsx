@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Druck } from './Druck';
 import { SheetRahmen } from './SheetRahmen';
+import { AuswahlZeile, Karte } from './EinstellungBausteine';
 import { MarkierungsEingabe } from './MarkierungsEingabe';
 import { colors, radius, spacing, themenStyles, typography } from '../constants/design';
 
@@ -129,7 +130,26 @@ export const FormularSheet = ({ visible, title, felder, knopf = 'Fertig', vorbel
         {felder.map((f, i) => (
           <View key={f.key} style={styles.feld}>
             <Text style={styles.label}>{f.label}</Text>
-            {f.typ === 'auswahl' ? (
+            {f.typ === 'auswahl' && (f.auswahl?.length ?? 0) <= 4 ? (
+              /*
+               * Kasten E16-1.5: wenige Möglichkeiten als Kreiszeilen — dasselbe
+               * Muster wie jede andere Auswahl in den Einstellungen und wie
+               * openFormular auf der Website. Lange Listen (Musik) bleiben Reihe.
+               */
+              <View style={styles.wahlListe}>
+                <Karte>
+                  {(f.auswahl ?? []).map((w, nr) => (
+                    <AuswahlZeile
+                      key={w}
+                      label={w}
+                      gewaehlt={(werte[f.key] ?? f.auswahl?.[0]) === w}
+                      onPress={() => setWerte((prev) => ({ ...prev, [f.key]: w }))}
+                      letzte={nr === (f.auswahl?.length ?? 0) - 1}
+                    />
+                  ))}
+                </Karte>
+              </View>
+            ) : f.typ === 'auswahl' ? (
               // Waagerechte Reihe statt eines Aufklappmenüs: React Native
               // hat keins, und bei einer Handvoll Sounds sieht man so gleich
               // alles, was zur Wahl steht.
@@ -216,6 +236,8 @@ const styles = themenStyles((colors) => ({
     ...typography.body,
   },
   mehrzeilig: { minHeight: 76, textAlignVertical: 'top' },
+  // Die Karte bringt eigenen Randabstand mit; das Feld hat schon spacing.lg.
+  wahlListe: { marginHorizontal: -spacing.lg },
   wahlReihe: { gap: spacing.sm, paddingRight: spacing.lg },
   wahl: {
     height: 36,

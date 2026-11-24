@@ -130,12 +130,12 @@ export const CommunityOptionenSheet = ({
               <Ionicons name="notifications-outline" size={18} color={colors.text2} />
             </View>
             <Text style={[styles.textBlock, styles.label]}>Benachrichtigungen</Text>
-            {/* Markenfarbe wie in den Einstellungen — der Grundzustand des
-                iOS-Schalters ist gruen und faellt sonst aus der App heraus. */}
+            {/* Gleicher Schalter wie in den Einstellungen (grau ↔ grün, E16-1.2). */}
             <Schalter
               value={!stumm}
               onValueChange={umschalten}
               disabled={laeuft}
+              accessibilityLabel="Benachrichtigungen"
             />
           </View>
         )}

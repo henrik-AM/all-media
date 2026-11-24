@@ -171,6 +171,44 @@ async function oeffnen(browser, { breite = 400, dunkel = false, schrift = 1 } = 
     pruefe('1.3 „Über All Media“ zeigt Version und Stand', /1\.0\.0/.test(stand) && /abc1234/.test(stand), stand);
     await seite.keyboard.press('Escape');
 
+    // Gegenprüfung R1: verspätete Antwort darf kein fremdes Oberthema zeigen.
+    await seite.route('**/api/version', async (r) => { await new Promise((ok) => setTimeout(ok, 700)); r.fulfill({ json: { version: '1.0.0', commit: 'abc1234' } }); });
+    await seite.click('[data-setting="Über All Media"]');
+    await seite.click('[data-setting="Medienqualität"]').catch(() => {});
+    await seite.keyboard.press('Escape');
+    await seite.waitForSelector('[data-testid="ueber-stand"]', { timeout: 5000 });
+    const ueberThema = await seite.evaluate(() => [...document.querySelectorAll('.sheet')].pop()?.querySelector('[data-testid="blatt-oberthema"]')?.textContent.trim());
+    pruefe('1.4 verspätetes „Über All Media“ zeigt „Hilfe“, nicht den zuletzt angetippten Abschnitt', ueberThema === 'Hilfe', String(ueberThema));
+    await seite.keyboard.press('Escape');
+    await seite.unroute('**/api/version');
+
+    // Gegenprüfung R1: abgelehnte Auswahl bleibt nicht als gewählt stehen.
+    await seite.route('**/api/einstellungen/medienqualitaet', (r) => r.fulfill({ json: { ok: false, error: 'kaputt' } }));
+    await seite.click('[data-setting="Medienqualität"]');
+    await seite.waitForSelector('.sheet [data-wahl="Hoch"]');
+    await seite.click('.sheet [data-wahl="Hoch"]');
+    await seite.waitForSelector('.sheet .einst-fehler', { timeout: 5000 }).catch(() => {});
+    const abgelehnt = await seite.evaluate(() => ({
+      offen: !!document.querySelector('.sheet [data-wahl]'),
+      fehler: document.querySelector('.sheet .einst-fehler')?.textContent || '',
+      gewaehlt: [...document.querySelectorAll('.sheet [data-wahl][aria-checked="true"]')].map((b) => b.dataset.wahl),
+    }));
+    pruefe('1.6 Serverfehler: Blatt bleibt offen, nennt den Fehler, „Standard“ bleibt gewählt', abgelehnt.offen && /nicht speichern/.test(abgelehnt.fehler) && abgelehnt.gewaehlt.join() === 'Standard', JSON.stringify(abgelehnt));
+    await seite.keyboard.press('Escape');
+    await seite.waitForTimeout(200);
+    const liste = await seite.$eval('[data-setting="Medienqualität"] .item__value', (e) => e.textContent.trim());
+    pruefe('1.6 Liste zeigt nach Fehler weiter „Standard“', liste === 'Standard', liste);
+    await seite.unroute('**/api/einstellungen/medienqualitaet');
+
+    // Gegenprüfung R1: Formular-Auswahl als Kreiszeilen (Entsperrcode).
+    await seite.click('[data-setting="Sicherheits-/Entsperrcode"]');
+    await seite.waitForSelector('.sheet [data-feldwahl="art"]');
+    await seite.click('.sheet [data-feldwahl="art"][data-wert="Eigener Code"]');
+    const feld = await seite.evaluate(() => ({ wert: document.querySelector('#f_art').value, kreise: document.querySelectorAll('.sheet .einst-wahl [data-feldwahl]').length, ober: document.querySelector('.sheet [data-testid="blatt-oberthema"]')?.textContent.trim() }));
+    pruefe('1.5 Formular-Auswahl: Kreiszeilen setzen den Wert', feld.wert === 'Eigener Code' && feld.kreise === 2, JSON.stringify(feld));
+    pruefe('1.4 Formular zeigt Oberthema „Allgemein“', feld.ober === 'Allgemein', String(feld.ober));
+    await seite.keyboard.press('Escape');
+
     // Blatt außerhalb der Einstellungen: kein Oberthema
     pruefe('keine Seitenfehler (hell)', fehler.length === 0, fehler.join(' | '));
     await seite.close();

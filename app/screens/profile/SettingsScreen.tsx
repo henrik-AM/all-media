@@ -556,7 +556,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   const [kontoLoeschenOffen, setKontoLoeschenOffen] = useState(false);
 
   /** Inhalt der Listen-Punkte. Alles kommt aus dem echten Zustand. */
-  const listeVon = (art: string): { zeilen: ListenZeile[]; leer: string } => {
+  const listeVon = (art: string): { zeilen: ListenZeile[]; leer: string; fehler?: boolean } => {
     /*
      * Kasten RS 1 (L11): hier standen „All Media Web — zuletzt heute“ und ein
      * Knopf „Gerät verknüpfen“, beide fest im Quelltext. Verknüpfen gibt es
@@ -645,12 +645,12 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
      * Zeilen niemand liest.
      */
     if (art === 'kontoanalysen') {
-      if(analyseFehler)return {leer:analyseFehler,zeilen:[]};
+      if(analyseFehler)return {leer:analyseFehler,zeilen:[],fehler:true};
       if(!analyse || analyse.konto!==ichId)return {leer:'Wird geladen …',zeilen:[]};
       return {leer:'',zeilen:Analyse.zeilen(analyse.daten)};
     }
     if (art === 'insights') {
-      if (!statistik) return { leer: 'Wird geladen …', zeilen: [] };
+      if (!statistik) return ladeFehler.statistik ? { leer: 'Konnte gerade nicht geladen werden.', zeilen: [], fehler: true } : { leer: 'Wird geladen …', zeilen: [] };
       const z = (n: number) => n.toLocaleString('de-DE');
       return {
         leer: '',
@@ -687,7 +687,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
      * Uhrzeit. Antippen schließt das Blatt und öffnet den Beitrag.
      */
     if (art === 'verlauf') {
-      if (verlaufFehler) return { leer: 'Verlauf konnte nicht geladen werden.', zeilen: [] };
+      if (verlaufFehler) return { leer: 'Verlauf konnte nicht geladen werden.', zeilen: [], fehler: true };
       if (!verlauf) return { leer: 'Wird geladen …', zeilen: [] };
       return {
         leer: 'Du hast noch nichts geliked, kommentiert, geteilt, repostet oder gespeichert.',
@@ -700,7 +700,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       };
     }
     if (art === 'gelikt') {
-      if (!gelikt) return { leer: 'Wird geladen …', zeilen: [] };
+      if (!gelikt) return ladeFehler.gelikt ? { leer: 'Konnte gerade nicht geladen werden.', zeilen: [], fehler: true } : { leer: 'Wird geladen …', zeilen: [] };
       return {
         leer: 'Dir hat noch nichts gefallen.',
         zeilen: gelikt.map((b) => ({
@@ -716,7 +716,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
      * die Website daneben nicht ihre eigene Fassung baut.
      */
     if (art === 'kommentiert') {
-      if (!kommentiert) return { leer: 'Wird geladen …', zeilen: [] };
+      if (!kommentiert) return ladeFehler.kommentiert ? { leer: 'Konnte gerade nicht geladen werden.', zeilen: [], fehler: true } : { leer: 'Wird geladen …', zeilen: [] };
       return {
         leer: 'Du hast noch nichts kommentiert.',
         zeilen: kommentiert.map((k) => ({
@@ -938,21 +938,30 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     if (offen?.liste === 'verlauf') verlaufLaden();
   }, [offen, verlaufLaden]);
 
+  /*
+   * Kasten E16-1.6 (Gegenprüfung 24.11.): ein Ladefehler landete nur im Log,
+   * das Blatt zeigte für immer „Wird geladen …“. Jetzt merkt sich jede Liste
+   * ihren Fehler; das Blatt sagt es und bietet „Erneut versuchen“.
+   */
+  const [ladeFehler, setLadeFehler] = useState<{ statistik?: boolean; gelikt?: boolean; kommentiert?: boolean }>({});
+  const listenLaden = useCallback(() => {
+    if (!supabase || !ichId) return;
+    setLadeFehler({});
+    const fehler = (name: 'statistik' | 'gelikt' | 'kommentiert') => (e: any) => {
+      console.error(`${name} laden fehlgeschlagen:`, e?.message ?? e);
+      setLadeFehler((f) => ({ ...f, [name]: true }));
+    };
+    ladeStatistik(supabase, ichId).then(setStatistik).catch(fehler('statistik'));
+    gelikteVon(supabase, ichId).then(setGelikt).catch(fehler('gelikt'));
+    kommentierteVon(supabase, ichId).then(setKommentiert).catch(fehler('kommentiert'));
+  }, [supabase, ichId]);
   useEffect(() => {
     if (!supabase || !ichId) return;
     ladeBanne(supabase, ichId)
       .then(setBanne)
       .catch((e: any) => console.error('Bann-Verlauf laden fehlgeschlagen:', e?.message ?? e));
-    ladeStatistik(supabase, ichId)
-      .then(setStatistik)
-      .catch((e: any) => console.error('Statistik laden fehlgeschlagen:', e?.message ?? e));
-    gelikteVon(supabase, ichId)
-      .then(setGelikt)
-      .catch((e: any) => console.error('Gelikte Beitraege laden fehlgeschlagen:', e?.message ?? e));
-    kommentierteVon(supabase, ichId)
-      .then(setKommentiert)
-      .catch((e: any) => console.error('Eigene Kommentare laden fehlgeschlagen:', e?.message ?? e));
-  }, [supabase, ichId]);
+    listenLaden();
+  }, [supabase, ichId, listenLaden]);
 
   /*
    * Kasten 9.1: Wer bei der Likes-Sichtbarkeit zur Wahl steht. Die
@@ -997,6 +1006,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     if (!sprung) return;
     // Kasten RS 3: aus einer Rechtsmitteilung — das Blatt öffnen, nicht nur hinscrollen.
     if (sprung === 'kontostatus' || sprung === 'meinemeldungen') {
+      setBlattThema('Hilfe');
       setKontostatus(sprung === 'kontostatus' ? 'kontostatus' : 'meine');
       onSprungFertig?.();
       return;
@@ -1253,7 +1263,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                       ) : (
                         <>
                           {!!rechts && (
-                            <Text style={styles.itemValue} numberOfLines={1}>
+                            <Text style={styles.itemValue} numberOfLines={2}>
                               {rechts}
                             </Text>
                           )}
@@ -1469,6 +1479,14 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
           }}
           zeilen={offen.liste ? listeVon(offen.liste).zeilen : undefined}
           leer={offen.liste ? listeVon(offen.liste).leer : undefined}
+          knopf={offen.liste && listeVon(offen.liste).fehler ? 'Erneut versuchen' : undefined}
+          onKnopf={() =>
+            offen.liste === 'verlauf'
+              ? verlaufLaden()
+              : offen.liste === 'kontoanalysen'
+              ? setOffen({ ...offen }) // lädt die Analysen neu (Effekt hängt an `offen`)
+              : listenLaden()
+          }
           info={offen.info}
           onClose={() => setOffen(null)}
         />

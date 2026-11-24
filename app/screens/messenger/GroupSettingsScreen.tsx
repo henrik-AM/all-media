@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Schalter } from '../../components/Schalter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Druck } from '../../components/Druck';
@@ -206,12 +207,10 @@ export const GroupSettingsScreen = ({ chat, onBack, onCall, onOpenMitglied, onVe
           })}
           <View style={styles.zeile}>
             <Text style={styles.zeileText}>Chat sperren</Text>
-            <Druck
-              style={[styles.schalter, gesperrt && styles.schalterAn]}
-              accessibilityRole="switch"
+            <Schalter
+              value={gesperrt}
               accessibilityLabel="Chat sperren"
-              accessibilityState={{ checked: gesperrt }}
-              onPress={() => {
+              onValueChange={() => {
                 if (!supabase || !ichId) return onNotice('Dafür musst du angemeldet sein');
                 const jetzt = !gesperrt;
                 setGesperrt(jetzt);
@@ -222,9 +221,7 @@ export const GroupSettingsScreen = ({ chat, onBack, onCall, onOpenMitglied, onVe
                   onNotice('Die Chatsperre hat nicht geklappt');
                 });
               }}
-            >
-              <View style={[styles.knopf, gesperrt && styles.knopfAn]} />
-            </Druck>
+            />
           </View>
         </View>
 

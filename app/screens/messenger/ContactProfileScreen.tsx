@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Schalter } from '../../components/Schalter';
 import { Druck } from '../../components/Druck';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -511,9 +512,10 @@ export const ContactProfileScreen = ({
           )}
           <View style={styles.zeile}>
             <Text style={styles.zeileText}>Chat sperren</Text>
-            <Druck
-              style={[styles.schalter, gesperrt && styles.schalterAn]}
-              onPress={() => {
+            <Schalter
+              value={gesperrt}
+              accessibilityLabel="Chat sperren"
+              onValueChange={() => {
                 if (!chat) return onNotice('Noch kein Chat mit dieser Person');
                 const jetzt = !gesperrt;
                 setGesperrt(jetzt);
@@ -528,9 +530,7 @@ export const ContactProfileScreen = ({
                   );
                 }
               }}
-            >
-              <View style={[styles.knopf, gesperrt && styles.knopfAn]} />
-            </Druck>
+            />
           </View>
           {zeile('Erweiterter Chat-Datenschutz', wert('Erweiterter Chat-Datenschutz', 'Aus'), () =>
             setOffen({ art: 'wahl', label: 'Erweiterter Chat-Datenschutz', wahl: ['Aus', 'An'], standard: 'Aus' })

@@ -126,8 +126,11 @@ const styles = themenStyles((colors) => ({
     backgroundColor: colors.text3,
     opacity: 0.35,
   },
+  // Kasten E16-1.6: Mindest- statt fester Höhe — große Schrift lässt den Kopf mitwachsen.
   kopf: {
-    height: 52,
+    minHeight: 52,
+    paddingTop: 14,
+    paddingBottom: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -135,7 +138,7 @@ const styles = themenStyles((colors) => ({
   },
   x: { position: 'absolute', left: spacing.md, top: 0, bottom: 0, justifyContent: 'center' },
   titel: { fontSize: 17, fontWeight: '600', color: colors.text, textAlign: 'center', paddingHorizontal: 48 },
-  kopfMitThema: { height: 62, paddingTop: 8 },
+  kopfMitThema: { minHeight: 62, paddingTop: 12 },
   oberthema: { fontSize: 11.5, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.brand, marginBottom: 1 },
   fuss: {
     paddingHorizontal: spacing.lg,

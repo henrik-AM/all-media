@@ -3239,13 +3239,13 @@ async function openFollowerList(profile, art) {
  * denselben Kopf wieder braucht. Vorher stand die Form nur hier inline, und
  * ein neu gezeichnetes Blatt verlor seinen Schliessen-Knopf.
  */
-function sheetKopf(title, mitX) {
+function sheetKopf(title, mitX, oberthema = null) {
   /*
    * Einstellungen 16.11., Kasten 1.4 (Henrik, 24.11.2026): ein Blatt aus den
    * Einstellungen zeigt klein sein Oberthema über dem Titel („Messenger“ über
    * „Lesebestätigung“). Wie SheetRahmen in der App.
    */
-  const thema = state.area === 'settings' && state.blattThema && state.blattThema !== title ? state.blattThema : '';
+  const thema = oberthema && oberthema !== title ? oberthema : '';
   const ober = thema ? `<div class="sheet__ober" data-testid="blatt-oberthema">${esc(thema)}</div>` : '';
   return mitX
     ? `<div class="sheet__kopf ${thema ? 'sheet__kopf--thema' : ''}">
@@ -3349,7 +3349,12 @@ function openSheet(title, bodyHtml, onMount, opts = {}) {
   sheet.className = 'sheet-backdrop';
   sheet.innerHTML = `
     <div class="sheet ${opts.hoch ? 'sheet--tall' : ''}" role="dialog" aria-label="${esc(title)}">
-      ${sheetKopf(title, opts.schliessen)}
+      ${sheetKopf(
+        title,
+        opts.schliessen,
+        // Kasten E16-1.4: beim Öffnen festgelegt, nicht beim späteren Zeichnen.
+        opts.oberthema !== undefined ? opts.oberthema : state.area === 'settings' ? state.blattThema : null
+      )}
       ${bodyHtml}
     </div>`;
   document.querySelector('.app').appendChild(sheet);
@@ -3666,7 +3671,7 @@ function renderProfilSeite() {
     <div class="scroll profilseite" data-testid="profilseite">
       <div class="profilseite__kopf">
         <button class="iconbtn" id="psZurueck" aria-label="${esc(T.zurueck)}">${ICONS.back}</button>
-        <h2 class="profilseite__titel">${esc(T.seite)}</h2>
+        <div class="profilseite__mitte"><span class="sheet__ober" data-testid="profilseite-oberthema">Konto</span><h2 class="profilseite__titel">${esc(T.seite)}</h2></div>
         <span class="profilseite__platz"></span>
       </div>
 
@@ -8820,6 +8825,8 @@ function bzWertText(ansicht) {
 }
 
 function openBildschirmzeit(ansicht) {
+  // Kasten E16-1.4: Oberthema beim Öffnen festhalten (der Kopf wird bei jedem Schritt neu gezeichnet).
+  const bzThema = state.area === 'settings' ? state.blattThema : null;
   if (!BZ) return toast('Die Bildschirmzeit ist gerade nicht verfügbar');
   const stapel = [ansicht];
   let kind = null;
@@ -8974,7 +8981,7 @@ function openBildschirmzeit(ansicht) {
     const eltern = !kind && bz.stand?.eltern && seite !== 'uebersicht' && seite !== 'kinder'
       ? `<p class="bz__eltern">${esc(BZ.TEXTE.elternGesetzt(bz.stand.eltern.name))}</p>` : '';
     const blatt = sheet.querySelector('.sheet');
-    blatt.innerHTML = `${sheetKopf(titel, true)}
+    blatt.innerHTML = `${sheetKopf(titel, true, bzThema)}
       <div class="sheet__body" data-bz-blatt="${esc(seite)}">${eltern}
         ${meldung ? `<p class="sheet__fehler" role="alert">${esc(meldung)}</p>` : ''}
         ${inhalt()}
@@ -10037,7 +10044,7 @@ function openSichtbarkeit(punkt) {
       });
 
     sheet.querySelector('.sheet').innerHTML =
-      sheetKopf(punkt.label, true) +
+      sheetKopf(punkt.label, true, punkt._thema ?? null) +
       `<div class="sheet__body">
          ${
            /*
@@ -10652,6 +10659,13 @@ function einstellungsListe(art) {
 /** `nachher` wird gerufen, wenn sich etwas geaendert hat - damit die
  *  aufrufende Seite ihren neuen Stand zeigen kann. */
 function openEinstellung(punkt, nachher) {
+  /*
+   * Kasten E16-1.4 (Gegenprüfung 24.11.): das Oberthema gehört zum Aufruf.
+   * Verspätete Antworten (Verlauf, Analysen, Version) zeigen sonst das Thema
+   * eines inzwischen angetippten anderen Punkts.
+   */
+  if (!('_thema' in punkt)) punkt = { ...punkt, _thema: state.area === 'settings' ? state.blattThema : null };
+  state.blattThema = punkt._thema;
   // Sichtbarkeit hat ein eigenes Blatt: vier Stufen plus Ausnahmeliste.
   if (punkt.sichtbar) return openSichtbarkeit(punkt);
   // Kasten 22: das Bildschirmzeit-Blatt.
@@ -10707,16 +10721,42 @@ function openEinstellung(punkt, nachher) {
         )
         .join('')}</div></div>`,
       (sheet, close) => {
+        /*
+         * Kasten E16-1.6 (Gegenprüfung 24.11.): erst speichern, dann
+         * schließen. Vorher ging das Blatt sofort zu; lehnte der Server ab,
+         * stand in der Liste weiter der abgelehnte Wert. Jetzt bleibt das
+         * Blatt bei einem Fehler offen und sagt es.
+         */
+        let laeuft = false;
         sheet.querySelectorAll('[data-wahl]').forEach((b) =>
-          b.addEventListener('click', () => {
-            einstellungSetzen(punkt, b.dataset.wahl);
+          b.addEventListener('click', async () => {
+            if (laeuft) return;
+            laeuft = true;
+            const wahl = b.dataset.wahl;
+            sheet.querySelectorAll('[data-wahl]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+            sheet.querySelector('.einst-wahl')?.setAttribute('aria-busy', 'true');
+            const ok = await einstellungSetzen(punkt, wahl);
+            laeuft = false;
+            sheet.querySelector('.einst-wahl')?.removeAttribute('aria-busy');
+            if (!ok) {
+              sheet.querySelectorAll('[data-wahl]').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.wahl === einstellung(punkt))));
+              let f = sheet.querySelector('.einst-fehler');
+              if (!f) {
+                f = document.createElement('p');
+                f.className = 'einst-fehler';
+                f.setAttribute('role', 'alert');
+                sheet.querySelector('.sheet__body')?.appendChild(f);
+              }
+              f.textContent = 'Das ließ sich gerade nicht speichern. Bitte versuch es noch einmal.';
+              return;
+            }
             close();
             // Nur dort neu zeichnen, wo die Liste auch steht. Aus der
             // Kontaktinfo heraus haette das sonst den Einstellungs-
             // Bildschirm unter das offene Fenster gebaut.
             if (state.area === 'settings') renderSettings();
             nachher?.();
-            toast(`${punkt.label}: ${b.dataset.wahl}`);
+            toast(`${punkt.label}: ${wahl}`);
           })
         );
       },
@@ -10811,7 +10851,8 @@ function openEinstellung(punkt, nachher) {
         toast(punkt.fertig || 'Gespeichert');
         return null;
       },
-      'Merken'
+      'Merken',
+      { wahlListe: true }
     );
   }
 
@@ -10900,6 +10941,7 @@ function openEinstellung(punkt, nachher) {
   if (punkt.aktion === 'datenauskunft') return datenauskunftLaden();
   // Kasten E16-1.3: „Über All Media“ unter Hilfe — Fassung und ausgelieferter Stand.
   if (punkt.aktion === 'ueber') {
+    const thema = punkt._thema;
     return (async () => {
       let stand;
       try {
@@ -10908,12 +10950,14 @@ function openEinstellung(punkt, nachher) {
       } catch {
         stand = 'Version 1.0.0 · Stand gerade nicht abrufbar';
       }
+      // Inzwischen woanders hin gewechselt: kein Blatt mehr aufmachen.
+      if (state.area !== 'settings') return;
       openSheet(
         'Über All Media',
         `<div class="sheet__body"><p class="sheet__text" data-testid="ueber-stand">${esc(stand)}</p>
           <p class="sheet__text">Ein Konto für Messenger, Videos und Communitys. Nutzungsbedingungen, Datenschutzerklärung und Impressum findest du im Abschnitt Hilfe; Fragen und Fehler schickst du über „Problem melden“.</p></div>`,
         null,
-        { schliessen: true }
+        { schliessen: true, oberthema: thema }
       );
     })();
   }
@@ -18551,7 +18595,22 @@ function openFormular(titel, felder, senden, knopf = 'Fertig', optionen = {}) {
         ? `<textarea ${gemeinsam} rows="3">${esc(f.wert || '')}</textarea>`
         : // Punkt 38: eine Auswahl statt eines Textfelds - Musik tippt man
           // nicht ab, man sucht sie aus dem aus, was es gibt.
-          f.typ === 'auswahl'
+          /*
+           * Kasten E16-1.5: in den Einstellungen dasselbe Auswahlmuster wie
+           * überall dort (Kreiszeilen). Der Wert steht in einem versteckten
+           * Feld mit derselben Kennung, damit das Absenden gleich bleibt.
+           */
+          f.typ === 'auswahl' && optionen.wahlListe
+          ? `<input type="hidden" id="f_${f.key}" value="${esc(f.wert || f.auswahl?.[0] || '')}">
+             <div class="einst-wahl" role="radiogroup" aria-label="${esc(f.label)}">${(f.auswahl || [])
+               .map(
+                 (w) => `<button type="button" class="einst-wahl__zeile" role="radio" aria-checked="${w === (f.wert || f.auswahl[0])}" data-feldwahl="${esc(f.key)}" data-wert="${esc(w)}">
+                   <span class="einst-wahl__text"><span class="einst-wahl__label">${esc(w)}</span></span>
+                   <span class="einst-wahl__kreis" aria-hidden="true"></span>
+                 </button>`
+               )
+               .join('')}</div>`
+          : f.typ === 'auswahl'
           ? `<select id="f_${f.key}">${(f.auswahl || [])
               .map((w) => `<option value="${esc(w)}" ${w === f.wert ? 'selected' : ''}>${esc(w)}</option>`)
               .join('')}</select>`
@@ -18574,6 +18633,15 @@ function openFormular(titel, felder, senden, knopf = 'Fertig', optionen = {}) {
       // Eine Auswahl bekommt keinen Fokus - sonst klappt sie beim Oeffnen auf.
       const ersteseingabe = sheet.querySelector('input, textarea');
       setTimeout(() => ersteseingabe?.focus(), 80);
+      sheet.querySelectorAll('[data-feldwahl]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const feld = sheet.querySelector('#f_' + b.dataset.feldwahl);
+          if (feld) feld.value = b.dataset.wert;
+          sheet
+            .querySelectorAll(`[data-feldwahl="${b.dataset.feldwahl}"]`)
+            .forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+        })
+      );
       // Kasten 25.1: Felder mit `markierbar` (Beschreibung) schlagen bei @ Personen vor.
       for (const f of felder) if (f.markierbar) markierungsEingabe(sheet.querySelector('#f_' + f.key), { unten: true });
 

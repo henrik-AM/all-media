@@ -2055,7 +2055,9 @@ body:has(.camera) .toast { bottom: 132px; }
   background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2);
   transition: transform .2s;
 }
-.schalter input:checked + span { background: var(--brand-grad); }
+.schalter input:checked + span { background: var(--success); }
+/* E16-1.2: aus grau, an grün — wie .switch und die App. */
+.schalter span { background: var(--schalter-aus); }
 .schalter input:checked + span::before { transform: translateX(18px); }
 
 .row.is-aktiv { background: var(--brand-soft); }
@@ -5655,3 +5657,8 @@ body:has(.erstellseite) .toast { bottom: calc(84px + env(safe-area-inset-bottom,
 .einst-konto .konto__wechsel { width: calc(100% - 28px); margin: 0 14px 12px; justify-content: center; }
 .einst-zeile .item__label { flex: 1 1 0; }
 .einst-zeile .item__value { flex: 0 1 auto; }
+.einst-fehler { margin: 0 16px 12px; padding: 10px 12px; border-radius: 12px; background: var(--danger-soft, rgba(229,72,77,.12)); color: var(--danger); font-size: 13px; font-weight: 600; }
+.einst-wahl[aria-busy="true"] { opacity: .6; pointer-events: none; }
+.profilseite__mitte { display: flex; flex-direction: column; align-items: center; }
+/* E16-1.6: Werte brechen um statt „Meine Kont…“ (Gegenprüfung 24.11.). */
+.einst-zeile .item__value { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25; overflow-wrap: anywhere; }
