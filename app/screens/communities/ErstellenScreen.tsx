@@ -147,7 +147,10 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
         <View style={styles.nameFeld}>
           <TextInput
             value={name}
-            onChangeText={setName}
+            onChangeText={(eingabe) => {
+              setName(eingabe);
+              setMeldung(null);
+            }}
             placeholder={istCommunity ? T.communityName : T.unterthemaName}
             placeholderTextColor={colors.text2}
             style={styles.nameEingabe}

@@ -333,6 +333,7 @@ async function teilB() {
       !aufrufe.some((a) => a.pfad === '/api/communities/c-neu/channels' && a.methode === 'POST'));
     if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, 'k28-10-pflichtfehler.png') });
     await seite.fill('#esName', 'Geheim');
+    pruefe('10.2 Bearbeiten des Namens blendet den bisherigen Pflichtfehler aus', await pflichtmeldung.isHidden());
     await seite.fill('#esBio', 'Nur für Eingeladene');
     await seite.click('label.erstellseite__schalter');
     const gruenerSchalter = await seite.waitForFunction(() => {

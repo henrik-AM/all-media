@@ -18890,6 +18890,7 @@ function openErstellenSeite(art, community) {
     overlay.innerHTML = '';
   };
   $('#esZu').addEventListener('click', schliessen);
+  $('#esName').addEventListener('input', () => meldung(''));
 
   /*
    * Den QR-Code per fetch holen, nicht über <img src>: der Server verlangt die
