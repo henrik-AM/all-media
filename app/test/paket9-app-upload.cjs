@@ -59,9 +59,9 @@ function appUpload(antworten) {
   };
 }
 const erfolgreich = async (melden) => {
-  melden({ bytesSent: 235, totalBytes: 1000 });
+  melden({ bytesSent: 235n, totalBytes: 1000n });
   melden({ bytesSent: 680, totalBytes: 1000 });
-  melden({ bytesSent: 1000, totalBytes: 1000 });
+  melden({ bytesSent: 1000n, totalBytes: 1000n });
   return { status: 200, body: '{"ok":true,"url":"bestaendig","sekunden":45}' };
 };
 

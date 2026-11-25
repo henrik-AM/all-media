@@ -85,7 +85,11 @@ export const ProfilBearbeitenScreen = ({ onBack, onNotice }: Props) => {
         <Druck onPress={onBack} hitSlop={10} accessibilityRole="button" accessibilityLabel={T.zurueck} testID="profilseite-zurueck">
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </Druck>
-        <Text style={styles.kopfTitel}>{T.seite}</Text>
+        {/* Kasten E16-1.4: Oberthema über dem Titel, wie bei jeder Einstellungs-Unterseite. */}
+        <View style={styles.kopfMitte}>
+          <Text style={styles.kopfOber} testID="profilseite-oberthema">Konto</Text>
+          <Text style={styles.kopfTitel} accessibilityRole="header">{T.seite}</Text>
+        </View>
         <View style={{ width: 22 }} />
       </View>
 
@@ -387,6 +391,8 @@ const FeldSeite = ({
 };
 
 const styles = themenStyles((colors) => ({
+  kopfMitte: { alignItems: 'center' },
+  kopfOber: { fontSize: 11.5, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.brand },
   seite: { flex: 1, backgroundColor: colors.surface },
   kopf: {
     flexDirection: 'row',

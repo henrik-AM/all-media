@@ -88,7 +88,7 @@ async function sendeVideodatei(
   signal: AbortSignal,
   melden: (stand: MedienUpload.Stand) => void,
 ): Promise<HochladeAntwort> {
-  const gesamt = datei.size;
+  const gesamt = Number(datei.size);
   const auftrag = datei.createUploadTask(url, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': typ },
     sessionType: 'foreground',
@@ -98,8 +98,10 @@ async function sendeVideodatei(
   // Der Listener empfängt native Byte-Ereignisse. onProgress würde zusätzlich
   // nach jeder HTTP-Antwort einen synthetischen 100-%-Wert auslösen.
   const abo = auftrag.addListener('progress', ({ bytesSent }) => {
-    if (signal.aborted || bytesSent <= geladen) return;
-    geladen = Math.min(gesamt, bytesSent);
+    // Expo Go liefert den nativen Int64-Wert auf iOS als BigInt.
+    const gesendet = Number(bytesSent);
+    if (signal.aborted || !Number.isFinite(gesendet) || gesendet <= geladen) return;
+    geladen = Math.min(gesamt, gesendet);
     melden({ geladen, gesamt, phase: geladen === gesamt ? 'pruefen' : 'hochladen' });
   });
   try {

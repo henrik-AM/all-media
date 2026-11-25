@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, themenStyles } from '../constants/design';
 import { useZiehenZumSchliessen } from '../lib/ziehen';
 import { FarbfilterSchicht } from './Farbfilter';
+import { useOberthema } from './Oberthema';
 
 interface Props {
   visible: boolean;
@@ -25,6 +26,10 @@ interface Props {
  */
 export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: Props) => {
   const insets = useSafeAreaInsets();
+  // Kasten E16-1.4: Oberthema klein über dem Titel, wenn die Einstellungen es setzen.
+  const thema = useOberthema();
+  // Gleich wie der Titel („Farbfilter“ über „Farbfilter“) sagt es nichts.
+  const oberthema = thema && thema !== title ? thema : null;
   // Paket 9: solange ein Blatt offen ist, zeigt es die Upload-Anzeige selbst.
   useEffect(() => { if (!visible) return; blattOffen(true); return () => blattOffen(false); }, [visible]);
   /*
@@ -52,13 +57,20 @@ export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: P
             ziehStil,
           ]}
         >
-          <View style={styles.kopf} {...griff}>
+          <View style={[styles.kopf, !!oberthema && styles.kopfMitThema]} {...griff}>
             {/* Der Griff, an dem gezogen wird - er zeigt auch, dass es geht. */}
             <View style={styles.griff} />
             <Druck style={styles.x} onPress={onClose} hitSlop={8} accessibilityLabel="Zurück">
               <Ionicons name="chevron-back" size={22} color={colors.text} />
             </Druck>
-            <Text style={styles.titel}>{title}</Text>
+            {!!oberthema && (
+              <Text style={styles.oberthema} numberOfLines={1} testID="blatt-oberthema">
+                {oberthema}
+              </Text>
+            )}
+            <Text style={styles.titel} numberOfLines={2} accessibilityRole="header">
+              {title}
+            </Text>
           </View>
 
           <View style={hoch ? styles.inhaltHoch : undefined}>{children}</View>
@@ -114,15 +126,20 @@ const styles = themenStyles((colors) => ({
     backgroundColor: colors.text3,
     opacity: 0.35,
   },
+  // Kasten E16-1.6: Mindest- statt fester Höhe — große Schrift lässt den Kopf mitwachsen.
   kopf: {
-    height: 52,
+    minHeight: 52,
+    paddingTop: 14,
+    paddingBottom: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  x: { position: 'absolute', left: spacing.md, top: 15 },
-  titel: { fontSize: 17, fontWeight: '600', color: colors.text },
+  x: { position: 'absolute', left: spacing.md, top: 0, bottom: 0, justifyContent: 'center' },
+  titel: { fontSize: 17, fontWeight: '600', color: colors.text, textAlign: 'center', paddingHorizontal: 48 },
+  kopfMitThema: { minHeight: 62, paddingTop: 12 },
+  oberthema: { fontSize: 11.5, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.brand, marginBottom: 1 },
   fuss: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,

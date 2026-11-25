@@ -1488,10 +1488,22 @@ export const ChatDetailScreen = ({
             </Text>
           )}
         </Druck>
-        <Druck style={styles.headerAction} onPress={() => onCall('video')} hitSlop={4}>
+        <Druck
+          style={styles.headerAction}
+          onPress={() => onCall('video')}
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel="Videoanruf starten"
+        >
           <Ionicons name="videocam-outline" size={22} color={colors.text2} />
         </Druck>
-        <Druck style={styles.headerAction} onPress={() => onCall('audio')} hitSlop={4}>
+        <Druck
+          style={styles.headerAction}
+          onPress={() => onCall('audio')}
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel="Sprachanruf starten"
+        >
           <Ionicons name="call-outline" size={20} color={colors.text2} />
         </Druck>
         {/* Leerraum, damit der Name wirklich in der Mitte des Kopfes steht —

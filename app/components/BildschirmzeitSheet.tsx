@@ -18,7 +18,8 @@
  * gleiche Texte aus gemeinsam/bildschirmzeit.js.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, Switch, Text, View, type ScrollViewInstance } from 'react-native';
+import { ScrollView, Text, View, type ScrollViewInstance } from 'react-native';
+import { Schalter } from './Schalter';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Druck } from './Druck';
@@ -328,12 +329,11 @@ export const BildschirmzeitSheet = ({ ansicht, onClose }: Props) => {
         <>
           <View style={styles.zeile}>
             <Text style={styles.zeileText}>Auszeit</Text>
-            <Switch
+            <Schalter
               value={a.an}
               onValueChange={(an) => aendern((r) => {
                 r.auszeit.an = an;
               })}
-              trackColor={{ true: colors.brand, false: colors.surface3 }}
               accessibilityLabel="Auszeit"
             />
           </View>

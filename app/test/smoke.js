@@ -444,7 +444,9 @@ const STRUCTURE = {
   await p.click('[data-area="settings"]');
   await p.waitForTimeout(400);
   assert('Einstellungen ohne obere Leiste', await p.$eval('#topbar', e => e.hidden));
-  assert('Einstellungen ohne Seitentitel', !(await p.$('.pagehead__title')));
+  // Bis 24.11.2026 „ohne Seitentitel“ (Prototyp). Henrik, E16-1.4 (24.11.2026):
+  // oben steht immer das aktuelle Oberthema — das geht dem Prototyp vor.
+  assert('Einstellungen zeigen das Oberthema', !!(await p.$('#einstThema')));
   // Die vier Abschnitte aus dem Prototyp muessen da sein. Weitere sind seit
   // Henriks Rueckmeldung ausdruecklich erwuenscht, deshalb keine feste Anzahl.
   const abschnitte = await p.$$eval('[data-jump]', e => e.map(x => x.dataset.jump));

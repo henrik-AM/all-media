@@ -47,6 +47,8 @@ const hellFarben = {
   danger: '#E5484D',
   dangerSoft: 'rgba(229,72,77,0.12)',
   success: '#12A150',
+  /** Spur eines ausgeschalteten Schalters (Kasten E16-1.2: grau ↔ grün). */
+  schalterAus: '#D3D6DE',
   online: '#22C55E',
 
   white: '#FFFFFF',
@@ -78,6 +80,7 @@ const dunkelFarben: typeof hellFarben = {
   danger: '#F26D70',
   dangerSoft: 'rgba(242,109,112,0.16)',
   success: '#2DD07C',
+  schalterAus: '#3A3F4A',
   online: '#22C55E',
 
   white: '#FFFFFF',

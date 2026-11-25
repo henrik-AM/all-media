@@ -1632,6 +1632,8 @@ let renderLaufListe = 0;
 
 function render() {
   renderLauf++;
+  // E16-1.4 (nach Runde 3): jede Navigation macht ausstehende Einstellungsblätter ungültig.
+  state.blattAufruf = (state.blattAufruf || 0) + 1;
   renderLaufListe = renderLauf;
   // Die Kamera laeuft weiter, solange niemand sie abschaltet — auch dann,
   // wenn ihre Seite laengst weggezeichnet ist. Am Handy bliebe das Licht an.
@@ -3239,14 +3241,21 @@ async function openFollowerList(profile, art) {
  * denselben Kopf wieder braucht. Vorher stand die Form nur hier inline, und
  * ein neu gezeichnetes Blatt verlor seinen Schliessen-Knopf.
  */
-function sheetKopf(title, mitX) {
+function sheetKopf(title, mitX, oberthema = null) {
+  /*
+   * Einstellungen 16.11., Kasten 1.4 (Henrik, 24.11.2026): ein Blatt aus den
+   * Einstellungen zeigt klein sein Oberthema über dem Titel („Messenger“ über
+   * „Lesebestätigung“). Wie SheetRahmen in der App.
+   */
+  const thema = oberthema && oberthema !== title ? oberthema : '';
+  const ober = thema ? `<div class="sheet__ober" data-testid="blatt-oberthema">${esc(thema)}</div>` : '';
   return mitX
-    ? `<div class="sheet__kopf">
-         <button class="sheet__x" data-sheet-close aria-label="Zurück">${ICONS.chevron}</button>
-         <div class="sheet__titel-mitte">${esc(title)}</div>
+    ? `<div class="sheet__kopf ${thema ? 'sheet__kopf--thema' : ''}">
+         <button class="sheet__x" data-sheet-close aria-label="Zurück">${ICONS.back}</button>
+         <div class="sheet__titel-mitte">${ober}<span>${esc(title)}</span></div>
        </div>`
     : `<div class="sheet__handle"></div>
-       <div class="sheet__title">${esc(title)}</div>`;
+       ${ober}<div class="sheet__title">${esc(title)}</div>`;
 }
 
 /*
@@ -3342,7 +3351,12 @@ function openSheet(title, bodyHtml, onMount, opts = {}) {
   sheet.className = 'sheet-backdrop';
   sheet.innerHTML = `
     <div class="sheet ${opts.hoch ? 'sheet--tall' : ''}" role="dialog" aria-label="${esc(title)}">
-      ${sheetKopf(title, opts.schliessen)}
+      ${sheetKopf(
+        title,
+        opts.schliessen,
+        // Kasten E16-1.4: beim Öffnen festgelegt, nicht beim späteren Zeichnen.
+        opts.oberthema !== undefined ? opts.oberthema : state.area === 'settings' ? state.blattThema : null
+      )}
       ${bodyHtml}
     </div>`;
   document.querySelector('.app').appendChild(sheet);
@@ -3659,7 +3673,7 @@ function renderProfilSeite() {
     <div class="scroll profilseite" data-testid="profilseite">
       <div class="profilseite__kopf">
         <button class="iconbtn" id="psZurueck" aria-label="${esc(T.zurueck)}">${ICONS.back}</button>
-        <h2 class="profilseite__titel">${esc(T.seite)}</h2>
+        <div class="profilseite__mitte"><span class="sheet__ober" data-testid="profilseite-oberthema">Konto</span><h2 class="profilseite__titel">${esc(T.seite)}</h2></div>
         <span class="profilseite__platz"></span>
       </div>
 
@@ -7963,7 +7977,13 @@ function geteiltBinden(liste) {
     b.addEventListener('click', (e) => {
       // Ein Ziehen zum Antworten endet nicht als Klick auf die Karte.
       if (b.closest('[data-gezogen]')) return e.preventDefault();
-      beitragOeffnen(b.dataset.beitragkind, b.dataset.beitrag);
+      const imChatOverlay = overlay.contains(liste);
+      beitragOeffnen(b.dataset.beitragkind, b.dataset.beitrag, () => {
+        // Nach einem Bereichswechsel gehört eine verspätete Antwort nicht mehr hierher.
+        if (!liste.isConnected || (imChatOverlay && overlay.hidden)) return false;
+        if (imChatOverlay) closeChat();
+        return true;
+      });
     })
   );
 }
@@ -8807,6 +8827,8 @@ function bzWertText(ansicht) {
 }
 
 function openBildschirmzeit(ansicht) {
+  // Kasten E16-1.4: Oberthema beim Öffnen festhalten (der Kopf wird bei jedem Schritt neu gezeichnet).
+  const bzThema = state.area === 'settings' ? state.blattThema : null;
   if (!BZ) return toast('Die Bildschirmzeit ist gerade nicht verfügbar');
   const stapel = [ansicht];
   let kind = null;
@@ -8961,7 +8983,7 @@ function openBildschirmzeit(ansicht) {
     const eltern = !kind && bz.stand?.eltern && seite !== 'uebersicht' && seite !== 'kinder'
       ? `<p class="bz__eltern">${esc(BZ.TEXTE.elternGesetzt(bz.stand.eltern.name))}</p>` : '';
     const blatt = sheet.querySelector('.sheet');
-    blatt.innerHTML = `${sheetKopf(titel, true)}
+    blatt.innerHTML = `${sheetKopf(titel, true, bzThema)}
       <div class="sheet__body" data-bz-blatt="${esc(seite)}">${eltern}
         ${meldung ? `<p class="sheet__fehler" role="alert">${esc(meldung)}</p>` : ''}
         ${inhalt()}
@@ -9081,6 +9103,27 @@ function renderSettingsWert() {
     el.textContent = bzWertText(el.dataset.bzWert);
   });
 }
+
+/*
+ * Einstellungen 16.11., Kasten 1.6: jeder .switch ist für Bildschirmleser ein
+ * Schalter mit Zustand. Die Handler schalten nur die Klasse is-on um; dieser
+ * Beobachter hält role und aria-checked dazu passend, überall in der Seite.
+ */
+(function schalterZugaenglich() {
+  const setze = (el) => {
+    if (!el.classList?.contains('switch') || el.classList.contains('einst-anzeige')) return;
+    if (el.getAttribute('role') !== 'switch') el.setAttribute('role', 'switch');
+    const an = String(el.classList.contains('is-on'));
+    if (el.getAttribute('aria-checked') !== an) el.setAttribute('aria-checked', an);
+  };
+  const beobachter = new MutationObserver((liste) => {
+    for (const m of liste) {
+      if (m.type === 'attributes') setze(m.target);
+      else m.addedNodes.forEach((n) => n.nodeType === 1 && (setze(n), n.querySelectorAll?.('.switch').forEach(setze)));
+    }
+  });
+  beobachter.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+})();
 
 /* ---------------------------------------------------------- settings */
 /*
@@ -9322,52 +9365,6 @@ const SETTINGS = [
     ],
   },
   {
-    id: 'speicher',
-    title: 'Speicher',
-    items: [
-      { label: 'Automatischer Download', icon: 'image', wahlKey: 'autoDownload', wahl: ['Nie', 'Nur im WLAN', 'Immer'], standard: 'Nur im WLAN' },
-      { label: 'Speicher verwalten', icon: 'compass', liste: 'speicher' },
-      { label: 'Datensparmodus', icon: 'portrait', toggle: 'datensparen' },
-      { label: 'Medienqualität', icon: 'image', wahlKey: 'medienqualitaet', wahl: ['Standard', 'Hoch'], standard: 'Standard' },
-    ],
-  },
-  {
-    id: 'hilfe',
-    title: 'Hilfe',
-    items: [
-      {
-        label: 'Hilfebereich',
-        icon: 'info',
-        info: 'Fragen und Antworten zu All Media. Bei allem, was hier nicht steht: schreib uns über „Problem melden“ — wir antworten meist innerhalb eines Werktags.',
-      },
-      /*
-       * Kasten RS 3: „Problem melden" meldete „angekommen" und speicherte
-       * nichts. Jetzt inhalt_melden('problem', …) über das Melden-Blatt; die
-       * Antwort kommt als Mitteilung in die Glocke (Schema 102). Darunter
-       * der Stand eigener Meldungen, der Kontostatus (DSA Art. 16, 17, 20)
-       * und — nur für Moderatoren — die Moderation. Gleiche Einträge in der
-       * App (SettingsScreen, Hilfe); die Moderation gibt es nur hier.
-       */
-      { label: 'Problem melden', icon: 'shield', aktion: 'problem' },
-      { label: 'Meine Meldungen', icon: 'flag', aktion: 'meinemeldungen' },
-      { label: 'Kontostatus', icon: 'info', aktion: 'kontostatus' },
-      { label: 'Moderation', icon: 'shield', aktion: 'moderation', nurModerator: true },
-      /*
-       * Kasten RS 1 (24.10.2026): bis hierher je zwei Sätze, die zum Teil
-       * nicht stimmten („ab 13"). Jetzt die vollständigen Texte aus
-       * gemeinsam/rechtstexte.js — dieselben wie in der App
-       * (app/components/RechtstextSheet.tsx).
-       */
-      { label: 'Die Regeln kurz erklärt', icon: 'info', rechtstext: 'kurz_erklaert' },
-      { label: 'Nutzungsbedingungen', icon: 'document', rechtstext: 'nutzungsbedingungen' },
-      { label: 'Community-Richtlinien', icon: 'people', rechtstext: 'community_richtlinien' },
-      { label: 'Datenschutzerklärung', icon: 'lock', rechtstext: 'datenschutz' },
-      { label: 'Für Eltern', icon: 'heart', rechtstext: 'eltern_info' },
-      { label: 'Impressum', icon: 'info', rechtstext: 'impressum' },
-      { label: 'Freunde einladen', icon: 'people', aktion: 'einladen' },
-    ],
-  },
-  {
     id: 'videos',
     title: 'Videos',
     items: [
@@ -9426,6 +9423,60 @@ const SETTINGS = [
       { label: 'Push-to-Talk Benachrichtigung', icon: 'mic', sichtbar: 'ptt' },
       { label: 'Gestummte Communitys', icon: 'mute', liste: 'stummeKanaele' },
       { label: 'Gestummte Profile', icon: 'block', liste: 'stummeProfile' },
+    ],
+  },
+
+  /*
+   * Einstellungen 16.11., Q04 (Kasten 1.3): „Speicher“ und „Hilfe“ als eigene
+   * Oberbegriffe unterhalb von Videos und Communitys. Gleiche Reihenfolge wie
+   * in der App (SECTIONS in SettingsScreen.tsx).
+   */
+  {
+    id: 'speicher',
+    title: 'Speicher',
+    items: [
+      { label: 'Automatischer Download', icon: 'image', wahlKey: 'autoDownload', wahl: ['Nie', 'Nur im WLAN', 'Immer'], standard: 'Nur im WLAN' },
+      { label: 'Speicher verwalten', icon: 'compass', liste: 'speicher' },
+      { label: 'Datensparmodus', icon: 'portrait', toggle: 'datensparen' },
+      { label: 'Medienqualität', icon: 'image', wahlKey: 'medienqualitaet', wahl: ['Standard', 'Hoch'], standard: 'Standard' },
+    ],
+  },
+  {
+    id: 'hilfe',
+    title: 'Hilfe',
+    items: [
+      {
+        label: 'Hilfebereich',
+        icon: 'info',
+        info: 'Fragen und Antworten zu All Media. Bei allem, was hier nicht steht: schreib uns über „Problem melden“ — wir antworten meist innerhalb eines Werktags.',
+      },
+      /*
+       * Kasten RS 3: „Problem melden" meldete „angekommen" und speicherte
+       * nichts. Jetzt inhalt_melden('problem', …) über das Melden-Blatt; die
+       * Antwort kommt als Mitteilung in die Glocke (Schema 102). Darunter
+       * der Stand eigener Meldungen, der Kontostatus (DSA Art. 16, 17, 20)
+       * und — nur für Moderatoren — die Moderation. Gleiche Einträge in der
+       * App (SettingsScreen, Hilfe); die Moderation gibt es nur hier.
+       */
+      { label: 'Problem melden', icon: 'shield', aktion: 'problem' },
+      { label: 'Meine Meldungen', icon: 'flag', aktion: 'meinemeldungen' },
+      { label: 'Kontostatus', icon: 'info', aktion: 'kontostatus' },
+      { label: 'Moderation', icon: 'shield', aktion: 'moderation', nurModerator: true },
+      /*
+       * Kasten RS 1 (24.10.2026): bis hierher je zwei Sätze, die zum Teil
+       * nicht stimmten („ab 13"). Jetzt die vollständigen Texte aus
+       * gemeinsam/rechtstexte.js — dieselben wie in der App
+       * (app/components/RechtstextSheet.tsx).
+       */
+      { label: 'Die Regeln kurz erklärt', icon: 'info', rechtstext: 'kurz_erklaert' },
+      { label: 'Nutzungsbedingungen', icon: 'document', rechtstext: 'nutzungsbedingungen' },
+      { label: 'Community-Richtlinien', icon: 'people', rechtstext: 'community_richtlinien' },
+      { label: 'Datenschutzerklärung', icon: 'lock', rechtstext: 'datenschutz' },
+      { label: 'Für Eltern', icon: 'heart', rechtstext: 'eltern_info' },
+      { label: 'Impressum', icon: 'info', rechtstext: 'impressum' },
+      { label: 'Freunde einladen', icon: 'people', aktion: 'einladen' },
+      // Einstellungen 16.11., Q78 (Kasten 1.3): „Über All Media“ gehört zur Hilfe. Wie in der App.
+      { label: 'Über All Media', icon: 'info', aktion: 'ueber' },
     ],
   },
 ];
@@ -9995,7 +10046,7 @@ function openSichtbarkeit(punkt) {
       });
 
     sheet.querySelector('.sheet').innerHTML =
-      sheetKopf(punkt.label, true) +
+      sheetKopf(punkt.label, true, punkt._thema ?? null) +
       `<div class="sheet__body">
          ${
            /*
@@ -10009,15 +10060,17 @@ function openSichtbarkeit(punkt) {
              ? `<div class="sheet__hint" data-testid="likes-ersteller-hinweis">${esc(window.Sichtbarkeit.LIKES_ERSTELLER_HINWEIS)}</div>`
              : ''
          }
-         ${window.Sichtbarkeit.stufenFuer(bereich).map(
-           (st) => `<button class="item sicht__stufe${st.key === jetzt.stufe ? ' is-active' : ''}" data-stufe="${st.key}">
-             <span class="item__label">
-               <b>${esc(st.label)}</b>
-               <small>${esc(st.hinweis)}</small>
+         <div class="listhead">Wer darf das?</div>
+         <div class="einst-wahl" role="radiogroup" aria-label="${esc(punkt.label)}">${window.Sichtbarkeit.stufenFuer(bereich).map(
+           // Kasten E16-1.5: dasselbe Auswahlmuster wie jede „eine aus mehreren“-Einstellung.
+           (st) => `<button class="einst-wahl__zeile sicht__stufe${st.key === jetzt.stufe ? ' is-active' : ''}" role="radio" aria-checked="${st.key === jetzt.stufe}" data-stufe="${st.key}">
+             <span class="einst-wahl__text">
+               <span class="einst-wahl__label">${esc(st.label)}</span>
+               <span class="einst-wahl__hinweis">${esc(st.hinweis)}</span>
              </span>
-             <span class="sicht__punkt">${st.key === jetzt.stufe ? ICONS.check : ''}</span>
+             <span class="einst-wahl__kreis" aria-hidden="true"></span>
            </button>`
-         ).join('')}
+         ).join('')}</div>
 
          ${
            /*
@@ -10028,7 +10081,7 @@ function openSichtbarkeit(punkt) {
             * Datenbank selbst (Schema 30), nicht hier.
             */
            bereich === 'story'
-             ? `<button class="item sicht__stufe${jetzt.stufe !== 'alle' ? ' is-aus' : ''}" data-invideos="1"${
+             ? `<button class="item sicht__stufe${jetzt.stufe !== 'alle' ? ' is-aus' : ''}" data-invideos="1" role="switch" aria-checked="${!!(jetzt.inVideos && jetzt.stufe === 'alle')}" aria-label="Story auch in Videos teilen"${
                  jetzt.stufe !== 'alle' ? ' disabled' : ''
                }>
                   <span class="item__label">
@@ -10039,9 +10092,7 @@ function openSichtbarkeit(punkt) {
                         : 'Nur bei „Alle" möglich.'
                     }</small>
                   </span>
-                  <span class="sicht__punkt">${
-                    jetzt.inVideos && jetzt.stufe === 'alle' ? ICONS.check : ''
-                  }</span>
+                  <span class="switch einst-anzeige ${jetzt.inVideos && jetzt.stufe === 'alle' ? 'is-on' : ''}" aria-hidden="true"><span class="switch__knob"></span></span>
                 </button>`
              : ''
          }
@@ -10360,17 +10411,35 @@ function einstellung(punkt) {
   return gespeichert && (!punkt.wahl || punkt.wahl.includes(gespeichert)) ? gespeichert : punkt.standard || '';
 }
 
-async function einstellungSetzen(punkt, wert) {
+// Kasten E16-1.6 (Gegenprüfung R2/R3): je Schlüssel zählt nur der jüngste Schreibvorgang;
+// Schreibvorgänge laufen nacheinander, beide Privatprofil-Schalter teilen sich die Reihe.
+const einstellungSchreibNr = {};
+const einstellungReihe = {};
+const einstellungBestaetigt = {};
+function einstellungSetzen(punkt, wert) {
   const schluessel = einstellungsSchluessel(punkt);
-  const vorher = state.einstellungen ? state.einstellungen[schluessel] : undefined;
-
-  // Sofort umlegen, damit es sich nicht zaeh anfuehlt.
+  const reihe = schluessel === 'videoPrivate' || schluessel === 'commPrivate' ? 'privat' : schluessel;
+  const nr = (einstellungSchreibNr[reihe] || 0) + 1;
+  einstellungSchreibNr[reihe] = nr;
+  if (!(schluessel in einstellungBestaetigt)) einstellungBestaetigt[schluessel] = state.einstellungen ? state.einstellungen[schluessel] : undefined;
+  // Sofort anzeigen; geschrieben wird der Reihe nach.
   state.einstellungen = { ...(state.einstellungen || {}), [schluessel]: wert };
+  const lauf = (einstellungReihe[reihe] || Promise.resolve()).then(() => einstellungSchreiben(punkt, wert, reihe, nr));
+  einstellungReihe[reihe] = lauf.catch(() => false);
+  return lauf;
+}
+async function einstellungSchreiben(punkt, wert, reihe, nr) {
+  const schluessel = einstellungsSchluessel(punkt);
+  // Eine neuere Wahl steht schon an: diese gar nicht erst schreiben.
+  if (einstellungSchreibNr[reihe] !== nr) return true;
 
   const antwort = await api(`/api/einstellungen/${encodeURIComponent(schluessel)}`, { wert });
+  if (antwort?.ok) einstellungBestaetigt[schluessel] = wert;
+  // Inzwischen wurde neu gewählt: diese Antwort darf nichts mehr zurückdrehen.
+  if (einstellungSchreibNr[reihe] !== nr) return !!antwort?.ok;
   if (!antwort?.ok) {
-    // Zurueckdrehen. Eine Einstellung, die anders aussieht, als sie
-    // gespeichert ist, ist schlimmer als eine, die sich nicht setzen laesst.
+    // Zurück auf den zuletzt BESTÄTIGTEN Wert, nicht auf einen Zwischenstand.
+    const vorher = einstellungBestaetigt[schluessel];
     if (vorher === undefined) delete state.einstellungen[schluessel];
     else state.einstellungen[schluessel] = vorher;
     toast(antwort?.error || 'Nicht gespeichert');
@@ -10607,7 +10676,57 @@ function einstellungsListe(art) {
 
 /** `nachher` wird gerufen, wenn sich etwas geaendert hat - damit die
  *  aufrufende Seite ihren neuen Stand zeigen kann. */
+/* E16-1.6: Zeilen eines Listenblatts — beim Öffnen und beim Nachladen im offenen Blatt. */
+function listenZeilenHtml(zeilen, leer) {
+  return (
+
+           zeilen.length
+             ? zeilen
+                 .map((z) =>
+                   /*
+                    * Zwischenueberschrift statt Eintrag. Die Profilstatistik
+                    * hat zwoelf Zeilen; ohne Gliederung sieht "Profilaufrufe
+                    * (7 Tage)" so wichtig aus wie "Follower gesamt", obwohl
+                    * das eine eine Entwicklung ist und das andere ein Stand.
+                    */
+                   z.kopf
+                     ? `<div class="sheet__gruppe">${esc(z.text)}</div>`
+                     : z.ziel
+                     ? // Verlauf, Gelikte, Kommentare: zum Beitrag (Kasten 10.1).
+                       `<button class="item" data-ziel-kind="${esc(z.ziel.kind || '')}" data-ziel-id="${esc(z.ziel.id)}">
+                     <span class="item__label">${esc(z.text)}</span>
+                     <span class="item__value item__value--zeit">${esc(z.neben || '')}</span>
+                     <span class="item__chevron">${ICONS.chevron}</span>
+                   </button>`
+                     : `<div class="item">
+                     <span class="item__label">${esc(z.text)}</span>
+                     <span class="item__value">${esc(z.neben || '')}</span>
+                   </div>`
+                 )
+                 .join('')
+             : `<div class="sheet__hint">${esc(leer)}</div>`
+         
+  );
+}
+function listenZeilenBinden(sheet, close) {
+  sheet.querySelectorAll('[data-ziel-id]').forEach((b) =>
+    b.addEventListener('click', () => {
+      close();
+      beitragOeffnen(b.dataset.zielKind, b.dataset.zielId);
+    })
+  );
+}
+
 function openEinstellung(punkt, nachher) {
+  /*
+   * Kasten E16-1.4 (Gegenprüfung 24.11.): das Oberthema gehört zum Aufruf.
+   * Verspätete Antworten (Verlauf, Analysen, Version) zeigen sonst das Thema
+   * eines inzwischen angetippten anderen Punkts.
+   */
+  if (!('_thema' in punkt)) punkt = { ...punkt, _thema: state.area === 'settings' ? state.blattThema : null, _aufruf: state.blattAufruf };
+  // Späte Antwort (Verlauf, Analysen): inzwischen woanders oder ein anderer Punkt geöffnet → verwerfen.
+  if (punkt._frisch && (state.area !== 'settings' || punkt._aufruf !== state.blattAufruf)) return;
+  state.blattThema = punkt._thema;
   // Sichtbarkeit hat ein eigenes Blatt: vier Stufen plus Ausnahmeliste.
   if (punkt.sichtbar) return openSichtbarkeit(punkt);
   // Kasten 22: das Bildschirmzeit-Blatt.
@@ -10653,25 +10772,52 @@ function openEinstellung(punkt, nachher) {
     const jetzt = einstellung(punkt);
     return openSheet(
       punkt.label,
-      `<div class="sheet__body">${punkt.wahl
+      // Kasten E16-1.5: dasselbe Auswahlmuster wie Sichtbarkeit und App (AuswahlZeile).
+      `<div class="sheet__body"><div class="einst-wahl" role="radiogroup" aria-label="${esc(punkt.label)}">${punkt.wahl
         .map(
-          (w) => `<button class="item" data-wahl="${esc(w)}">
-            <span class="item__label">${esc(w)}</span>
-            ${w === jetzt ? `<span class="item__haken">${ICONS.check}</span>` : ''}
+          (w) => `<button class="einst-wahl__zeile" role="radio" aria-checked="${w === jetzt}" data-wahl="${esc(w)}">
+            <span class="einst-wahl__text"><span class="einst-wahl__label">${esc(w)}</span></span>
+            <span class="einst-wahl__kreis" aria-hidden="true"></span>
           </button>`
         )
-        .join('')}</div>`,
+        .join('')}</div></div>`,
       (sheet, close) => {
+        /*
+         * Kasten E16-1.6 (Gegenprüfung 24.11.): erst speichern, dann
+         * schließen. Vorher ging das Blatt sofort zu; lehnte der Server ab,
+         * stand in der Liste weiter der abgelehnte Wert. Jetzt bleibt das
+         * Blatt bei einem Fehler offen und sagt es.
+         */
+        let laeuft = false;
         sheet.querySelectorAll('[data-wahl]').forEach((b) =>
-          b.addEventListener('click', () => {
-            einstellungSetzen(punkt, b.dataset.wahl);
+          b.addEventListener('click', async () => {
+            if (laeuft) return;
+            laeuft = true;
+            const wahl = b.dataset.wahl;
+            sheet.querySelectorAll('[data-wahl]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+            sheet.querySelector('.einst-wahl')?.setAttribute('aria-busy', 'true');
+            const ok = await einstellungSetzen(punkt, wahl);
+            laeuft = false;
+            sheet.querySelector('.einst-wahl')?.removeAttribute('aria-busy');
+            if (!ok) {
+              sheet.querySelectorAll('[data-wahl]').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.wahl === einstellung(punkt))));
+              let f = sheet.querySelector('.einst-fehler');
+              if (!f) {
+                f = document.createElement('p');
+                f.className = 'einst-fehler';
+                f.setAttribute('role', 'alert');
+                sheet.querySelector('.sheet__body')?.appendChild(f);
+              }
+              f.textContent = 'Das ließ sich gerade nicht speichern. Bitte versuch es noch einmal.';
+              return;
+            }
             close();
             // Nur dort neu zeichnen, wo die Liste auch steht. Aus der
             // Kontaktinfo heraus haette das sonst den Einstellungs-
             // Bildschirm unter das offene Fenster gebaut.
             if (state.area === 'settings') renderSettings();
             nachher?.();
-            toast(`${punkt.label}: ${b.dataset.wahl}`);
+            toast(`${punkt.label}: ${wahl}`);
           })
         );
       },
@@ -10766,7 +10912,8 @@ function openEinstellung(punkt, nachher) {
         toast(punkt.fertig || 'Gespeichert');
         return null;
       },
-      'Merken'
+      'Merken',
+      { wahlListe: true }
     );
   }
 
@@ -10775,49 +10922,26 @@ function openEinstellung(punkt, nachher) {
     const { zeilen, leer, knopf, knopfText } = punkt._zeilen
       ? { zeilen: punkt._zeilen, leer: '', knopf: null, knopfText: '' }
       : einstellungsListe(punkt.liste);
+    const nachladeName = Object.keys(NACHLADE_LISTE).find((k) => NACHLADE_LISTE[k] === punkt.liste);
+    const ladeFehler = nachladeName && !state[nachladeName] && einstellungNachgeladen[nachladeName] && einstellungNachgeladen[nachladeName] !== 'laeuft';
     return openSheet(
       punkt.label,
-      `<div class="sheet__body">
-         ${
-           zeilen.length
-             ? zeilen
-                 .map((z) =>
-                   /*
-                    * Zwischenueberschrift statt Eintrag. Die Profilstatistik
-                    * hat zwoelf Zeilen; ohne Gliederung sieht "Profilaufrufe
-                    * (7 Tage)" so wichtig aus wie "Follower gesamt", obwohl
-                    * das eine eine Entwicklung ist und das andere ein Stand.
-                    */
-                   z.kopf
-                     ? `<div class="sheet__gruppe">${esc(z.text)}</div>`
-                     : z.ziel
-                     ? // Verlauf, Gelikte, Kommentare: zum Beitrag (Kasten 10.1).
-                       `<button class="item" data-ziel-kind="${esc(z.ziel.kind || '')}" data-ziel-id="${esc(z.ziel.id)}">
-                     <span class="item__label">${esc(z.text)}</span>
-                     <span class="item__value item__value--zeit">${esc(z.neben || '')}</span>
-                     <span class="item__chevron">${ICONS.chevron}</span>
-                   </button>`
-                     : `<div class="item">
-                     <span class="item__label">${esc(z.text)}</span>
-                     <span class="item__value">${esc(z.neben || '')}</span>
-                   </div>`
-                 )
-                 .join('')
-             : `<div class="sheet__hint">${esc(leer)}</div>`
-         }
+      `<div class="sheet__body" data-liste="${esc(punkt.liste)}" data-thema="${esc(punkt._thema || '')}">
+         ${listenZeilenHtml(zeilen, leer)}
        </div>
-       ${knopf ? `<div class="sheet__footer"><button class="prof__btn is-primary" id="listenKnopf">${esc(knopf)}</button></div>` : ''}`,
+       ${knopf ? `<div class="sheet__footer"><button class="prof__btn is-primary" id="listenKnopf">${esc(knopf)}</button></div>` : ''}
+       ${ladeFehler ? `<div class="sheet__footer"><button class="prof__btn is-primary" id="listeNochmal">Erneut versuchen</button></div>` : ''}`,
       (sheet, close) => {
+        // Kasten E16-1.6: nach einem Ladefehler sofort neu fragen statt 30 s zu warten.
+        sheet.querySelector('#listeNochmal')?.addEventListener('click', () => listeNochmal(nachladeName, sheet));
         sheet.querySelector('#listenKnopf')?.addEventListener('click', () => {
           close();
           toast(knopfText);
         });
-        sheet.querySelectorAll('[data-ziel-id]').forEach((b) =>
-          b.addEventListener('click', () => {
-            close();
-            beitragOeffnen(b.dataset.zielKind, b.dataset.zielId);
-          })
-        );
+        listenZeilenBinden(sheet, close);
+        // Für das Nachladen im offenen Blatt (einstellungNachladen).
+        const body = sheet.querySelector('[data-liste]');
+        if (body) body._zu = close;
       },
       { schliessen: true, hoch: zeilen.length > 4 }
     );
@@ -10853,6 +10977,28 @@ function openEinstellung(punkt, nachher) {
   if (punkt.aktion === 'engefreunde') return openEngeFreunde();
 
   if (punkt.aktion === 'datenauskunft') return datenauskunftLaden();
+  // Kasten E16-1.3: „Über All Media“ unter Hilfe — Fassung und ausgelieferter Stand.
+  if (punkt.aktion === 'ueber') {
+    const thema = punkt._thema;
+    return (async () => {
+      let stand;
+      try {
+        const v = await (await fetch('/api/version')).json();
+        stand = `Version ${v.version} · Stand ${v.commit}`;
+      } catch {
+        stand = 'Version 1.0.0 · Stand gerade nicht abrufbar';
+      }
+      // Inzwischen woanders hin gewechselt oder etwas anderes geöffnet: kein Blatt mehr aufmachen.
+      if (state.area !== 'settings' || punkt._aufruf !== state.blattAufruf) return;
+      openSheet(
+        'Über All Media',
+        `<div class="sheet__body"><p class="sheet__text" data-testid="ueber-stand">${esc(stand)}</p>
+          <p class="sheet__text">Ein Konto für Messenger, Videos und Communitys. Nutzungsbedingungen, Datenschutzerklärung und Impressum findest du im Abschnitt Hilfe; Fragen und Fehler schickst du über „Problem melden“.</p></div>`,
+        null,
+        { schliessen: true, oberthema: thema }
+      );
+    })();
+  }
 
   if (punkt.aktion === 'sicherung') {
     const anzahl = state.chats.length;
@@ -10938,8 +11084,41 @@ function einstellungNachladen(name, pfad, auswerten) {
     })
     .finally(() => {
       if (state.area === 'settings') renderSettings();
+      /*
+       * Gegenprüfung R2: ein schon offenes Blatt dieser Liste zeigte weiter
+       * „Wird geladen …“. Es wird mit dem neuen Stand (oder dem Fehler) neu
+       * geöffnet — mit demselben Oberthema.
+       */
+      const liste = NACHLADE_LISTE[name];
+      const offen = liste && document.querySelector(`.sheet [data-liste="${liste}"]`);
+      if (offen) {
+        // Nach Runde 3: im vorhandenen Blatt aktualisieren — Platz, Fokus und Schließen bleiben.
+        const { zeilen, leer } = einstellungsListe(liste);
+        const scroll = offen.scrollTop;
+        offen.innerHTML = listenZeilenHtml(zeilen, leer);
+        offen.scrollTop = scroll;
+        listenZeilenBinden(offen, offen._zu || (() => offen.closest('.sheet-backdrop')?.remove()));
+        const sheet = offen.closest('.sheet');
+        const fehler = !state[name] && einstellungNachgeladen[name] && einstellungNachgeladen[name] !== 'laeuft';
+        const fuss = sheet?.querySelector('#listeNochmal')?.closest('.sheet__footer');
+        if (!fehler) fuss?.remove();
+        else if (!fuss && sheet) {
+          sheet.insertAdjacentHTML('beforeend', '<div class="sheet__footer"><button class="prof__btn is-primary" id="listeNochmal">Erneut versuchen</button></div>');
+          sheet.querySelector('#listeNochmal').addEventListener('click', () => listeNochmal(name, sheet));
+        }
+      }
     });
 }
+function listeNochmal(name, sheet) {
+  einstellungNachgeladen[name] = undefined;
+  const body = sheet.querySelector('[data-liste]');
+  if (body) body.innerHTML = '<div class="sheet__hint">Wird geladen …</div>';
+  sheet.querySelector('#listeNochmal')?.closest('.sheet__footer')?.remove();
+  const pfade = { statistik: ['/api/statistik', (d) => d?.statistik || null], gelikt: ['/api/gelikt', (d) => (Array.isArray(d) ? d : null)], kommentiert: ['/api/kommentiert', (d) => (Array.isArray(d) ? d : null)] };
+  einstellungNachladen(name, ...pfade[name]);
+}
+// Welche Liste in den Einstellungen an welchem Nachladen hängt.
+const NACHLADE_LISTE = { statistik: 'insights', gelikt: 'gelikt', kommentiert: 'kommentiert' };
 /** Leertext einer nachgeladenen Liste: noch unterwegs oder gescheitert. */
 function nachladenLeer(name) {
   return einstellungNachgeladen[name] && einstellungNachgeladen[name] !== 'laeuft'
@@ -11004,10 +11183,10 @@ function renderSettings() {
   const itemHtml = (it, sektionId) => {
     if (it.toggle) {
       const on = it.toggle === 'theme' ? state.theme === 'dark' : schalterAn(it.toggle);
-      return `<div class="item">
+      return `<div class="item einst-zeile">
         <span class="item__icon">${ICONS[it.icon]}</span>
         <span class="item__label">${esc(it.label)}</span>
-        <button class="switch ${on ? 'is-on' : ''}" data-toggle="${it.toggle}" aria-label="${esc(it.label)}"><span class="switch__knob"></span></button>
+        <button class="switch ${on ? 'is-on' : ''}" data-toggle="${it.toggle}" aria-label="${esc(it.label)}" role="switch" aria-checked="${on}"><span class="switch__knob"></span></button>
       </div>`;
     }
     // Bei einer Auswahl steht rechts, was gerade gilt - sonst muesste man
@@ -11021,7 +11200,7 @@ function renderSettings() {
       : it.aktion === 'entsperrcode' && bz.stand
       ? (bz.stand.eigene_art === 'eigen' ? 'Eigener Code' : 'Spenden-PIN')
       : '';
-    return `<button class="item ${it.gefahr ? 'item--danger' : ''}" data-setting="${esc(it.label)}" data-abschnitt="${esc(sektionId)}">
+    return `<button class="item einst-zeile ${it.gefahr ? 'item--danger' : ''}" data-setting="${esc(it.label)}" data-abschnitt="${esc(sektionId)}">
       <span class="item__icon">${ICONS[it.icon]}</span>
       <span class="item__label">${esc(it.label)}</span>
       ${wert ? `<span class="item__value">${esc(wert)}</span>` : ''}
@@ -11031,22 +11210,28 @@ function renderSettings() {
   };
 
   main.innerHTML = `
-    <div class="pagehead">
+    <div class="pagehead einst-kopf">
       ${
         nur
           ? `<div class="pagehead__row">
               <button class="iconbtn" id="settingsNurBack" aria-label="Zurück zu allen Einstellungen">${ICONS.back}</button>
-              <h2 class="pagehead__title">${esc(nur.title)}</h2>
+              <div class="einst-titel"><span class="einst-titel__ober">Einstellungen</span><h2 class="pagehead__title" id="einstThema">${esc(nur.title)}</h2></div>
             </div>`
           : ''
       }
       ${
         // Nur wenn man aus einem Profil kam - wer die Einstellungen ueber die
         // untere Leiste oeffnet, hat kein "zurueck".
-        !nur && state.settingsAus
+        /*
+         * Einstellungen 16.11., Kasten 1.4 (Henrik, 24.11.2026): oben steht
+         * immer, wo man ist. Über dem ersten Abschnitt „Einstellungen“, beim
+         * Blättern der aktuelle Abschnitt (Scroll-Verfolgung weiter unten).
+         * Gleicher Kopf in der App (SettingsScreen.tsx).
+         */
+        !nur
           ? `<div class="pagehead__row">
-              <button class="iconbtn" id="settingsBack" aria-label="Zurück zum Profil">${ICONS.back}</button>
-              <h2 class="pagehead__title">Einstellungen</h2>
+              ${state.settingsAus ? `<button class="iconbtn" id="settingsBack" aria-label="Zurück zum Profil">${ICONS.back}</button>` : ''}
+              <div class="einst-titel"><span class="einst-titel__ober" id="einstOber" hidden>Einstellungen</span><h2 class="pagehead__title" id="einstThema">Einstellungen</h2></div>
             </div>`
           : ''
       }
@@ -11063,6 +11248,7 @@ function renderSettings() {
           color: ich.color || '',
         };
         return `
+        <div class="einst-konto">
         <div class="konto__kopf" id="kontoKopf">
           <span class="avatar avatar--52" style="background:${farbe(aktiv.color)}">${esc(aktiv.initials)}</span>
           <div class="konto__body">
@@ -11073,7 +11259,8 @@ function renderSettings() {
         </div>
         <button class="konto__wechsel" id="kontoWechselBtn">
           ${ICONS.people}<span>Konto wechseln oder hinzufügen</span>
-        </button>`;
+        </button>
+        </div>`;
       })()}
       ${
         nur
@@ -11083,31 +11270,34 @@ function renderSettings() {
       </div>`
       }
     </div>
-    <div class="scroll" id="settingsScroll">
+    <div class="scroll einst" id="settingsScroll">
       ${(nur ? [nur] : SETTINGS).map(
         (sec) => `${
           nur
             ? ''
-            : `<button class="listhead listhead--knopf" id="sec-${sec.id}" data-settingsnur="${sec.id}" aria-label="${esc(sec.title)}, alle anzeigen">${esc(sec.title)} →</button>`
+            : `<button class="listhead listhead--knopf" id="sec-${sec.id}" data-settingsnur="${sec.id}" aria-label="${esc(sec.title)}, alle anzeigen">${esc(sec.title)} <span class="einst-pfeil" aria-hidden="true">${ICONS.chevron}</span></button>`
         }
-          <div class="group">${sec.items
+          <div class="group einst-karte">${sec.items
             .filter((it) => !it.nurEltern || bzKinderZahl() > 0)
             // Kasten RS 3: die Moderation nur, wenn ist_moderator() ja sagt (Bootstrap).
             .filter((it) => !it.nurModerator || state.istModerator === true)
             .map((it) => itemHtml(it, sec.id))
             .join('')}</div>`
       ).join('')}
-      ${nur ? '' : `<div class="group">
-        <button class="item" data-setting="Über All Media">
-          <span class="item__icon">${ICONS.info}</span>
-          <span class="item__label">Über All Media</span>
-          <span class="item__value">1.0.0</span>
-        </button>
-        <button class="item item--danger" data-setting="Abmelden">
+      ${
+        /*
+         * Einstellungen 16.11., Q79 (Kasten 1.3): „Abmelden“ stand direkt unter
+         * Communitys und las sich wie ein Teil davon. Eigener Block mit Satz;
+         * „Über All Media“ steht seitdem unter Hilfe. Wie in der App.
+         */
+        nur ? '' : `<div class="listhead einst-frei">Konto auf diesem Gerät</div>
+      <div class="group einst-karte">
+        <button class="item einst-zeile item--danger" data-setting="Abmelden">
           <span class="item__icon">${ICONS.logout}</span>
           <span class="item__label">Abmelden</span>
         </button>
-      </div>`}
+      </div>
+      <p class="einst-fuss">Meldet nur dieses Konto ab. Weitere Konten in diesem Browser bleiben angemeldet.</p>`}
     </div>`;
 
   main.querySelectorAll('[data-settingsnur]').forEach((b) =>
@@ -11124,14 +11314,46 @@ function renderSettings() {
     document.getElementById('sec-' + abschnitt)?.scrollIntoView({ block: 'start' });
   });
 
-  $('#kontoKopf')?.addEventListener('click', openKontoWechsel);
-  $('#kontoWechselBtn')?.addEventListener('click', openKontoWechsel);
+  const kontoWechsel = () => {
+    state.blattThema = null;
+    openKontoWechsel();
+  };
+  $('#kontoKopf')?.addEventListener('click', kontoWechsel);
+  $('#kontoWechselBtn')?.addEventListener('click', kontoWechsel);
 
   main.querySelectorAll('[data-jump]').forEach((b) =>
     b.addEventListener('click', () => {
       document.getElementById('sec-' + b.dataset.jump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     })
   );
+
+  // Kasten E16-1.4: Kopf und Pille folgen dem Abschnitt, der gerade oben steht.
+  const einstScroll = $('#settingsScroll');
+  if (!nur && einstScroll) {
+    let zuletzt;
+    const verfolgen = () => {
+      const oben = einstScroll.getBoundingClientRect().top;
+      let id = null;
+      for (const sec of SETTINGS) {
+        const el = document.getElementById('sec-' + sec.id);
+        if (el && el.getBoundingClientRect().top - oben <= 12) id = sec.id;
+      }
+      if (id === zuletzt) return;
+      zuletzt = id;
+      const thema = $('#einstThema');
+      if (thema) thema.textContent = id ? SETTINGS.find((x) => x.id === id).title : 'Einstellungen';
+      const ober = $('#einstOber');
+      if (ober) ober.hidden = !id;
+      main.querySelectorAll('[data-jump]').forEach((p) => {
+        const an = p.dataset.jump === id;
+        p.classList.toggle('is-active', an);
+        p.setAttribute('aria-current', an ? 'true' : 'false');
+        if (an) p.parentElement?.scrollTo?.({ left: Math.max(0, p.offsetLeft - 16), behavior: 'smooth' });
+      });
+    };
+    einstScroll.addEventListener('scroll', verfolgen, { passive: true });
+    verfolgen();
+  }
 
   // Aus dem Menü im eigenen Profil kommend: gleich beim richtigen Abschnitt
   // anfangen (Prototyp "VP + Einstellung" / "CP + Einstellung").
@@ -11150,7 +11372,10 @@ function renderSettings() {
       const abschnitt = SETTINGS.find((sec) => sec.id === abschnittId);
       const punkt = abschnitt?.items.find((it) => it.label === state.settingsPunkt);
       state.settingsPunkt = null;
-      if (punkt) setTimeout(() => openEinstellung(punkt), 60);
+      state.blattThema = abschnitt?.title || null;
+      state.blattAufruf = (state.blattAufruf || 0) + 1;
+      const aufruf = state.blattAufruf;
+      if (punkt) setTimeout(() => state.area === 'settings' && state.blattAufruf === aufruf && openEinstellung(punkt), 60);
     }
   }
 
@@ -11213,6 +11438,10 @@ function renderSettings() {
     b.addEventListener('click', () => {
       const abschnitt = SETTINGS.find((sec) => sec.id === b.dataset.abschnitt);
       const punkt = abschnitt?.items.find((it) => it.label === b.dataset.setting);
+      // Kasten E16-1.4: das Blatt zeigt über seinem Titel, wozu es gehört.
+      state.blattThema = abschnitt?.title || null;
+      // Gegenprüfung R2: jeder Aufruf bekommt eine Nummer; späte Antworten älterer Aufrufe öffnen nichts mehr.
+      state.blattAufruf = (state.blattAufruf || 0) + 1;
       if (punkt) return openEinstellung(punkt);
 
       // Die zwei Punkte ganz unten stehen ausserhalb der Abschnitte.
@@ -11368,7 +11597,7 @@ function renderFriendMap() {
             <div class="standort__sub">${esc(standortText())}</div>
           </div>
           <label class="schalter">
-            <input type="checkbox" id="standortAn" ${standortAn() ? 'checked' : ''} />
+            <input type="checkbox" id="standortAn" aria-label="Deinen Standort teilen" ${standortAn() ? 'checked' : ''} />
             <span></span>
           </label>
         </div>
@@ -13684,7 +13913,8 @@ function mitteilungOeffnen(ziel, text = '') {
    * den Hinweis auf den Kontostatus, wer gemeldet hat, auf „Meine Meldungen" —
    * so steht es im Satz der Datenbank (meldung_entscheiden).
    */
-  if (ziel.art === 'meldung') return openKontostatus(/Kontostatus/.test(text) ? 'kontostatus' : 'meine');
+  // E16-1.4: auch der Direktweg aus der Mitteilung zeigt „Hilfe“ als Oberthema.
+  if (ziel.art === 'meldung') return openKontostatus(/Kontostatus/.test(text) ? 'kontostatus' : 'meine', 'Hilfe');
   if (ziel.art === 'profile') return openProfile(ziel.id);
   if (ziel.art === 'community') return openChat(ziel.id);
   // Kasten 8.3: „Push to Talk beitreten?" führt ins Unterthema — dort sitzt
@@ -13747,9 +13977,8 @@ function mitteilungOeffnen(ziel, text = '') {
  * `kind` ist posts.kind (post, reel, clip). Die Profil-Routen liefern
  * stattdessen `art` (post, clip, video) — `video` heisst dort Reel.
  */
-async function beitragOeffnen(kind, id) {
+async function beitragOeffnen(kind, id, vorOeffnen) {
   if (!id) return;
-  state.einzelBeitragZiel=id;
   if(![...(state.posts||[]),...(state.videos||[]),...(state.clips||[])].some(p=>p.id===id)){
     const konto=window.Anmeldung?.nutzer?.()?.id;
     const r=await fetch(`/api/beitraege/${encodeURIComponent(id)}`).then(r=>r.json()).catch(()=>null);
@@ -13757,6 +13986,8 @@ async function beitragOeffnen(kind, id) {
     if(!r?.beitrag)return toast('Dieser Beitrag ist nicht verfügbar.');
     const b=r.beitrag;const liste=b.kind==='clip'?'clips':b.kind==='reel'?'videos':'posts';state[liste]=[...(state[liste]||[]),{...b,nurEinzeln:true}];
   }
+  if (vorOeffnen && !vorOeffnen()) return;
+  state.einzelBeitragZiel = id;
   if (kind === 'clip') return openClip(id);
   if (kind === 'reel' || kind === 'video') return mitteilungOeffnen({ art: 'video', id });
   return mitteilungOeffnen({ art: 'post', id });
@@ -14205,7 +14436,7 @@ function openKontoLoeschen() {
  * Daten; leer → Leertext; ohne Schema 102 → ehrlicher Hinweis statt einer
  * leeren Liste. Gegenstück in der App: components/KontostatusSheet.tsx.
  */
-async function openKontostatus(ansicht) {
+async function openKontostatus(ansicht, oberthema) {
   const M = window.Meldung;
   const titel = ansicht === 'meine' ? 'Meine Meldungen' : 'Kontostatus';
   const pfad = ansicht === 'meine' ? '/api/meldungen/meine' : '/api/meldungen/kontostatus';
@@ -14308,7 +14539,7 @@ async function openKontostatus(ansicht) {
       };
       laden();
     },
-    { schliessen: true, hoch: true }
+    { schliessen: true, hoch: true, ...(oberthema ? { oberthema } : {}) }
   );
 }
 
@@ -18440,7 +18671,22 @@ function openFormular(titel, felder, senden, knopf = 'Fertig', optionen = {}) {
         ? `<textarea ${gemeinsam} rows="3">${esc(f.wert || '')}</textarea>`
         : // Punkt 38: eine Auswahl statt eines Textfelds - Musik tippt man
           // nicht ab, man sucht sie aus dem aus, was es gibt.
-          f.typ === 'auswahl'
+          /*
+           * Kasten E16-1.5: in den Einstellungen dasselbe Auswahlmuster wie
+           * überall dort (Kreiszeilen). Der Wert steht in einem versteckten
+           * Feld mit derselben Kennung, damit das Absenden gleich bleibt.
+           */
+          f.typ === 'auswahl' && optionen.wahlListe
+          ? `<input type="hidden" id="f_${f.key}" value="${esc(f.wert || f.auswahl?.[0] || '')}">
+             <div class="einst-wahl" role="radiogroup" aria-label="${esc(f.label)}">${(f.auswahl || [])
+               .map(
+                 (w) => `<button type="button" class="einst-wahl__zeile" role="radio" aria-checked="${w === (f.wert || f.auswahl[0])}" data-feldwahl="${esc(f.key)}" data-wert="${esc(w)}">
+                   <span class="einst-wahl__text"><span class="einst-wahl__label">${esc(w)}</span></span>
+                   <span class="einst-wahl__kreis" aria-hidden="true"></span>
+                 </button>`
+               )
+               .join('')}</div>`
+          : f.typ === 'auswahl'
           ? `<select id="f_${f.key}">${(f.auswahl || [])
               .map((w) => `<option value="${esc(w)}" ${w === f.wert ? 'selected' : ''}>${esc(w)}</option>`)
               .join('')}</select>`
@@ -18463,6 +18709,15 @@ function openFormular(titel, felder, senden, knopf = 'Fertig', optionen = {}) {
       // Eine Auswahl bekommt keinen Fokus - sonst klappt sie beim Oeffnen auf.
       const ersteseingabe = sheet.querySelector('input, textarea');
       setTimeout(() => ersteseingabe?.focus(), 80);
+      sheet.querySelectorAll('[data-feldwahl]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const feld = sheet.querySelector('#f_' + b.dataset.feldwahl);
+          if (feld) feld.value = b.dataset.wert;
+          sheet
+            .querySelectorAll(`[data-feldwahl="${b.dataset.feldwahl}"]`)
+            .forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+        })
+      );
       // Kasten 25.1: Felder mit `markierbar` (Beschreibung) schlagen bei @ Personen vor.
       for (const f of felder) if (f.markierbar) markierungsEingabe(sheet.querySelector('#f_' + f.key), { unten: true });
 
@@ -18883,6 +19138,7 @@ function openErstellenSeite(art, community) {
     overlay.innerHTML = '';
   };
   $('#esZu').addEventListener('click', schliessen);
+  $('#esName').addEventListener('input', () => meldung(''));
 
   /*
    * Den QR-Code per fetch holen, nicht über <img src>: der Server verlangt die

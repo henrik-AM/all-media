@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, StyleSheet, Switch, Text, TextInput, View, type TextInputInstance } from 'react-native';
+import { FlatList, StyleSheet, Text, TextInput, View, type TextInputInstance } from 'react-native';
+import { Schalter } from '../../components/Schalter';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -306,7 +307,7 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
           <>
             <View style={styles.auto}>
               <Text style={styles.autoText}>Aufzeichnung automatisch veröffentlichen</Text>
-              <Switch
+              <Schalter
                 value={auto}
                 onValueChange={(an) => void einstellungen.setzen('liveAutoVeroeffentlichen', an ? 'an' : 'aus')}
                 accessibilityLabel="Aufzeichnung automatisch veröffentlichen"

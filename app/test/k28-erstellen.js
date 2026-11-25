@@ -315,7 +315,7 @@ async function teilB() {
     pruefe('10.1 Seite „Unterthema erstellen“ liegt sichtbar vor der Homeseite', await obenAuf('[data-erstellseite="unterthema"]'));
     const ut = await seite.textContent('[data-erstellseite="unterthema"]');
     const utPlatz = await seite.$$eval('[data-erstellseite] [placeholder]', (els) => els.map((e) => e.placeholder));
-    pruefe('10.2 Felder wie „CC + Unterthema erstellen“: Name*, Biografie, Link, Privates Unterthema, Einladung, QR, fertig',
+    pruefe('10.2 All-Media-Unterthemaformular: Name*, Biografie, Link, Privates Unterthema, Einladung, QR, fertig',
       ['Pflichtfeld', 'Privates Unterthema', 'Beitritt nur mit Einladung', 'Einladungslink senden', 'oder per QR-Code:', 'fertig'].every((t) => ut.includes(t)) &&
         ['Unterthema benennen', 'Biografie hinzufügen', 'Link hinzufügen'].every((p) => utPlatz.includes(p)), utPlatz.join(' | '));
     pruefe('10.2 kein Bild, keine Unterthemen beim Unterthema', !(await seite.$('#esBild')) && !(await seite.$('#esUnterthemaNeu')));
@@ -323,12 +323,31 @@ async function teilB() {
     pruefe('10.2 eigener Einladungscode fürs Unterthema', E.istCode(utCode) && utCode !== code);
     if (process.env.BILDER) {
       await seite.waitForFunction(() => document.querySelector('#esQr')?.naturalWidth > 0);
-      if (process.env.FIGMA_UNTERTHEMA) await seite.locator('#toast').waitFor({ state: 'hidden' });
+      await seite.locator('#toast').waitFor({ state: 'hidden' });
       await seite.screenshot({ path: path.join(process.env.BILDER, 'k28-10-unterthema-leer.png'), animations: 'disabled' });
     }
+    await seite.click('#esFertig');
+    const pflichtmeldung = seite.locator('#esMeldung');
+    pruefe('10.2 Pflichtfehler steht sichtbar am Fertig-Knopf und sendet nichts',
+      await pflichtmeldung.isVisible() && /Unterthema benennen/i.test(await pflichtmeldung.innerText()) &&
+      !aufrufe.some((a) => a.pfad === '/api/communities/c-neu/channels' && a.methode === 'POST'));
+    if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, 'k28-10-pflichtfehler.png') });
     await seite.fill('#esName', 'Geheim');
+    pruefe('10.2 Bearbeiten des Namens blendet den bisherigen Pflichtfehler aus', await pflichtmeldung.isHidden());
     await seite.fill('#esBio', 'Nur für Eingeladene');
     await seite.click('label.erstellseite__schalter');
+    const gruenerSchalter = await seite.waitForFunction(() => {
+      const schalter = document.querySelector('#esPrivat');
+      if (!schalter?.checked) return false;
+      const farbmuster = document.createElement('span');
+      farbmuster.style.backgroundColor = 'var(--success)';
+      schalter.parentElement.append(farbmuster);
+      const erwartet = getComputedStyle(farbmuster).backgroundColor;
+      const angezeigt = getComputedStyle(schalter.nextElementSibling).backgroundColor;
+      farbmuster.remove();
+      return angezeigt === erwartet;
+    }, null, { timeout: 3000 }).then(() => true, () => false);
+    pruefe('10.2 Privatschalter zeigt im Ein-Zustand das All-Media-Grün', gruenerSchalter);
     if (process.env.BILDER) await seite.waitForTimeout(400), await seite.screenshot({ path: path.join(process.env.BILDER, 'k28-10-unterthema-erstellen.png') });
     await seite.click('#esFertig');
     await seite.waitForSelector('[data-erstellseite]', { state: 'detached', timeout: 5000 }).catch(() => {});
