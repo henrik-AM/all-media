@@ -40,8 +40,8 @@ interface Props {
 }
 
 /**
- * „Community erstellen“ und „Unterthema erstellen“ nach dem Figma-Prototyp
- * (Kästen 28/10.2 und 16).
+ * Gemeinsames All-Media-Formular für „Community erstellen“ und
+ * „Unterthema erstellen“ (Kästen 28/10.2 und 16).
  *
  * Henrik am 28.09.2026: „…halte dich, wenn ich auf Neues Unterthema
  * erstellen drücke, explizit an meinen Figma Prototypen. Deine Seite weicht
@@ -64,8 +64,8 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
   const { supabase } = useSupabase();
   const istCommunity = art === 'community';
   const { height, width } = useWindowDimensions();
-  const kompakt = height - insets.top - insets.bottom < 850;
-  const qrGroesse = istCommunity ? 200 : Math.min(kompakt ? 200 : 234, width - 36);
+  const kompakt = !istCommunity && height - insets.top - insets.bottom < 850;
+  const qrGroesse = Math.min(200, width - 2 * spacing.lg);
 
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
@@ -129,27 +129,27 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       testID={istCommunity ? 'community-erstellen' : 'unterthema-erstellen'}
     >
-      <View style={[styles.kopf, !istCommunity && styles.unterthemaKopf, { paddingTop: insets.top + spacing.sm }]}>
+      <View style={[styles.kopf, { paddingTop: insets.top + spacing.sm }]}>
         <Druck onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel={T.schliessen} testID="erstellen-zu">
           <Ionicons name="close" size={30} color={colors.text} />
         </Druck>
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.inhalt, !istCommunity && styles.unterthemaInhalt]}
+        contentContainerStyle={styles.inhalt}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.pflichtZeile, !istCommunity && styles.unterthemaPflicht]}>
+        <View style={styles.pflichtZeile}>
           <Text style={styles.stern}>{'✳\uFE0E'}</Text>
           <Text style={styles.pflichtText}>{T.pflichtfeld}</Text>
         </View>
 
-        <View style={[styles.nameFeld, !istCommunity && styles.unterthemaName]}>
+        <View style={styles.nameFeld}>
           <TextInput
             value={name}
             onChangeText={setName}
             placeholder={istCommunity ? T.communityName : T.unterthemaName}
-            placeholderTextColor={istCommunity ? colors.text2 : colors.text}
+            placeholderTextColor={colors.text2}
             style={styles.nameEingabe}
             maxLength={Erstellen.NAME_MAX}
             accessibilityLabel={istCommunity ? T.communityName : T.unterthemaName}
@@ -194,7 +194,7 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
           onChangeText={setBio}
           placeholder={T.bio}
           placeholderTextColor={colors.text2}
-          style={[styles.feld, styles.feldAbstand, !istCommunity && styles.unterthemaBio]}
+          style={[styles.feld, styles.feldAbstand]}
           multiline
           maxLength={Erstellen.BIO_MAX}
           accessibilityLabel={T.bio}
@@ -205,7 +205,7 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
           onChangeText={setLink}
           placeholder={T.link}
           placeholderTextColor={colors.text2}
-          style={[styles.feld, !istCommunity && styles.unterthemaFeld]}
+          style={styles.feld}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
@@ -259,33 +259,34 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
           </>
         ) : null}
 
-        <View style={[styles.schalterZeile, !istCommunity && styles.unterthemaSchalter]}>
+        <View style={styles.schalterZeile}>
           <View style={{ flex: 1 }}>
             <Text style={styles.schalterTitel}>{istCommunity ? T.privatCommunity : T.privatUnterthema}</Text>
-            <Text style={[styles.schalterSub, !istCommunity && styles.unterthemaSchalterSub]}>{istCommunity ? T.privatCommunitySub : T.privatUnterthemaSub}</Text>
+            <Text style={styles.schalterSub}>{istCommunity ? T.privatCommunitySub : T.privatUnterthemaSub}</Text>
           </View>
-          {/* Markenfarbe wie in den Einstellungen. */}
+          {/* Grau aus, Grün an wie bei den All-Media-Schaltern. */}
           <Switch
             value={privat}
             onValueChange={setPrivat}
-            trackColor={{ true: colors.brand, false: colors.surface3 }}
+            trackColor={{ true: colors.success, false: colors.surface3 }}
+            ios_backgroundColor={colors.surface3}
             accessibilityLabel={istCommunity ? T.privatCommunity : T.privatUnterthema}
             testID="erstellen-privat"
           />
         </View>
 
-        <Druck style={[styles.einladen, !istCommunity && styles.unterthemaEinladen]} onPress={teilen} accessibilityRole="button" accessibilityLabel={T.einladen} testID="erstellen-einladen">
+        <Druck style={styles.einladen} onPress={teilen} accessibilityRole="button" accessibilityLabel={T.einladen} testID="erstellen-einladen">
           <Text style={styles.einladenText}>{T.einladen}</Text>
         </Druck>
-        <Text style={[styles.qrText, !istCommunity && styles.unterthemaQrText]}>{T.qr}</Text>
+        <Text style={styles.qrText}>{T.qr}</Text>
         <View
-          style={[styles.qr, !istCommunity && (kompakt ? styles.unterthemaQrKompakt : styles.unterthemaQr)]}
+          style={[styles.qr, kompakt && styles.qrKompakt]}
           accessibilityLabel={`QR-Code: ${einladung}`}
           testID="erstellen-qr"
         >
           <QrCode text={einladung} groesse={qrGroesse} />
         </View>
-        <Text style={[styles.qrHinweis, !istCommunity && kompakt && styles.unterthemaHinweisKompakt]}>{T.qrHinweis}</Text>
+        <Text style={[styles.qrHinweis, kompakt && styles.qrHinweisKompakt]}>{T.qrHinweis}</Text>
       </ScrollView>
 
       <View style={[styles.fuss, { paddingBottom: insets.bottom + spacing.md }]}>
@@ -453,18 +454,6 @@ const styles = themenStyles((c) => ({
     alignItems: 'center' as const,
   },
   fertigText: { fontSize: 17, color: c.white },
-  // Maße aus Figma 928:13446. Die Seite behält den iOS-Sicherheitsabstand und scrollt bei wenig Platz.
-  unterthemaKopf: { paddingHorizontal: 28 },
-  unterthemaInhalt: { paddingHorizontal: 18 },
-  unterthemaPflicht: { paddingLeft: 14, marginBottom: 11, gap: 12 },
-  unterthemaName: { minHeight: 75, paddingLeft: 12, paddingRight: 36 },
-  unterthemaBio: { marginTop: 43, paddingHorizontal: 12 },
-  unterthemaFeld: { paddingHorizontal: 12 },
-  unterthemaSchalter: { minHeight: 60, marginTop: 45, marginHorizontal: -18, paddingLeft: 24, paddingRight: 18, paddingVertical: 8 },
-  unterthemaSchalterSub: { fontSize: 11 },
-  unterthemaEinladen: { marginHorizontal: 3, paddingHorizontal: 12, paddingLeft: 37, paddingVertical: 4 },
-  unterthemaQrText: { marginLeft: 41, fontSize: 15 },
-  unterthemaQr: { marginTop: 46 },
-  unterthemaQrKompakt: { marginTop: 8 },
-  unterthemaHinweisKompakt: { marginTop: 4 },
+  qrKompakt: { marginTop: spacing.sm },
+  qrHinweisKompakt: { marginTop: spacing.xs },
 }));
