@@ -1,4 +1,5 @@
 const { pruefKopf } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 // Prueft die echte Datenbank — nicht den Code, sondern das, was in Supabase
 // wirklich steht.
 //
@@ -34,7 +35,7 @@ const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
 // Das Testkonto aus SUPABASE_SCHEMA_7_testkonto.sql.
-const KONTO = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
+const KONTO = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
 
 const WEBSITE = process.argv[2] || '';
 

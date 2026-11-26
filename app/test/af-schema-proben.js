@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /** AF-Schemas ausschließlich in verworfener Transaktion; keine Medien/Anmeldung/Resets.
  * KI-Belegung supabase-schema UND testbestand erforderlich. Token nur aus Umgebung.
  * Die abschließende Ausnahme erzwingt Rollback auch bei Management-API-Verbindungen.
@@ -55,7 +56,7 @@ if(nr===132){
  sql+=owner(check('privilegierter_austausch_entwertet',`not exists(select 1 from public.video_upload_belege where objekt_id='${obj}')`));
  sql+=als(A,deny('nach_austausch_zu',`insert into public.posts(user_id,kind,media_url) values(auth.uid(),'reel',public.medien_adresse('${pfad}'))`)+deny('als_foto_tarnen_zu',`insert into public.posts(user_id,kind,media_url) values(auth.uid(),'post',public.medien_adresse('${pfad}'))`));
  sql+=`insert into public.posts(id,user_id,kind,demo,description) select '${id(41)}',id,'reel',true,'Rollback: bekannte Demo-Vorlage' from public.profiles where id='3baafacd-bbdb-40fb-8ef4-a4e365ae00c4' and public.ist_testkonto(id);`;
- sql+=als('3baafacd-bbdb-40fb-8ef4-a4e365ae00c4',deny('demo_update_keine_ausnahme',`update public.posts set media_url=public.medien_adresse('${pfad}') where id='${id(41)}'`));
+ sql+=als(KONTENPOOL.partnerId,deny('demo_update_keine_ausnahme',`update public.posts set media_url=public.medien_adresse('${pfad}') where id='${id(41)}'`));
  sql+=owner(check('interne_testvorlage_weiter_möglich',`exists(select 1 from public.posts where description='Rollback: bekannte Demo-Vorlage' and demo)`));
  sql+=owner(check('anon_belege_zu',`not has_table_privilege('anon','public.video_upload_belege','SELECT')`)+check('beleg_update_zu',`not has_table_privilege('authenticated','public.video_upload_belege','UPDATE')`));
 }

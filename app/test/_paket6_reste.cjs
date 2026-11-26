@@ -1,4 +1,5 @@
 const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /** Wiederaufnahme nur der protokollierten Paket-6-Fixtures, ohne Reset. */
 require('./_ki_belegung').pruefeBelegung('testbestand');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -9,8 +10,8 @@ const art=process.argv[2]||'live';
 if(!['live','native'].includes(art)||process.argv.length>3)throw Error('Nur live oder native als Journalwahl erlaubt');
 const datei=path.resolve(__dirname,'../../pruefbelege/paket-6/'+(art==='native'?'native-live-fixtures.json':'live-fixtures.json'));
 const m=JSON.parse(fs.readFileSync(datei));
-const ids=['3baafacd-bbdb-40fb-8ef4-a4e365ae00c4','62616c1d-82e2-4ee4-aab9-950e40e438a4'];
-const konten=[['test@all-media.app',TESTKONTO_PASS],['all.media.prueflauf@web.de',PRUEFKONTO_PASS]];
+const ids=[KONTENPOOL.partnerId,KONTENPOOL.pruefId];
+const konten=[[KONTENPOOL.partner,TESTKONTO_PASS],[KONTENPOOL.pruef,PRUEFKONTO_PASS]];
 const {schreiben}=require('./_paket6_journal.cjs');
 const q=async p=>{const r=await p;if(r.error)throw Error(r.error.message);return r.data;};
 (async()=>{

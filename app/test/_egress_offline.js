@@ -1,3 +1,4 @@
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 // Ausführung: node --test app/test/_egress_offline.js. Kein Konto, kein Netzwerk.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -403,7 +404,7 @@ test('Prüfbrowser: Beispielvideos bekommen Ersatz gleicher Länge/Form und lass
 test('Prüfbrowser: nur Uploads dieses Laufs bekommen Ersatz, Bestand und Fremdes bleiben gesperrt', () => {
   const { eigenerUploadDiesesLaufs } = require('./_medien_egressschutz');
   const s = 'https://projekt.supabase.co/storage/v1/object/sign/media/';
-  const uid = '62616c1d-82e2-4ee4-aab9-950e40e438a4';
+  const uid = KONTENPOOL.pruefId;
   const ab = 1794020000000;
   assert.equal(eigenerUploadDiesesLaufs(`${s}stories/${uid}-1794020631497-y9fdspbk.jpg?token=x`, ab), 'bild');
   assert.equal(eigenerUploadDiesesLaufs(`${s}posts/${uid}-1794020631497-y9fdspbk.mp4?token=x`, ab), 'video');

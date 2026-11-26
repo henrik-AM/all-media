@@ -240,6 +240,7 @@ require('./_fixtures').bereiteFixturesVor();
 
   console.log('\nWeitere Optionen im Profil');
 
+  const demokontakt = K.person('u1');
   await pruefe('Der Mehr-Knopf zeigt fuenf Optionen', async () => {
     /*
      * Erst den Hinweis abwarten, dann die Leiste anklicken.
@@ -264,21 +265,8 @@ require('./_fixtures').bereiteFixturesVor();
       .catch(() => {});
     await page.click('[data-area="videos"]');
     await page.waitForSelector('.post__name[data-profile]', { timeout: 10000 });
-    /*
-     * Ein FREMDES Profil — nicht das erste im Feed.
-     *
-     * Seit jedes Konto eigene Testbeiträge hat, steht ganz oben der eigene.
-     * Stummschalten und Blockieren gehen bei sich selbst nicht, und die
-     * Datenbank lehnt es zu Recht ab ("mutes_nicht_selbst"). Der Prüflauf
-     * meldete daraufhin drei Fehler, die keine waren.
-     */
-    await page.waitForSelector('[data-profile]', { timeout: 10000 });
-    const fremd = await page.$$eval('.post__name[data-profile]', (n) => {
-      const treffer = n.find((x) => x.getAttribute('data-profile') !== 'me');
-      return treffer ? treffer.getAttribute('data-profile') : null;
-    });
-    if (!fremd) throw new Error('kein fremdes Profil im Feed');
-    await page.click(`.post__name[data-profile="${fremd}"]`);
+    // Nur den bekannten Demokontakt im Feed stummschalten, blockieren und melden.
+    await page.locator(`.post__name[data-profile="${demokontakt}"]`).first().click();
     await page.waitForSelector('.prof__name', { timeout: 10000 });
     await page.waitForTimeout(400);
     await page.click('#profMore');
@@ -300,8 +288,13 @@ require('./_fixtures').bereiteFixturesVor();
     if (!hinweis.includes('stummgeschaltet')) throw new Error(hinweis);
   });
 
+  const istKontakt = () => page.evaluate(async (id) => {
+    const antwort = await fetch('/api/bootstrap');
+    if (!antwort.ok) throw new Error(`Kontakte: HTTP ${antwort.status}`);
+    return (await antwort.json()).contacts.some((kontakt) => kontakt.id === id);
+  }, demokontakt);
   await pruefe('Blockieren nimmt die Person aus den Kontakten', async () => {
-    const vorher = await page.evaluate(async () => (await (await fetch('/api/bootstrap')).json()).contacts.length);
+    if (!(await istKontakt())) throw new Error('Demoprofil war vor dem Blockieren kein Kontakt');
     await page.click('#profMore');
     await page.waitForSelector('[data-popt]');
     await page.click('[data-popt="block"]');
@@ -311,8 +304,7 @@ require('./_fixtures').bereiteFixturesVor();
     ).catch(() => {});
     const hinweis = await page.$eval('.prof__hinweis', (e) => e.textContent).catch(() => 'kein Hinweis');
     if (!hinweis.includes('blockiert')) throw new Error(hinweis);
-    const nachher = await page.evaluate(async () => (await (await fetch('/api/bootstrap')).json()).contacts.length);
-    if (nachher !== vorher - 1) throw new Error(`${vorher} -> ${nachher}`);
+    if (await istKontakt()) throw new Error('Demoprofil ist nach dem Blockieren noch ein Kontakt');
   });
 
   await pruefe('Der Nachricht-Knopf ist dann gesperrt', async () => {

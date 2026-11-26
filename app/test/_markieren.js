@@ -1,4 +1,5 @@
 const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * @-Markierungen wirken? — Kasten 25 (Schema 86_markierungen)
  *
@@ -51,7 +52,7 @@ const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
-const A_ZUGANG = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
+const A_ZUGANG = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
 const B_ZUGANG = {
   email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   passwort: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,
@@ -201,7 +202,8 @@ async function teilWebsite(a) {
       markierungsEingabe(t);
     });
     await page.click('#markiereingabe');
-    await page.keyboard.type('Hi @' + a.handle.replace(/^@/, '').slice(0, 3));
+    // Ganzer Name: seit dem Kontenpool (Schema 138) gibt es @test, @test2 … @test4.
+    await page.keyboard.type('Hi @' + a.handle.replace(/^@/, ''));
     await page.waitForSelector('.markierliste [data-mwahl]', { timeout: 6000 }).catch(() => null);
     const liste = await page.evaluate(() => [...document.querySelectorAll('.markierliste__namen span')].map((n) => n.textContent));
     pruefe('Beim Tippen von @ steht A in der Liste', liste.includes(a.handle), JSON.stringify(liste));

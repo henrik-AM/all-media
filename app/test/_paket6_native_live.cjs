@@ -1,4 +1,5 @@
 const { pruefAnmelden, seiteAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 // Historischer Format1-Prüfstand vor der Opus-Korrektur; kein Format2-Abnahmenachweis.
 // Aktuelle native Abnahme: _paket7_plattformen.cjs + _paket7_native.py und pruefbelege/paket67-abschluss/native-kontexte.
 /** Paket 6: echte Zwei-Konten-/App-Logik-/Website-Rundreise, kein Reset/Schema.
@@ -18,7 +19,7 @@ const W=path.resolve(__dirname,'../..'),OUT=path.join(W,'pruefbelege/paket-6'),Z
 if(!ZIEL||!/^http:\/\/(127\.0\.0\.1|localhost):3300\/?$/.test(ZIEL))throw new Error('Eigener Paket-6-Server auf 3300 erforderlich');
 const URL=process.env.SUPABASE_URL||process.env.EXPO_PUBLIC_SUPABASE_URL,KEY=process.env.SUPABASE_ANON_KEY||process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 if(!URL||!KEY)throw new Error('Supabase-Konfiguration fehlt');
-const konten=[{id:'3baafacd-bbdb-40fb-8ef4-a4e365ae00c4',email:'test@all-media.app',pass:TESTKONTO_PASS},{id:'62616c1d-82e2-4ee4-aab9-950e40e438a4',email:'all.media.prueflauf@web.de',pass:PRUEFKONTO_PASS}];
+const konten=[{id:KONTENPOOL.partnerId,email:KONTENPOOL.partner,pass:TESTKONTO_PASS},{id:KONTENPOOL.pruefId,email:KONTENPOOL.pruef,pass:PRUEFKONTO_PASS}];
 const lauf=crypto.randomUUID(),manifest={supabaseUrl:URL,kontakteVorher:{},schluesselVorher:{},nachrichten:[],lauf,pid:process.pid,chatId:null,schluessel:[],start:new Date().toISOString()};
 fs.mkdirSync(OUT,{recursive:true});
 const manifestDatei=path.join(OUT,'native-live-fixtures.json');

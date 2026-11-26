@@ -1,4 +1,5 @@
 const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Prüflauf „Feed steuern" (Kasten 24) — wirkt die Lenkung auf BEIDEN Seiten?
  *
@@ -353,7 +354,7 @@ async function vorhersage(client, zeilen, eintraege) {
     await webApi('/api/lenkung', { art: 'hashtag', wert: t, anzeige: t, richtung: 'mehr' });
     const anderer = createClient(URL_, KEY);
     const { data: anderesKonto, error: andererFehler } = await pruefAnmelden(anderer, {
-      email: 'test@all-media.app',
+      email: KONTENPOOL.partner,
       password: TESTKONTO_PASS,
     });
     if (andererFehler) {

@@ -1,4 +1,5 @@
 const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Geburtsdatum, Altersgrenze und die Zustimmung der Eltern (Schema 52).
  *
@@ -67,7 +68,7 @@ const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
 // Der ELTERNTEIL ist das Testkonto, der FREMDE das Prüfkonto.
-const ELTERN = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
+const ELTERN = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
 const FREMDER = {
   email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
   passwort: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,

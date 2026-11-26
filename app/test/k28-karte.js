@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Feedback 28.09.2026, Nachtrag 11.10.2026 (2) — Agent „Karte".
  *
@@ -255,7 +256,7 @@ async function teilB() {
     email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
     password: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,
   });
-  const a2 = await pruefAnmelden(te, { email: nurTestkonto('test@all-media.app'), password: TESTKONTO_PASS });
+  const a2 = await pruefAnmelden(te, { email: nurTestkonto(KONTENPOOL.partner), password: TESTKONTO_PASS });
   pruefe('Beide Testkonten melden sich an', !a1.error && !a2.error, (a1.error || a2.error)?.message);
   if (a1.error || a2.error) return;
   const prId = a1.data.user.id;

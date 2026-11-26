@@ -1,4 +1,5 @@
 const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Rankt der Feed — und rankt er nach dem, wonach er ranken soll?
  *
@@ -52,7 +53,7 @@ const wert = (name) => (UMGEBUNG.match(new RegExp('^' + name + '=(.*)$', 'm')) |
 const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
-const TESTKONTO = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
+const TESTKONTO = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
 
 let fehler = 0;
 const pruefe = (name, wahr, zusatz = '') => {

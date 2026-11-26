@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Paket 9: Bestand für die App-Bilder im Prüfsimulator (Konto @test).
  *   node test/paket9-app-bestand.js anlegen   Karussell + 20-min-Reel (@test),
@@ -28,8 +29,8 @@ async function konto(email, pass) {
 }
 
 (async () => {
-  const T = await konto('test@all-media.app', TESTKONTO_PASS);
-  const P = await konto('all.media.prueflauf@web.de', PRUEFKONTO_PASS);
+  const T = await konto(KONTENPOOL.partner, TESTKONTO_PASS);
+  const P = await konto(KONTENPOOL.pruef, PRUEFKONTO_PASS);
   if (process.argv[2] === 'weg') {
     for (const k of [T, P]) {
       const { data } = await k.c.from('posts').select('id,media_url,medien').eq('user_id', k.id).or('description.like.Paket 9%,description.like.Packet 9%');

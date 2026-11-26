@@ -1,4 +1,5 @@
 const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * „Mein Verlauf" — landet jede der fünf Aktionen dort, mit Zeitpunkt und
  * Ziel? Und bleibt Fremdes draußen? (Feedback 21.09.2026, Kasten 10)
@@ -49,8 +50,8 @@ const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 const OFFLINE = process.argv.includes('--offline');
 
-const TESTKONTO = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
-const PRUEFKONTO = { email: 'all.media.prueflauf@web.de', passwort: PRUEFKONTO_PASS };
+const TESTKONTO = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
+const PRUEFKONTO = { email: KONTENPOOL.pruef, passwort: PRUEFKONTO_PASS };
 
 let fehler = 0;
 let geprueft = 0;

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Feedback 28.09.2026, Kästen 1 und 3 — Agent „Profil".
  *
@@ -212,7 +213,7 @@ async function teilBC() {
       if (an.error) throw an.error;
       meineId = an.data.user.id;
       anderer = createClient(URL, KEY);
-      const { error } = await pruefAnmelden(anderer, { email: 'test@all-media.app', password: TESTKONTO_PASS });
+      const { error } = await pruefAnmelden(anderer, { email: KONTENPOOL.partner, password: TESTKONTO_PASS });
       if (error) throw error;
       if (meineId) {
         const { data } = await anderer.from('profiles').select('avatar_url').eq('id', meineId).maybeSingle();

@@ -1,3 +1,4 @@
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Prüflauf: die Angriffe aus der Sicherheitsprüfung vom 16./17.10.2026.
  *
@@ -27,8 +28,8 @@
 
 const { frage } = require('./_aufraeumen');
 
-const PRUEFKONTO = '62616c1d-82e2-4ee4-aab9-950e40e438a4'; // all.media.prueflauf@web.de
-const TESTKONTO = '3baafacd-bbdb-40fb-8ef4-a4e365ae00c4'; // test@all-media.app
+const PRUEFKONTO = KONTENPOOL.pruefId; // all.media.prueflauf@web.de
+const TESTKONTO = KONTENPOOL.partnerId; // test@all-media.app
 // Ein Chat, den das Prüfkonto am 06.09. angelegt und danach verlassen hat.
 // Genau so ein Chat war der Weg zurück hinein.
 const VERLASSENER_CHAT = 'a21f820f-4d73-4cd6-acf6-1e1da9bdb73b';

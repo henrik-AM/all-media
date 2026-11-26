@@ -1,4 +1,5 @@
 const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Testfall fürs App-Elternblatt im Simulator (F12): ein Kinderkonto entsteht
  * per SQL und fragt per Telefonnummer bei @test (Simulatorkonto) an.
@@ -45,7 +46,7 @@ function geborenVor(jahre) {
          ${sql(JSON.stringify({ handle: 'pruefkindsim' + k, name: 'Prüfkind Sim', phone: nummer, geburtsdatum: geborenVor(12) }))}::jsonb,
          now(), now(), '', '', '', '')`);
     const [eltern] = await frage(`select phone from public.profiles where id =
-      (select id from auth.users where email = 'test@all-media.app')`);
+      (select id from auth.users where email = '${KONTENPOOL.partner}')`);
     const c = createClient(URL, KEY, { auth: { persistSession: false } });
     const an = await pruefAnmelden(c, { email: mail, password: pass });
     if (an.error) throw an.error;

@@ -1,4 +1,5 @@
 const { pruefAnmelden, seiteAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /** Paket 7: Originalwebsite + native Original-Chatkomponenten, echte Testkonten.
  * Nur eigener Server3300 und exklusiver Testbestand. Keine Schemas/Resets.
  */
@@ -10,7 +11,7 @@ const {frage}=require('./_aufraeumen'),{medienEgressSchuetzen}=require('./_medie
 process.loadEnvFile(path.join(__dirname,'../.env.local'));
 const URL=process.env.EXPO_PUBLIC_SUPABASE_URL,KEY=process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,OUT=process.env.P7_PLATTFORM_OUT||path.resolve(__dirname,'../../pruefbelege/paket-7');
 const lauf=crypto.randomUUID(),chats=[{id:crypto.randomUUID(),isGroup:false,bereich:'community'},{id:crypto.randomUUID(),isGroup:true,bereich:'community'}];
-const konten=[{id:'3baafacd-bbdb-40fb-8ef4-a4e365ae00c4',email:'test@all-media.app',pass:TESTKONTO_PASS,name:'A'},{id:'62616c1d-82e2-4ee4-aab9-950e40e438a4',email:'all.media.prueflauf@web.de',pass:PRUEFKONTO_PASS,name:'B'}];
+const konten=[{id:KONTENPOOL.partnerId,email:KONTENPOOL.partner,pass:TESTKONTO_PASS,name:'A'},{id:KONTENPOOL.pruefId,email:KONTENPOOL.pruef,pass:PRUEFKONTO_PASS,name:'B'}];
 let browser,bridge,ende,fehler=0,gut=0,begonnen=false;const keys=[],messungen=[],nativeTexte=[];let spaet;
 const manifest={lauf,chats:chats.map(c=>c.id),keys,rest:null};
 const sichern=()=>fs.writeFileSync(path.join(OUT,'plattform-fixtures.json'),JSON.stringify(manifest,null,2));

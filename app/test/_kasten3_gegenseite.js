@@ -1,4 +1,5 @@
 const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 // Die Gegenseite für den App-Bildnachweis zu Kasten 3.
 //
 // Im Prüfsimulator ist @test angemeldet. Damit dort eine Anfrage eingehen
@@ -22,13 +23,13 @@ const client = createClient(wert('EXPO_PUBLIC_SUPABASE_URL'), wert('EXPO_PUBLIC_
 (async () => {
   const [was, text] = process.argv.slice(2);
   const { data: an, error: anFehler } = await pruefAnmelden(client, {
-    email: 'all.media.prueflauf@web.de',
+    email: KONTENPOOL.pruef,
     password: PRUEFKONTO_PASS,
   });
   if (anFehler) throw anFehler;
   const ich = an.user.id;
 
-  const { data: eigner } = await client.from('profiles').select('id').eq('handle', '@test').single();
+  const { data: eigner } = await client.from('profiles').select('id').eq('handle', KONTENPOOL.partnerHandle).single();
   const { data: meine } = await client.from('chat_members').select('chat_id').eq('user_id', ich);
   const { data: gemeinsam } = await client
     .from('chat_members')

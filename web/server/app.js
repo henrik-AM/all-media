@@ -659,7 +659,19 @@ app.post('/api/medien/unterschreiben',route(async req=>require('./medien').unter
 app.post('/api/medien/loeschen',route(async req=>require('./medien').loeschen(req.db,req.nutzerId,req.body?.pfad)));
 
 app.post('/api/reset', route(async (req) => {
-  const { data, error } = await req.db.rpc('zuruecksetzen', { ziel: req.nutzerId });
+  /*
+   * Kontenpool (Schema 138/139): Bis zu vier Prüfplätze setzen zugleich
+   * zurück. zuruecksetzen() wartet auf eine gemeinsame Sperre, weil alle
+   * Resets dieselben Demo-Beitragszähler anfassen. Unter Last läuft das
+   * Warten in die 8-s-Zeitgrenze der Rolle (57014), selten bleibt ein
+   * Deadlock (40P01). Beides ist ein Stau, kein Fehler: kurz warten, neu.
+   */
+  let data, error;
+  for (let versuch = 1; ; versuch++) {
+    ({ data, error } = await req.db.rpc('zuruecksetzen', { ziel: req.nutzerId }));
+    if (!error || !['57014', '40P01'].includes(error.code) || versuch >= 5) break;
+    await new Promise((r) => setTimeout(r, 500 * versuch + Math.random() * 1000));
+  }
   if (error) throw error;
   // "Kein Interesse" (Schema 55) kennt zuruecksetzen() nicht. Ohne diese
   // Zeile bliebe ein einmal ausgeblendeter Beitrag fuer jeden spaeteren

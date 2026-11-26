@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Feedback 28.09.2026, Kasten 1.3 — Nachtrag 10.10.2026, Agent „Profilseite“.
  *
@@ -148,7 +149,15 @@ async function teilBC() {
   page.on('pageerror', (e) => jsFehler.push(e.message));
 
   if (!(await vorbereiten(page, BASIS))) await beenden(browser, 1);
-  await page.waitForSelector('[data-area]', { timeout: 20000 });
+  // Die Navigationsleiste steht schon im HTML. Erst nach dem Start darf
+  // der Einstellungsweg mit einem vollständig geladenen Profil beginnen.
+  await page.waitForSelector('body:not(.is-startet):not(.ist-abgemeldet) [data-area]', { timeout: 20000 });
+  const startfehler = await page.evaluate(() => document.querySelector('.startfehler__grund')?.textContent);
+  if (startfehler) {
+    pruefe('Website-Start', false, startfehler);
+    await beenden(browser, 1);
+    return;
+  }
 
   // Zweites Konto und eigene Kennung — für C und den „vergebenen“ Namen.
   let meineId = null;
@@ -165,7 +174,7 @@ async function teilBC() {
       if (an.error) throw an.error;
       meineId = an.data.user.id;
       anderer = createClient(URL, KEY);
-      const zwei = await pruefAnmelden(anderer, { email: 'test@all-media.app', password: TESTKONTO_PASS });
+      const zwei = await pruefAnmelden(anderer, { email: KONTENPOOL.partner, password: TESTKONTO_PASS });
       if (zwei.error) throw zwei.error;
       const { data: h } = await anderer.from('profiles').select('handle').eq('id', zwei.data.user.id).maybeSingle();
       fremderHandle = h?.handle || null;
@@ -192,8 +201,27 @@ async function teilBC() {
 
   console.log('\nB  Website');
   await pruefeAsync('Einstellungen → Konto → „Profil bearbeiten“ öffnet die Seite mit Bild und fünf Zeilen', async () => {
-    await zurSeite();
-    const zeilen = await page.$$eval('[data-psfeld]', (n) => n.map((e) => e.dataset.psfeld).join(','));
+    // Die Statistik-Antwort erst nach dem Öffnen des Profils durchlassen.
+    // Das Nachladen darf die Profilseite nicht durch die Einstellungen ersetzen.
+    const statistik = '**/api/statistik';
+    const freigabe = Promise.withResolvers();
+    await page.route(statistik, async (route) => {
+      await freigabe.promise;
+      await route.continue();
+    }, { times: 1 });
+    const antwort = page.waitForResponse(statistik);
+    try {
+      await zurSeite();
+    } finally {
+      freigabe.resolve();
+      await antwort;
+    }
+    await page.waitForFunction(() => einstellungNachgeladen.statistik !== 'laeuft');
+    const profilseite = page.locator('[data-testid="profilseite"]');
+    await profilseite.locator('[data-psfeld="links"]').waitFor();
+    const zeilen = await profilseite.locator('[data-psfeld]').evaluateAll(
+      (n) => n.map((e) => e.dataset.psfeld).join(',')
+    );
     if (zeilen !== 'name,benutzername,pronomen,bio,links') throw new Error('Zeilen: ' + zeilen);
     if (!(await page.$('#psBild'))) throw new Error('kein „Bild bearbeiten“');
   });

@@ -50,7 +50,8 @@ const crypto = require('crypto');
  *      die auf wechselndem Grund entstanden ist, ist keine Messung.
  */
 
-const SPERRE = path.join(__dirname, '.gesamtlauf-laeuft.json');
+// Je Prüfplatz eine Sperre (Kontenpool, Schema 138): zwei Plätze dürfen parallel.
+const SPERRE = path.join(__dirname, (() => { const n = require('./_kontenpool').platzSetzen(); return n === 1 ? '.gesamtlauf-laeuft.json' : `.gesamtlauf-laeuft-${n}.json`; })());
 
 /** Läuft der Prozess mit dieser Kennung noch? */
 function lebt(pid) {
@@ -127,6 +128,9 @@ function stempel(pfade = BEOBACHTET) {
     if (eintrag.isFile()) return dateien.push(ort);
     for (const kind of fs.readdirSync(ort, { withFileTypes: true })) {
       if (kind.name === 'node_modules' || kind.name.startsWith('.')) continue;
+      // Ausgaben der Läufe selbst (af-fix-vorher.js schreibt ergebnisse-af-fix/vorher.txt);
+      // zwei Prüfplätze zugleich machten die Messung sonst immer ungültig (Kontenpool).
+      if (kind.isDirectory() && kind.name.startsWith('ergebnisse')) continue;
       sammle(path.join(ort, kind.name));
     }
   };
@@ -343,7 +347,8 @@ async function haupt() {
   const { token, projekt } = umgebung();
   if (!token || !projekt) throw new Error('ABBRUCH: SUPABASE_TOKEN/Projekt fehlen; Bereinigung wäre unmöglich.');
   const mitteilungen = require('./_lauf_mitteilungen').laufMitteilungen({
-    datei: path.join(__dirname, '.gesamtlauf-bereinigung.json'), projekt, frage,
+    // Je Prüfplatz ein Journal (Kontenpool, Schema 138).
+    datei: path.join(__dirname, (() => { const n = require('./_kontenpool').platzSetzen(); return n === 1 ? '.gesamtlauf-bereinigung.json' : `.gesamtlauf-bereinigung-${n}.json`; })()), projekt, frage,
   });
   const abbruch = new AbortController();
   let signal;

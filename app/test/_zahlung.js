@@ -1,4 +1,5 @@
 const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Spendencode, Zahlungsmethoden, Kontowechsel, nur Testkonten
  * (Feedback 21.09.2026, Kasten 13).
@@ -60,8 +61,8 @@ const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY
 const OFFLINE = process.argv.includes('--offline');
 
 // Fest, nicht aus der Umgebung: dieser Lauf legt Zahlungsmethoden an.
-const PRUEFKONTO = { email: 'all.media.prueflauf@web.de', passwort: PRUEFKONTO_PASS };
-const TESTKONTO = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
+const PRUEFKONTO = { email: KONTENPOOL.pruef, passwort: PRUEFKONTO_PASS };
+const TESTKONTO = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
 
 let fehler = 0;
 let geprueft = 0;
@@ -223,7 +224,7 @@ function kontowechsel() {
 function nurTestkonten() {
   console.log('\n5. Nur Testkonten (13.4)');
   pruefe('Dieselbe Liste wie ist_testkonto()',
-    TESTKONTEN.every((m) => lies('SUPABASE_SCHEMA_62_nur_eigene_testkonten.sql').includes(`'${m}'`)));
+    TESTKONTEN.every((m) => lies('SUPABASE_SCHEMA_138_kontenpool.sql').includes(`'${m}'`)));
   const offen = [];
   for (const ordner of ['app/test', 'app/tools']) {
     for (const datei of fs.readdirSync(path.join(WURZEL, ordner))) {

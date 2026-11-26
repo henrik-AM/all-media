@@ -1,4 +1,5 @@
 const { pruefAnmelden, seiteAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Kasten 27 — „A schreibt ‚cxv', bei B kommt ‚cwkdew' an."
  *
@@ -167,7 +168,7 @@ async function teilZwei() {
     if (error) throw new Error(`${email}: ${error.message}`);
     return { client, id: data.user.id };
   };
-  const A = await anmelden('test@all-media.app', TESTKONTO_PASS);
+  const A = await anmelden(KONTENPOOL.partner, TESTKONTO_PASS);
   const B = await anmelden(nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
     process.env.AM_TEST_PASS || PRUEFKONTO_PASS);
 

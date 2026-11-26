@@ -44,6 +44,13 @@ function pruefeBelegung(sache = 'testbestand') {
   if (globalThis.__kiBelegungGeprueft) return;
   globalThis.__kiBelegungGeprueft = true;
 
+  // Kontenpool (Schema 138): „testbestand" heißt der Platz dieser Sitzung,
+  // Platz 1 = testbestand, Platz n = testbestand-n.
+  if (sache === 'testbestand') {
+    const pool = require('./_kontenpool');
+    sache = pool.platzSache(pool.platzSetzen());
+  }
+
   const r = spawnSync('bash', [SKRIPT, 'meine', sache], { encoding: 'utf8', timeout: 20000 });
   if (r.status === 0) return;
 
@@ -55,8 +62,9 @@ function pruefeBelegung(sache = 'testbestand') {
   console.error(
     `\nABBRUCH  ${sache} ${grund}.\n` +
     '          Dieser Lauf setzt gemeinsame Testdaten zurück und läuft nur mit eigener Belegung:\n' +
-    `          ki-abgleich.sh belegen <ki> ${sache} "<zweck>"   (danach: freigeben <ki> ${sache})\n` +
-    '          Gehört sie einer anderen Sitzung: warten oder Henrik fragen, nicht erzwingen.\n'
+    '          ki-abgleich.sh platz <ki> "<zweck>"   (Kontenpool: nimmt den ersten freien von 4 Plätzen)\n' +
+    `          danach: freigeben <ki> ${sache} — oder ende gibt ihn mit frei.\n` +
+    '          Gehört er einer anderen Sitzung: einen anderen Platz nehmen, nicht erzwingen.\n'
   );
   process.exit(2);
 }

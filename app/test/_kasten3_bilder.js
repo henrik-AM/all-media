@@ -1,4 +1,5 @@
 const { seiteAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 // Bildnachweis Website zu Kasten 3 (Feedback 21.09.2026, „Community-Chat vor
 // Messenger"). Zwei Browser, zwei Testkonten — nie ein echtes Konto:
 //
@@ -20,11 +21,11 @@ const { TESTKONTO_PASS, PRUEFKONTO_PASS } = require('./_testpasswoerter');
 
 const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 const BILDER = path.join(__dirname, '..', '..', 'bilder', 'kasten3');
-const F = { mail: 'all.media.prueflauf@web.de', pass: PRUEFKONTO_PASS };
-const E = { mail: 'test@all-media.app', pass: TESTKONTO_PASS };
+const F = { mail: KONTENPOOL.pruef, pass: PRUEFKONTO_PASS };
+const E = { mail: KONTENPOOL.partner, pass: TESTKONTO_PASS };
 // Feste Kennung von @test: im Teilen-Blatt stehen auch echte Konten, ein
 // Treffer über den Namen könnte daneben greifen.
-const E_ID = '3baafacd-bbdb-40fb-8ef4-a4e365ae00c4';
+const E_ID = KONTENPOOL.partnerId;
 
 const ergebnisse = [];
 const pruefe = (name, ok, zusatz = '') => {
@@ -154,7 +155,7 @@ const leisteZeigt = (page, muster) =>
     await chatOeffnen(e, 'Prüfname');
     await schreiben(e, 'Danke fürs Video!');
     await neu(f);
-    await chatOeffnen(f, 'Test Nutzer');
+    await chatOeffnen(f, KONTENPOOL.partnerName);
     let text = await leiste(f);
     pruefe('Nach dem Austausch bietet die Leiste die Anfrage an', /Messenger wechselt/.test(text));
     await bild(f, '06-web-anfrage-angeboten');
@@ -180,7 +181,7 @@ const leisteZeigt = (page, muster) =>
     await bild(e, '09-web-abgelehnt-bleibt-community');
 
     await neu(f);
-    await chatOeffnen(f, 'Test Nutzer');
+    await chatOeffnen(f, KONTENPOOL.partnerName);
     text = await leiste(f);
     pruefe('Der Fragende sieht die Absage', /bleibt lieber hier unter Communitys/.test(text));
     await schreiben(f, 'Alles gut, dann hier.');
@@ -197,7 +198,7 @@ const leisteZeigt = (page, muster) =>
     await e.click('[data-messenger="fragen"]');
     await leisteZeigt(e, /Anfrage an .* läuft/);
     await neu(f);
-    await chatOeffnen(f, 'Test Nutzer');
+    await chatOeffnen(f, KONTENPOOL.partnerName);
     await f.click('[data-messenger="ja"]');
     await leisteZeigt(f, /im Messenger verbunden/);
     text = await leiste(f);
@@ -215,14 +216,14 @@ const leisteZeigt = (page, muster) =>
     console.log('\n3.4 Plus → Telefonnummer → Kontakt');
     // Die angenommene Anfrage hat @prueflauf schon zum Kontakt gemacht. Damit
     // das Bild echtes Hinzufügen zeigt, nimmt @test den eigenen Eintrag weg.
-    const weg = await e.evaluate(async () => {
+    const weg = await e.evaluate(async (pruefHandle) => {
       const client = await window.Anmeldung.aufbauen();
       const ich = window.Anmeldung.nutzer().id;
       const { data } = await client.from('contacts').delete().eq('user_id', ich).neq('contact_id', ich)
-        .in('contact_id', (await client.from('profiles').select('id').eq('handle', '@prueflauf')).data.map((p) => p.id))
+        .in('contact_id', (await client.from('profiles').select('id').eq('handle', pruefHandle)).data.map((p) => p.id))
         .select('contact_id');
       return (data || []).length;
-    });
+    }, KONTENPOOL.pruefHandle);
     pruefe('Vorher: @prueflauf aus den Kontakten von @test genommen', weg === 1, String(weg));
     await neu(e);
     await e.click('[data-area="messenger"]');
@@ -246,7 +247,7 @@ const leisteZeigt = (page, muster) =>
     pruefe('Unbekannte Nummer: Hinweis sichtbar im Blatt',
       obenauf.sichtbar && /kein Konto/.test(obenauf.text), JSON.stringify(obenauf));
     await bild(e, '15a-web-unbekannte-nummer');
-    await e.fill('#contactHandle', '+49 151 9900110');
+    await e.fill('#contactHandle', KONTENPOOL.pruefTelefon);
     pruefe('Neue Eingabe räumt den Hinweis weg', await e.locator('#contactFehler').isHidden());
     await bild(e, '15-web-nummer-eingeben');
     await e.click('#contactAdd');
@@ -254,11 +255,11 @@ const leisteZeigt = (page, muster) =>
     await bild(e, '16-web-kontakt-angelegt');
     const toastText = await e.locator('.toast').allInnerTexts().then((t) => t.join(' ')).catch(() => '');
     pruefe('Nummer führt zum Kontakt (Rückmeldung)', toastText && !/nicht|Fehler|kommen über|bereits/i.test(toastText), toastText);
-    const drin = await e.evaluate(async () => {
+    const drin = await e.evaluate(async (pruefHandle) => {
       const client = await window.Anmeldung.aufbauen();
       const { data } = await client.from('contacts').select('herkunft, profiles!contacts_contact_id_fkey(handle)').eq('user_id', window.Anmeldung.nutzer().id);
-      return (data || []).filter((k) => k.profiles?.handle === '@prueflauf').map((k) => k.herkunft);
-    });
+      return (data || []).filter((k) => k.profiles?.handle === pruefHandle).map((k) => k.herkunft);
+    }, KONTENPOOL.pruefHandle);
     pruefe('Der Kontakt steht in der Datenbank, Herkunft Nummer', drin.length === 1 && drin[0] === 'nummer', JSON.stringify(drin));
   } catch (err) {
     pruefe('Ablauf ohne Abbruch', false, err.message);

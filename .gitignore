@@ -33,7 +33,7 @@ Thumbs.db
 
 # Sperre und Protokolle des Gesamtlaufs (app/test/alles.js). Die .lauf-Dateien
 # raeumt der Lauf selbst wieder weg — waehrend er laeuft, liegt immer eine da.
-.gesamtlauf-laeuft.json
+.gesamtlauf-laeuft*.json
 .lauf-*.log
 
 # Was ein Plugin auf diesem Rechner installiert hat — kein Projektstand.
@@ -52,3 +52,4 @@ Thumbs.db
 # Lokaler, auf Geheimnisse geprüfter Bunny-App-Export
 .bunny-live-bundle/
 .figma/
+.gesamtlauf-bereinigung*.json

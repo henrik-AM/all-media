@@ -1,4 +1,5 @@
 const { pruefKopf } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 // Prueft die Sammlungen — Playlists und Highlights (SUPABASE_SCHEMA_46).
 //
 // Warum es diesen Test gibt: bis zum 20.09.2026 waren `profiles.highlights`
@@ -26,7 +27,7 @@ const URL = process.env.SUPABASE_URL || wert('EXPO_PUBLIC_SUPABASE_URL');
 const KEY = process.env.SUPABASE_ANON_KEY || wert('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
 // Dasselbe Konto wie in SUPABASE_SCHEMA_7_testkonto.sql.
-const KONTO = { email: 'test@all-media.app', passwort: TESTKONTO_PASS };
+const KONTO = { email: KONTENPOOL.partner, passwort: TESTKONTO_PASS };
 
 let gut = 0;
 let schlecht = 0;

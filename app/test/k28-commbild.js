@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const { pruefAnmelden } = require('./_anmelden'); // captcha-feste Anmeldung (C8)
+const KONTENPOOL = require('./_kontenpool').konten(); // Schema 138: Konten des Prüfplatzes
 /**
  * Feedback 28.09.2026, Nachtrag 12.10.2026 (3) — Agent „Community-Profilbilder".
  *
@@ -179,7 +180,7 @@ async function teilBC() {
     email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
     password: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,
   });
-  const a2 = await pruefAnmelden(te, { email: nurTestkonto('test@all-media.app'), password: TESTKONTO_PASS });
+  const a2 = await pruefAnmelden(te, { email: nurTestkonto(KONTENPOOL.partner), password: TESTKONTO_PASS });
   pruefe('Beide Testkonten melden sich an', !a1.error && !a2.error, (a1.error || a2.error)?.message);
   if (a1.error || a2.error) return;
   const prId = a1.data.user.id;
@@ -300,23 +301,28 @@ async function teilBC() {
         if (n) throw new Error(n + ' Bild(er) mit dem Kontaktbild');
       });
       await pruefeAsync('11.4 Klick aufs fremde Bild → öffentliches Profil von @test', async () => {
-        const anfragen = [];
-        page.on('request', (r) => anfragen.push(r.url()));
-        await page.locator(`.msgzeile__bild[data-commprofil="${teId}"]`).first().click();
-        await page.waitForTimeout(1500);
-        if (!anfragen.some((u) => u.includes('/api/profile/' + teId))) throw new Error('kein /api/profile/' + teId);
+        const [antwort] = await Promise.all([
+          page.waitForResponse((r) => new globalThis.URL(r.url()).pathname === `/api/profile/${teId}` && r.request().method() === 'GET'),
+          page.locator(`.msgzeile__bild[data-commprofil="${teId}"]`).first().click(),
+        ]);
+        if (!antwort.ok()) throw new Error(`Fremdprofil: HTTP ${antwort.status()}`);
+        const profil = await antwort.json();
+        const fremdprofil = page.locator('#overlay');
+        const kopf = fremdprofil.locator('.chathead__name');
+        await kopf.waitFor({ state: 'visible' });
+        try {
+          const handle = await kopf.innerText();
+          if (handle !== (profil.handle || '@' + profil.name)) throw new Error(`Falsches Profil: ${handle}`);
+        } finally {
+          await fremdprofil.locator('#profBack').click();
+          await fremdprofil.waitFor({ state: 'hidden' });
+        }
       });
-      // Paket 5: das öffentliche Profil liegt heute als Overlay über #main — erst schließen.
-      await page.evaluate(() => typeof closeOverlay === 'function' && closeOverlay());
       await zeichnen();
       await page.waitForSelector('#commMsgs', { timeout: 15000 });
-      // Nach dem Overlay blendet die Seite ein; vorher hängt der Klick bis zur Zeitgrenze.
-      await page.waitForTimeout(800);
       await pruefeAsync('11.4 Klick aufs eigene Bild → Communitys → Profil', async () => {
         await page.locator('.msgzeile__bild[data-commprofil="me"]').first().click();
-        await page.waitForTimeout(800);
-        const r = await page.evaluate(() => ({ area: state.area, sub: state.sub.communities }));
-        if (r.area !== 'communities' || r.sub !== 'profile') throw new Error(JSON.stringify(r));
+        await page.locator('#main [data-stat="created"][data-commview="erstellt"]').waitFor({ state: 'visible' });
       });
       await pruefeAsync('11.3 messageBubble: Community-Gruppe mit Bild, Einzelchat und Messenger ohne', async () => {
         const r = await page.evaluate(() => {
