@@ -350,6 +350,18 @@ function zusammengelegt(bauOrdner, name) {
     'const SUPABASE_CONFIG = { redirectUrl: location.origin };'
   );
 
+  /*
+   * 26.11.2026 (Captcha C6): aktionen.ts holt vor der Passwort-Anmeldung ein
+   * Turnstile-Token aus `./captcha`. Das Modul braucht die WebView der App
+   * (CaptchaHost) und gibt es im Prüfbrowser nicht. Prüfserver laufen ohne
+   * TURNSTILE_SITE_KEY; captchaHolen() liefert dort auch in der App
+   * `undefined`. Die Attrappe verhält sich also genau wie das Original.
+   */
+  quelltext = quelltext.replace(
+    /^\s*import\s*\{[^}]*\}\s*from\s*['"]\.\/captcha(?:\.js)?['"];?\s*$/gm,
+    'async function captchaHolen() { return undefined; }'
+  );
+
   const bausteine = umdTeile();
 
   const medien = finde(bauOrdner, 'medien.js');

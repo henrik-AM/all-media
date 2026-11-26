@@ -68,6 +68,7 @@ function app(speicher = {}, konten = [A,B]) {
       if(id==='./kontenspeicher') return {gespeicherteKonten:async()=>konten};
       if(id==='./krypto') return laden('app/lib/krypto.ts');
       if(id==='./medien') return {};
+      if(id==='./captcha') return {captchaHolen:async()=>undefined}; // Prüfserver ohne Turnstile-Schlüssel
       if(id==='../constants/supabase') return {SUPABASE_CONFIG:{}};
       return echt(id);
     };
