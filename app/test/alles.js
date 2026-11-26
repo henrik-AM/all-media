@@ -114,12 +114,16 @@ const BEOBACHTET = [
   path.join(__dirname, '..', '..', 'web', 'public'),
 ];
 
+// Dieser laufend neu erzeugte Beleg liegt aus historischen Gründen neben
+// den Prüfscripten. Er ist kein Eingang für eine Prüfung.
+const AF_FIX_VORHER_BELEG = path.join(__dirname, 'ergebnisse-af-fix', 'vorher.txt');
+
 function stempel(pfade = BEOBACHTET) {
   const hash = crypto.createHash('sha256');
   const dateien = [];
 
   const sammle = (ort) => {
-    if (!fs.existsSync(ort)) return;
+    if (ort === AF_FIX_VORHER_BELEG || !fs.existsSync(ort)) return;
     const eintrag = fs.statSync(ort);
     if (eintrag.isFile()) return dateien.push(ort);
     for (const kind of fs.readdirSync(ort, { withFileTypes: true })) {
