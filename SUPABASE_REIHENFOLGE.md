@@ -741,3 +741,8 @@ Karussell nur aus `posts/`/`beispiel/`, Analysen zählen Zuschauer-Tage. Probe `
 Livestream-Ende rechnet die Aufzeichnungsdauer aus `created_at`. Probe `node app/test/af-schema-proben.js 136`.
 
 **137** `livestream_dauer` (22.11.2026): Livestream-Ende auch bei reiner Formatänderung, Dauer ab 100 Minuten vollständig, keine negativen Werte und stabil bei wiederholtem Speichern.
+
+## Nachtrag 26.11.2026: Schema 140 (Datenschutz Fassung 2, Captcha C7)
+
+- `SUPABASE_SCHEMA_140_datenschutz_fassung_2.sql` — nur eine neue Zeile in `rechtstext_fassungen` (`datenschutz`, Fassung 2, Prüfsumme `a7db2a57546301dc`): Datenschutzerklärung nennt Cloudflare Turnstile. Keine neuen Objekte, keine Doppelung. Nach 106.
+- Einspielen gemeinsam mit dem Ausliefern von `gemeinsam/rechtstexte.js` (Fassung 2), sonst passen Registrierungs-Metadaten und geltende Fassung nicht zusammen.

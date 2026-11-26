@@ -41,7 +41,7 @@ const PRUEFSUMMEN = {
   kurz_erklaert: { 1: '8bbbd3a159c055f7' },
   nutzungsbedingungen: { 1: '093abb7871ad3802' },
   community_richtlinien: { 1: '78549dde77a7bbe0' },
-  datenschutz: { 1: '73aa228acb1edf9d' },
+  datenschutz: { 1: '73aa228acb1edf9d', 2: 'a7db2a57546301dc' },
   eltern_info: { 1: 'b14f4267ef4df3fe' },
   impressum: { 1: 'de376c5e63a63a01' },
   kinderschutz: { 1: '8d5531d4ef88510d' },
@@ -86,7 +86,7 @@ console.log('\n2. Zustimmung');
 const z = R.zustimmungsDaten(new Date('2026-10-24T12:00:00Z'));
 pruefe('Zeitpunkt, Pflicht-Dokumente und Kenntnisnahme mit Fassung',
   z.zustimmung_am === '2026-10-24T12:00:00.000Z' && z.zustimmung_nutzungsbedingungen === '1' &&
-  z.zustimmung_community_richtlinien === '1' && z.kenntnis_datenschutz === '1');
+  z.zustimmung_community_richtlinien === '1' && z.kenntnis_datenschutz === '2');
 pruefe('nur Zeichenketten (signUp-Metadaten)', Object.values(z).every((w) => typeof w === 'string'));
 
 console.log('\n3. App und Website gleichauf');
@@ -132,6 +132,7 @@ const DIENSTE = {
   'nominatim.openstreetmap.org': 'Ortssuche',
   'api.pwnedpasswords.com': 'Have I Been Pwned',
   'bunny.net': 'Bunny.net',
+  'challenges.cloudflare.com': 'Cloudflare Turnstile',
 };
 /* Adressen, an die All Media nichts schickt: Beispiele, Kommentare, Lizenzen, Links zum Anklicken. */
 const OHNE_DATEN = ['www.openstreetmap.org', 'deine-seite.de', 'fremd.example', 'cdn.jsdelivr.net',
@@ -234,8 +235,14 @@ console.log('\n6b. Fassungen in der Datenbank (Schema 106, RS 7)');
 {
   const fs106 = require('fs');
   const pfad = require('path').join(__dirname, '..', '..', 'SUPABASE_SCHEMA_106_einwilligung_fassung.sql');
-  const sql = fs106.existsSync(pfad) ? fs106.readFileSync(pfad, 'utf8') : '';
-  pruefe('Schema 106 vorhanden', sql.length > 0);
+  const sql106 = fs106.existsSync(pfad) ? fs106.readFileSync(pfad, 'utf8') : '';
+  pruefe('Schema 106 vorhanden', sql106.length > 0);
+  // Neue Fassungen kommen per eigenem Schema (z. B. 140: Datenschutz Fassung 2).
+  const spaeter = fs106.readdirSync(wurzel)
+    .filter((d) => /^SUPABASE_SCHEMA_(\d+)_.*\.sql$/.test(d) && Number(d.match(/\d+/)[0]) > 106)
+    .map((d) => fs106.readFileSync(require('path').join(wurzel, d), 'utf8'))
+    .filter((t) => /insert into public\.rechtstext_fassungen/.test(t));
+  const sql = [sql106, ...spaeter].join('\n');
   const zeilen = [...sql.matchAll(/\('([a-z_]+)',\s*(\d+),\s*'([0-9a-f]{16})',\s*'(zustimmung|kenntnis)'/g)];
   const pflicht = R.ZUSTIMMUNG_PFLICHT.map((id) => [id, 'zustimmung']).concat(R.ZUR_KENNTNIS.map((id) => [id, 'kenntnis']));
   pruefe('jedes zuzustimmende Dokument steht als Fassung im Schema', zeilen.length > 0 &&

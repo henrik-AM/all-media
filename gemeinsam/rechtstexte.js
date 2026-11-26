@@ -9,7 +9,8 @@
  * Richtlinien, die Datenschutzerklärung hatte drei Sätze, die Nutzungs-
  * bedingungen sagten „ab 13" (für Deutschland gilt 16, siehe alter.js) und
  * die Anmeldung behauptete „werden nicht mit Dritten geteilt" — falsch:
- * Supabase, Render, Bunny.net, Kartendienste und die Passwortprüfung bekommen Daten.
+ * Supabase, Render, Bunny.net, Kartendienste und die Passwortprüfung bekommen Daten
+ * (seit 26.11.2026 auch Cloudflare Turnstile bei Registrierung/Anmeldung).
  *
  * Die Texte stehen NUR hier. App und Website zeigen sie über dieselbe
  * Funktion an, `test:recht` vergleicht sie mit alter.js, den Schemas und
@@ -226,7 +227,8 @@
 
     datenschutz: {
       titel: 'Datenschutzerklärung',
-      version: 1,
+      // Fassung 2 (26.11.2026): Cloudflare Turnstile ergänzt, Schema 140.
+      version: 2,
       abschnitte: [
         { titel: 'Wer verantwortlich ist', text: [
           'Verantwortlich für deine Daten ist ' + BETREIBER.name + ', ' + BETREIBER.anschrift + ', ' + BETREIBER.email + '.',
@@ -249,6 +251,8 @@
           'Render (Website): ' + P('Region des Render-Dienstes prüfen; ohne Angabe USA') + '. Grundlage ist ein Auftragsverarbeitungsvertrag (Art. 28 DSGVO); Übermittlungen in die USA stützen sich auf das EU-US Data Privacy Framework, sonst auf Standardvertragsklauseln.',
           // Seit 28.10.2026 (Schema 115/116, Verarbeitungsverzeichnis V18). Firmierung und AVV prüft Gate 1.
           'Bunny.net (Fotos und Videos speichern und ausliefern): BunnyWay d.o.o. in Slowenien (EU); die Auslieferung läuft über Server in vielen Ländern, die dabei technisch deine IP-Adresse sehen. Grundlage ist ein Auftragsverarbeitungsvertrag (Art. 28 DSGVO). ' + P('Firmierung, AVV und Unterauftragnehmer von Bunny.net prüfen') + '.',
+          // Captcha (Fahrplan C5/C6, 26.11.2026): Widget nur auf der eigenen Seite /captcha, nie auf der Hauptseite.
+          'Sicherheitsprüfung bei Registrierung und Anmeldung (Cloudflare Turnstile): Nur wenn du dich registrierst, anmeldest oder ein Passwort zurücksetzt, öffnet sich eine kurze Prüfung von Cloudflare, Inc. (USA), die automatisierte Massenanmeldungen verhindert. Dabei sieht Cloudflare deine IP-Adresse und technische Merkmale deines Browsers bzw. Geräts; es werden keine Werbe-Cookies gesetzt. Grundlage ist unser berechtigtes Interesse am Schutz vor Missbrauch (Art. 6 Abs. 1 f DSGVO); Übermittlungen in die USA stützen sich auf das EU-US Data Privacy Framework. ' + P('Zertifizierung von Cloudflare im Data Privacy Framework und Turnstile-Datenschutzzusatz prüfen') + '.',
           'Passwortprüfung (Have I Been Pwned): Beim Festlegen eines Passworts schicken wir nur die ersten fünf Zeichen eines Hashwerts — nie das Passwort selbst — um zu prüfen, ob es schon in Datenlecks aufgetaucht ist.',
           'Karten und Ortssuche (OpenStreetMap Foundation, OpenTopoMap, Esri ArcGIS): Wenn du eine Karte öffnest oder einen Ort suchst, lädt dein Gerät Kartenbilder bzw. Suchergebnisse direkt von dort. Dabei sehen diese Dienste deine IP-Adresse und den Kartenausschnitt bzw. Suchbegriff.',
           'Schriften und Kartenbibliothek liefern wir selbst aus — es gehen dafür keine Daten an Google oder andere.',
@@ -468,7 +472,7 @@
     kurz_erklaert: '8bbbd3a159c055f7',
     nutzungsbedingungen: '093abb7871ad3802',
     community_richtlinien: '78549dde77a7bbe0',
-    datenschutz: '73aa228acb1edf9d',
+    datenschutz: 'a7db2a57546301dc',
     eltern_info: 'b14f4267ef4df3fe',
     impressum: 'de376c5e63a63a01',
     kinderschutz: '8d5531d4ef88510d',
