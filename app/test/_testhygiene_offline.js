@@ -11,6 +11,8 @@ const { bereiteFixturesVor } = require('./_fixtures');
 const { laufMitteilungen } = require('./_lauf_mitteilungen');
 const { laufProzess } = require('./_lauf_prozess');
 const { stempel } = require('./alles');
+const { platz, partner, pruef } = require('./_kontenpool').konten();
+const JOURNALNAME = platz === 1 ? '.gesamtlauf-bereinigung.json' : `.gesamtlauf-bereinigung-${platz}.json`;
 
 function temp(t) {
   const p = fs.mkdtempSync(path.join(os.tmpdir(), 'allmedia-hygiene-'));
@@ -68,14 +70,15 @@ test('Laufjournal belegt Leerstand; Löschen erfasst beide Testkonten auch bei z
   assert.equal(journal.projekt, 'projekt1');
   assert.equal(journal.version, 2);
   assert.equal(journal.leerstand, true);
+  assert.deepEqual(journal.konten, [partner, pruef]);
   await l.beenden();
   assert.equal(fs.existsSync(datei), false);
   const sql = db.sql.find(q => /delete/.test(q));
   assert.match(sql, /where \(actor_id in/);
   assert.match(sql, /or user_id in[\s\S]+\)\)/);
   assert.doesNotMatch(sql, /created_at >=/);
-  assert.match(sql, /test@all-media\.app/);
-  assert.match(sql, /all\.media\.prueflauf@web\.de/);
+  const kontenfilter = `email in ('${partner}', '${pruef}')`;
+  assert.deepEqual(sql.match(/email in \([^)]*\)/g), [kontenfilter, kontenfilter]);
   assert.equal(db.sql.filter(q => /select count/.test(q)).length, 3); // Vorprüfung, DELETE-CTE, Nachzählung
   assert.doesNotMatch(JSON.stringify(journal), /token|password/i);
 });
@@ -261,7 +264,7 @@ test('Gesamtlauf: Fehlgeschlagene Suite stoppt weitere Suiten nicht; Bereinigung
   assert.equal(status.bereinigung, 'erfolgreich');
   assert.equal(status.code, 1);
   assert.match(fs.readFileSync(path.join(stand, 'rot.log'), 'utf8'), /FAIL/);
-  assert.equal(fs.existsSync(path.join(r.p, '.gesamtlauf-bereinigung.json')), false);
+  assert.equal(fs.existsSync(path.join(r.p, JOURNALNAME)), false);
 });
 
 test('Gesamtlauf: alle Suiten mit Zahlen, stabile Quellen und Rest null ergeben Exit 0', async t => {
@@ -301,7 +304,7 @@ test('Gesamtlauf: Bereinigungsfehler verhindert Erfolg und bewahrt Journal', asy
   const r = runner(t, { db: datenbank({ loeschfehler: true }) });
   r.add('gruen', "console.log('PASS gruen');");
   await assert.rejects(r.haupt(), /Löschen gesperrt/);
-  assert.equal(fs.existsSync(path.join(r.p, '.gesamtlauf-bereinigung.json')), true);
+  assert.equal(fs.existsSync(path.join(r.p, JOURNALNAME)), true);
   const belege = path.join(r.p, '.gesamtlauf-belege');
   const status = JSON.parse(fs.readFileSync(path.join(belege, fs.readdirSync(belege)[0], 'status.json')));
   assert.equal(status.bereinigung, 'fehlgeschlagen');
@@ -313,7 +316,7 @@ test('Gesamtlauf: SIGTERM beendet Kind, überspringt Rest und räumt vor Rückga
   r.add('wartet', 'setInterval(() => {}, 1000);');
   r.add('verboten', "throw new Error('darf nicht starten');");
   assert.equal(await r.haupt(), 143);
-  assert.equal(fs.existsSync(path.join(r.p, '.gesamtlauf-bereinigung.json')), false);
+  assert.equal(fs.existsSync(path.join(r.p, JOURNALNAME)), false);
   const logs = fs.readdirSync(path.join(r.p, '.gesamtlauf-belege'));
   const stand = JSON.parse(fs.readFileSync(path.join(r.p, '.gesamtlauf-belege', logs[0], 'status.json')));
   assert.equal(stand.ergebnisse.length, 1);
