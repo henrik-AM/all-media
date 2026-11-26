@@ -45,13 +45,13 @@ function abrufMit(antwort, status = 200) {
     assert.strictEqual(rolleAus('kaputt'), '');
   });
 
-  await pruefe('Admin-Schlüssel nur im Authorization-Kopf des Token-Aufrufs', async () => {
+  await pruefe('Admin-Schlüssel nur im apikey-Kopf des Token-Aufrufs (sb_secret ist kein JWT)', async () => {
     const { abruf, rufe } = abrufMit({ access_token: jwt('authenticated'), refresh_token: 'r', user: { id: 'u1' } });
     await tokenHolen('a@test', 'pw', { abruf });
     assert.strictEqual(rufe.length, 1);
     assert.match(rufe[0].adresse, /\/auth\/v1\/token\?grant_type=password$/);
-    assert.strictEqual(rufe[0].einstellungen.headers.Authorization, 'Bearer admin-schluessel');
-    assert.strictEqual(rufe[0].einstellungen.headers.apikey, 'anon-schluessel');
+    assert.strictEqual(rufe[0].einstellungen.headers.Authorization, undefined);
+    assert.strictEqual(rufe[0].einstellungen.headers.apikey, 'admin-schluessel');
   });
 
   await pruefe('Token mit Rolle service_role wird abgelehnt (Regel 3)', async () => {
@@ -70,17 +70,17 @@ function abrufMit(antwort, status = 200) {
     assert.ok(r.error && /Admin-Schlüssel/.test(r.error.message));
   });
 
-  await pruefe('pruefKopf: Admin-Schlüssel und anon zusammen', () => {
+  await pruefe('pruefKopf: Admin-Schlüssel im apikey, kein Authorization', () => {
     const k = pruefKopf('anon-schluessel');
-    assert.strictEqual(k.apikey, 'anon-schluessel');
-    assert.strictEqual(k.Authorization, 'Bearer admin-schluessel');
+    assert.strictEqual(k.apikey, 'admin-schluessel');
+    assert.strictEqual(k.Authorization, undefined);
   });
 
   // Ohne Admin-Schlüssel: nur nachstellbar, wenn keine .env.local ihn liefert.
   {
     const vorher = process.env.SUPABASE_SERVICE_ROLE_KEY;
     process.env.SUPABASE_SERVICE_ROLE_KEY = ' ';
-    if (pruefKopf('x').Authorization) {
+    if (pruefKopf('x').apikey !== 'x') {
       console.log('UEBERSPRUNGEN  Captcha-Fehler ohne Admin-Schlüssel — .env.local liefert ihn (nicht gezählt)');
     } else {
       await pruefe('Ohne Admin-Schlüssel: Captcha-Fehler nennt die Ursache', async () => {

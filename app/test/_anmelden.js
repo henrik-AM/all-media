@@ -8,8 +8,12 @@
  * keines — er löst kein Rätsel. Ohne diesen Helfer stünden dann alle Läufe,
  * die sich in Node anmelden, mit „captcha verification process failed“.
  *
- * Supabase überspringt das Captcha, wenn der Aufruf den Admin-Schlüssel
- * (service_role) im Authorization-Kopf trägt. Gelesen im Quelltext von
+ * Supabase überspringt das Captcha, wenn der Aufruf Admin-Rechte trägt.
+ * Seit dem Schlüsseltausch (25.11.2026) ist der Admin-Schlüssel ein
+ * `sb_secret_…` und KEIN JWT: im Authorization-Kopf ignoriert ihn das
+ * Gateway (Live-Probe 26.11.: /auth/v1/admin/users → 403). Er muss in den
+ * `apikey`-Kopf; das Gateway setzt dann selbst das service_role-JWT
+ * (Probe: 200). Gelesen im Quelltext von
  * supabase/auth (internal/api/middleware.go, verifyCaptcha) — LIVE NOCH
  * NICHT GEPROBT: das geht erst, wenn der Captcha-Schalter an ist (C11/C12).
  * Bis dahin verhält sich der Helfer genau wie eine normale Anmeldung.
@@ -78,11 +82,9 @@ async function tokenHolen(email, passwort, { abruf = fetch } = {}) {
   const anon = ANON();
   if (!adresse || !anon) throw new Error('Prüfanmeldung: Supabase-Adresse oder anon-Schlüssel fehlt (app/.env.local)');
 
-  const admin = ADMIN();
-  const kopf = { apikey: anon, 'Content-Type': 'application/json' };
   // Regel 1: der Admin-Schlüssel nur hier. Fehlt er, läuft die Anmeldung
   // wie bisher — solange das Captcha aus ist, ändert das nichts.
-  if (admin) kopf.Authorization = 'Bearer ' + admin;
+  const kopf = pruefKopf(anon);
 
   const antwort = await abruf(`${adresse}/auth/v1/token?grant_type=password`, {
     method: 'POST',
@@ -92,7 +94,7 @@ async function tokenHolen(email, passwort, { abruf = fetch } = {}) {
   const daten = await antwort.json().catch(() => ({}));
   if (!antwort.ok || !daten.access_token) {
     const grund = daten.error_description || daten.msg || daten.message || daten.error || `HTTP ${antwort.status}`;
-    const hinweis = /captcha/i.test(grund) && !admin
+    const hinweis = /captcha/i.test(grund) && !ADMIN()
       ? ' — SUPABASE_SERVICE_ROLE_KEY fehlt, ohne ihn kommt kein Prüflauf am Captcha vorbei'
       : '';
     const fehler = new Error(`Prüfanmeldung ${email}: ${grund}${hinweis}`);
@@ -137,10 +139,10 @@ async function pruefAnmelden(client, { email, password }) {
  * NUR für POST /auth/v1/token?grant_type=password verwenden (Regel 1).
  */
 function pruefKopf(anon) {
-  const kopf = { apikey: anon, 'Content-Type': 'application/json' };
   const admin = ADMIN();
-  if (admin) kopf.Authorization = 'Bearer ' + admin;
-  return kopf;
+  // sb_secret_… gehört in apikey (kein JWT); ein altes JWT-Format ginge
+  // auch dort, das Gateway reicht es durch.
+  return { apikey: admin || anon, 'Content-Type': 'application/json' };
 }
 
 /**
