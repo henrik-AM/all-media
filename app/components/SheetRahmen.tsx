@@ -1,4 +1,5 @@
 import { UploadAnzeige, blattOffen } from './UploadAnzeige';
+import { CaptchaSchicht } from './CaptchaHost';
 import React, { useEffect } from 'react';
 import { Animated, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, View } from 'react-native';
 import { Druck } from './Druck';
@@ -91,6 +92,8 @@ export const SheetRahmen = ({ visible, title, onClose, hoch, children, fuss }: P
           <FarbfilterSchicht radius={22} />
         </Animated.View>
         <UploadAnzeige eingebettet />
+        {/* Captcha im Blatt selbst — ein zweites Modal zeigt iOS nicht (26.11.2026). */}
+        <CaptchaSchicht />
       </KeyboardAvoidingView>
     </Modal>
   );

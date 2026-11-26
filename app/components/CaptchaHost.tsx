@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
 import { WebView as WebViewRoh } from 'react-native-webview';
 import type { WebViewMessageEvent, WebViewProps } from 'react-native-webview';
@@ -21,28 +21,54 @@ const WebView = WebViewRoh as unknown as React.ComponentClass<WebViewProps>;
  */
 type Offen = { adresse: string; fertig: (t: string | undefined) => void; fehler: (e: Error) => void };
 
-export function CaptchaHost() {
-  const [offen, setOffen] = useState<Offen | null>(null);
-  const offenRef = useRef<Offen | null>(null);
-  offenRef.current = offen;
+/*
+ * iOS zeigt kein zweites Modal über einem schon offenen (Lehre Paket 9,
+ * UploadAnzeige; Simulator 26.11.2026: „Konto hinzufügen" → Anmelden hing
+ * still, weil das Captcha-Modal hinter dem Blatt lag). Darum:
+ *   - der Zustand liegt hier im Modul, nicht in einer Komponente;
+ *   - CaptchaHost (App-Wurzel) zeigt ein Modal nur, solange kein Blatt offen ist;
+ *   - CaptchaSchicht steckt in jedem Blatt (SheetRahmen, KontoWechsel) und
+ *     zeigt die Prüfung als Schicht im selben Fenster — nur im obersten Blatt,
+ *     damit nie zwei Widgets gleichzeitig laufen.
+ */
+let aktuell: Offen | null = null;
+const hoerer = new Set<() => void>();
+let ebenen: number[] = [];
+let naechsteEbene = 1;
+const melden = () => hoerer.forEach((f) => f());
 
+function setzen(o: Offen | null) {
+  aktuell = o;
+  melden();
+}
+
+captchaAnzeigerSetzen(
+  (adresse) =>
+    new Promise<string | undefined>((fertig, fehler) => {
+      // Ein laufender Versuch wird abgelöst, nie doppelt angezeigt.
+      aktuell?.fehler(new CaptchaAbbruch());
+      setzen({ adresse, fertig, fehler });
+    })
+);
+
+function useStand() {
+  const [, neu] = useState(0);
   useEffect(() => {
-    captchaAnzeigerSetzen(
-      (adresse) =>
-        new Promise<string | undefined>((fertig, fehler) => {
-          // Ein laufender Versuch wird abgelöst, nie doppelt angezeigt.
-          offenRef.current?.fehler(new CaptchaAbbruch());
-          setOffen({ adresse, fertig, fehler });
-        })
-    );
-    return () => captchaAnzeigerSetzen(null);
+    const f = () => neu((n) => n + 1);
+    hoerer.add(f);
+    return () => {
+      hoerer.delete(f);
+    };
   }, []);
+  return { offen: aktuell, ebenen };
+}
 
-  if (!offen) return null;
-
+function Pruefung({ offen }: { offen: Offen }) {
   const herkunft = offen.adresse.replace(/^(https?:\/\/[^/]+).*$/, '$1');
 
-  const schliessen = () => setOffen(null);
+  const schliessen = () => {
+    if (aktuell === offen) setzen(null);
+  };
   const abbrechen = () => {
     offen.fehler(new CaptchaAbbruch());
     schliessen();
@@ -68,29 +94,58 @@ export function CaptchaHost() {
   };
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={abbrechen}>
-      <View style={styles.huelle}>
-        <View style={styles.karte}>
-          <Text style={styles.titel}>Sicherheitsprüfung</Text>
-          <WebView
-            source={{ uri: offen.adresse }}
-            style={styles.web}
-            onMessage={empfangen}
-            originWhitelist={[herkunft, 'https://challenges.cloudflare.com']}
-            onShouldStartLoadWithRequest={(r) =>
-              r.url.startsWith(herkunft + '/captcha') ||
-              r.url.startsWith('https://challenges.cloudflare.com/') ||
-              r.url === 'about:blank'
-            }
-            javaScriptEnabled
-            incognito
-          />
-          <Druck onPress={abbrechen} style={styles.knopf} accessibilityRole="button" accessibilityLabel="Abbrechen">
-            <Text style={styles.knopfText}>Abbrechen</Text>
-          </Druck>
-        </View>
+    <View style={styles.huelle} testID="captcha-pruefung">
+      <View style={styles.karte}>
+        <Text style={styles.titel}>Sicherheitsprüfung</Text>
+        <WebView
+          source={{ uri: offen.adresse }}
+          style={styles.web}
+          onMessage={empfangen}
+          originWhitelist={[herkunft, 'https://challenges.cloudflare.com']}
+          onShouldStartLoadWithRequest={(r) =>
+            r.url.startsWith(herkunft + '/captcha') ||
+            r.url.startsWith('https://challenges.cloudflare.com/') ||
+            r.url === 'about:blank'
+          }
+          javaScriptEnabled
+          incognito
+        />
+        <Druck onPress={abbrechen} style={styles.knopf} accessibilityRole="button" accessibilityLabel="Abbrechen">
+          <Text style={styles.knopfText}>Abbrechen</Text>
+        </Druck>
       </View>
+    </View>
+  );
+}
+
+/** Einmal an der App-Wurzel: zeigt die Prüfung, solange kein Blatt offen ist. */
+export function CaptchaHost() {
+  const { offen, ebenen: offeneBlaetter } = useStand();
+  if (!offen || offeneBlaetter.length > 0) return null;
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={() => { offen.fehler(new CaptchaAbbruch()); setzen(null); }}>
+      <Pruefung offen={offen} />
     </Modal>
+  );
+}
+
+/** In jedem Blatt (eigenes Modal): zeigt die Prüfung, wenn dieses Blatt oben liegt. */
+export function CaptchaSchicht() {
+  const [id] = useState(() => naechsteEbene++);
+  useEffect(() => {
+    ebenen = [...ebenen, id];
+    melden();
+    return () => {
+      ebenen = ebenen.filter((e) => e !== id);
+      melden();
+    };
+  }, [id]);
+  const { offen, ebenen: liste } = useStand();
+  if (!offen || liste[liste.length - 1] !== id) return null;
+  return (
+    <View style={[StyleSheet.absoluteFill, styles.schicht]}>
+      <Pruefung offen={offen} />
+    </View>
   );
 }
 
@@ -114,4 +169,5 @@ const styles = StyleSheet.create({
   web: { height: 200, backgroundColor: 'transparent' },
   knopf: { alignItems: 'center', paddingVertical: spacing.sm },
   knopfText: { ...typography.body, color: '#555' },
+  schicht: { zIndex: 100, elevation: 100 },
 });

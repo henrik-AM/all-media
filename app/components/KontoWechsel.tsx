@@ -21,6 +21,7 @@ import { RegistrierFelder } from './RegistrierFelder';
 import { colors, radius, sizes, spacing, themenStyles, typography } from '../constants/design';
 
 import { FarbfilterSchicht } from './Farbfilter';
+import { CaptchaSchicht } from './CaptchaHost';
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -323,6 +324,8 @@ export const KontoWechsel = ({ visible, onClose, onNotice }: Props) => {
           <FarbfilterSchicht radius={20} />
         </View>
       </KeyboardAvoidingView>
+      {/* Captcha im selben Fenster — ein zweites Modal zeigt iOS nicht (26.11.2026). */}
+      <CaptchaSchicht />
     </Modal>
   );
 };
