@@ -148,7 +148,15 @@ async function teilBC() {
   page.on('pageerror', (e) => jsFehler.push(e.message));
 
   if (!(await vorbereiten(page, BASIS))) await beenden(browser, 1);
-  await page.waitForSelector('[data-area]', { timeout: 20000 });
+  // Die Navigationsleiste steht schon im HTML. Erst nach dem Start darf
+  // der Einstellungsweg mit einem vollständig geladenen Profil beginnen.
+  await page.waitForSelector('body:not(.is-startet):not(.ist-abgemeldet) [data-area]', { timeout: 20000 });
+  const startfehler = await page.evaluate(() => document.querySelector('.startfehler__grund')?.textContent);
+  if (startfehler) {
+    pruefe('Website-Start', false, startfehler);
+    await beenden(browser, 1);
+    return;
+  }
 
   // Zweites Konto und eigene Kennung — für C und den „vergebenen“ Namen.
   let meineId = null;
@@ -193,7 +201,11 @@ async function teilBC() {
   console.log('\nB  Website');
   await pruefeAsync('Einstellungen → Konto → „Profil bearbeiten“ öffnet die Seite mit Bild und fünf Zeilen', async () => {
     await zurSeite();
-    const zeilen = await page.$$eval('[data-psfeld]', (n) => n.map((e) => e.dataset.psfeld).join(','));
+    const profilseite = page.locator('[data-testid="profilseite"]');
+    await profilseite.locator('[data-psfeld="links"]').waitFor();
+    const zeilen = await profilseite.locator('[data-psfeld]').evaluateAll(
+      (n) => n.map((e) => e.dataset.psfeld).join(',')
+    );
     if (zeilen !== 'name,benutzername,pronomen,bio,links') throw new Error('Zeilen: ' + zeilen);
     if (!(await page.$('#psBild'))) throw new Error('kein „Bild bearbeiten“');
   });

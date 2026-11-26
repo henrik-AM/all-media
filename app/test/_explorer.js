@@ -190,12 +190,21 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Der Pfeil an einer Zeile oeffnet den anderen Ort', async () => {
-    const vorher = await page.$eval('.exp__adresse', (e) => e.textContent);
-    await page.click('#ortListe [data-ortoeffnen]');
-    await page.waitForTimeout(1200);
-    if (await page.$('#ortKarte')) throw new Error('Kartenansicht blieb offen');
-    const nachher = await page.$eval('.exp__adresse', (e) => e.textContent).catch(() => '');
-    if (!nachher || nachher === vorher) throw new Error('kein anderer Ort: ' + nachher);
+    const liste = page.locator('#ortListe');
+    const pfeil = liste.locator('[data-ortoeffnen]').first();
+    const ziel = await pfeil.getAttribute('data-ortoeffnen');
+    const bisher = await liste.locator('[data-ortzeige].is-aktiv').getAttribute('data-ortzeige');
+    const titel = await pfeil.evaluate((e) => e.closest('[data-ortzeige]').querySelector('.row__name').textContent.trim());
+    if (!ziel || ziel === bisher || !titel) throw new Error('kein anderer Ort in der Prüfliste');
+    // Zwei Orte können dieselbe Adresse haben. Entscheidend sind Ziel-ID und Titel.
+    const pfad = '/api/explorer/standort/' + encodeURIComponent(ziel);
+    const [antwort] = await Promise.all([
+      page.waitForResponse((r) => new URL(r.url()).pathname === pfad && r.request().method() === 'GET'),
+      pfeil.click(),
+    ]);
+    if (!antwort.ok() || !(await antwort.json()).ok) throw new Error('Zielort nicht geladen: ' + ziel);
+    await page.locator('#ortKarte').waitFor({ state: 'hidden' });
+    await page.waitForFunction((name) => document.querySelector('.exp__ortkopf .exp__titel')?.textContent.trim() === name, titel);
     // Zurueck zum Hamburger Hafen fuer die folgenden Pruefungen.
     // Ob openExplorer eine Ebene stapelt oder ersetzt: so lange zurueck,
     // bis die Seite zu ist.
