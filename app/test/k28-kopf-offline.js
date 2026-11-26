@@ -52,7 +52,7 @@ async function appChecks() {
   visit(tree);
   const statements = [...declarations.values()].join('\n');
   const code = ts.transpileModule(`module.exports = function(props) {
-    const {chat,communities,onOpenCommunity,onOpenProfile,onOpenGroupSettings,onOpenChatInfo,communityChats=[],praesenz='Online'}=props;
+    const {chat,communities,geoeffneteKanalCommunity,onOpenCommunity,onOpenProfile,onOpenGroupSettings,onOpenChatInfo,communityChats=[],praesenz='Online'}=props;
     ${statements}
     return (${header});
   };`, { compilerOptions: { jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS } }).outputText;
@@ -77,6 +77,13 @@ async function appChecks() {
   await check('App: technische Chatbezeichnung bleibt unverändert', () => assert.equal(channelChat.name, 'B · Allgemein'));
   await check('App: Kopfklick nimmt richtige ID bei gleichnamigen Unterthemen', () => { headerTree.props.onPress(); assert.deepEqual(calls.pop(), ['community', 'com-b']); });
   await check('App: Zugänglichkeitslabel bezeichnet Ziel-Community', () => assert.equal(headerTree.props.accessibilityLabel, '# Allgemein, zur Community B'));
+  await check('App: nachgeladenes Unterthema funktioniert ohne Community im Startbestand', () => {
+    const community = communities[1];
+    const kopf = module.exports({ ...base, communities: [communities[0]], geoeffneteKanalCommunity: community, chat: channelChat });
+    assert.equal(flatten(kopf), '# Allgemein');
+    kopf.props.onPress();
+    assert.deepEqual(calls.pop(), ['community', 'com-b']);
+  });
   await check('App: Einzelchat behält Name, Präsenz und Profilklick', () => {
     headerTree = module.exports({ ...base, chat: { id: 'chat-einzeln', name: 'Anna', userId: 'u-anna', isGroup: false } });
     assert.equal(flatten(headerTree), 'AnnaOnline'); headerTree.props.onPress(); assert.deepEqual(calls.pop(), ['profile', 'u-anna']);

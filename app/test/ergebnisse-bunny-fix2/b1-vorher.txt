@@ -1,0 +1,14 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+2 !== 1
+
+    at /Users/henrik.dikta/allmedia-wt-codex/bunny-anschluss/app/test/bunny-fix-b1.js:9:187
+    at async test (/Users/henrik.dikta/allmedia-wt-codex/bunny-anschluss/app/test/bunny-fix-b1.js:3:38)
+    at async /Users/henrik.dikta/allmedia-wt-codex/bunny-anschluss/app/test/bunny-fix-b1.js:9:2 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 2,
+  expected: 1,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

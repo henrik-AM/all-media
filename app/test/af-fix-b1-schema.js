@@ -1,0 +1,21 @@
+const S=require('./_af_fix_sql'),{id,schema,check,deny,als,admin,konto}=S;
+const A=id(1),B=id(2),P=id(10),O=id(20),pfad=`posts/${A}-film.mp4`;
+const objekt=()=>`insert into storage.objects(id,bucket_id,name,owner,owner_id,metadata) values('${O}','media','${pfad}','${A}','${A}','{"size":1000,"mimetype":"video/mp4"}');`;
+const beleg=()=>`insert into public.video_upload_belege(objekt_id,user_id,pfad,sekunden,sha256,bytes) values('${O}','${A}','${pfad}',10,repeat('a',64),1000);`;
+let sql=S.anfang()+"select set_config('storage.allow_delete_query','true',true);";for(const n of [89,90,94,97,98,99,107,109])sql+=schema(n,true);sql+=konto(1)+konto(2)+objekt()+beleg();
+sql+=als(A,`insert into public.posts(id,user_id,kind,media_url) values('${P}',auth.uid(),'reel',public.medien_adresse('${pfad}'));delete from storage.objects where id='${O}';get diagnostics n=row_count;`+check('B1_vorher_Loeschumgehung_belegt','n=1')+`insert into storage.objects(bucket_id,name,owner,owner_id,metadata) values('media','${pfad}',auth.uid(),auth.uid()::text,'{"size":2000,"mimetype":"video/mp4"}');`);
+sql+=admin(check('B1_vorher_ungeprueftes_Objekt_hinter_Post',`exists(select 1 from public.posts where id='${P}') and not exists(select 1 from public.video_upload_belege where pfad='${pfad}')`));
+sql+=`delete from storage.objects where name='${pfad}';`+objekt()+beleg()+schema(109);
+sql+=als(A,`delete from storage.objects where id='${O}';get diagnostics n=row_count;`+check('B1_nachher_109_DELETE_null','n=0')+deny('B1_nachher_109_Pfad_bleibt_belegt',`insert into storage.objects(bucket_id,name) values('media','${pfad}')`)+check('B1_nachher_109_Serverloeschung_zu',`public.medium_loeschrecht('${pfad}') is null`));
+for(const n of [110,111,113])sql+=schema(n);
+sql+=als(A,`delete from storage.objects where id='${O}';get diagnostics n=row_count;`+check('B1_nachher_113_DELETE_null','n=0')+check('B1_nachher_113_Serverloeschung_zu',`public.medium_loeschrecht('${pfad}') is null`)+`delete from public.posts where id='${P}';`+check('B1_nachher_unreferenziert_loeschbar',`public.medium_loeschrecht('${pfad}')='supabase'`));
+const bild=`posts/${A}-bild.jpg`,Q=id(11);
+sql+=`insert into storage.objects(bucket_id,name,owner,owner_id,metadata) values('media','${bild}','${A}','${A}','{"size":1000,"mimetype":"image/jpeg"}');`;
+sql+=als(A,`insert into public.posts(id,user_id,kind,medien) values('${Q}',auth.uid(),'post',jsonb_build_array(jsonb_build_object('url',public.medien_adresse('${bild}'),'typ','image'),jsonb_build_object('url',public.medien_adresse('${pfad}'),'typ','video')));`+
+ check('B1_113_Video_an_zweiter_Stelle_geschuetzt',`public.medium_loeschrecht('${pfad}') is null`)+
+ check('B1_113_Titelbild_geschuetzt',`public.medium_loeschrecht('${bild}') is null`)+
+ `delete from storage.objects where name='${bild}';get diagnostics n=row_count;`+check('B1_113_Bild_DELETE_null','n=0')+
+ `delete from public.posts where id='${Q}';`+check('B1_113_nach_Karussellloeschung_frei',`public.medium_loeschrecht('${pfad}')='supabase'`));
+sql+=als(B,check('B1_fremde_Serverloeschung_zu',`public.medium_loeschrecht('${pfad}') is null`));
+sql+=admin(check('B1_Beleg_unveraendert',`exists(select 1 from public.video_upload_belege where objekt_id='${O}' and bytes=1000)`));
+S.ausfuehren(sql).catch(e=>{console.error(e.message);process.exitCode=1;});

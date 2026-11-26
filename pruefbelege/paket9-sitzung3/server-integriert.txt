@@ -1,0 +1,5 @@
+Dienstversion {"version":"1.0.0","commit":"54d7b840","quelle":"git","zweig":null,"gestartet":"2026-11-22T17:44:36.158Z"}
+Rohupload: 20:01 fachlich abgewiesen
+Rohupload: HTTP 200 und 5 Sekunden aus dem MP4
+Reel: 1 Beitrag, Dauer 0:05 aus Bytebeleg
+Löschroute: 0 Beiträge und 0 Medieneinträge für den Prüflauf

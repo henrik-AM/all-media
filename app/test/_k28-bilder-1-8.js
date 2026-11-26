@@ -69,7 +69,11 @@ async function bild(seite, name) {
     const seite = await browser.newPage({ viewport: { width: 400, height: 860 } });
     const seitenfehler = [];
     seite.on('pageerror', (e) => seitenfehler.push(e.message));
+    let beitragVerfuegbar = false;
     await attrappe(seite, daten, {
+      '/api/beitraege/p-1': () => beitragVerfuegbar
+        ? { beitrag: { id: 'p-1', userId: 'u-anna', kind: 'post', description: geteilt.beschreibung } }
+        : { beitrag: null },
       '/api/communities/c-oeff/channels/c-oeff-k1': kanal,
       '/api/ptt/sitzung/n4': { ok: true, eintraege: [
         { userId: 'u-ben', name: 'Ben Berg', zeitpunkt: '2026-10-21T18:10:00Z', dauer: 7 },
@@ -179,6 +183,17 @@ async function bild(seite, name) {
     await seite.waitForTimeout(800);
     pruefe('7.9 Gruppeninfo mit Mitgliedern', /Anna Schmidt/.test((await seite.locator('#overlay').textContent().catch(() => '')) || ''));
     await bild(seite, 'k28-7-gruppeninfo.png');
+
+    await seite.click('#giBack');
+    await seite.locator('#overlay [data-testid="geteilt-karte"]').click();
+    await seite.locator('#toast').filter({ hasText: 'Dieser Beitrag ist nicht verfügbar' }).waitFor();
+    pruefe('7.3 Nicht verfügbarer Beitrag lässt den Chat sichtbar', await seite.locator('#chatBack').isVisible());
+    beitragVerfuegbar = true;
+    await seite.locator('#overlay [data-testid="geteilt-karte"]').click();
+    await seite.locator('#post-p-1').waitFor({ state: 'visible' });
+    pruefe('7.3 Verfügbarer Beitrag öffnet den Feed ohne Chat davor', await seite.locator('#overlay').isHidden());
+    await bild(seite, 'k28-7-beitrag-geoeffnet.png');
+
 
     pruefe('keine Fehler in der Seite', !seitenfehler.length, seitenfehler.join(' | '));
   } finally {

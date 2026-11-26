@@ -177,30 +177,50 @@ async function teilB() {
   console.log('\nB  Wirkung mit zwei Konten (setzt Schema 89 + 90 voraus)');
   const A = await konto('test@all-media.app', TESTKONTO_PASS);
   const B = await konto('all.media.prueflauf@web.de', PRUEFKONTO_PASS);
-  const warte = (ms) => new Promise((r) => setTimeout(r, ms));
   // Zweierchat + Kontakt des Testpaars sichern (fehlten am 06.11.2026 im
   // Testbestand) — sonst fällt der Messenger-Teil von 5.x stumm aus.
   const Testpaar = require('./_testpaar');
-  const pttPfade = [];
-  try {
-    await Testpaar.testpaarSichern();
-  } catch (e) {
-    pruefe('Testpaar @test ↔ @prueflauf (Kontakt + Zweierchat) sichern', false, e.message);
+  const { frage } = require('./_aufraeumen');
+  const uuid = (id) => {
+    if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error('Ungültige Prüfkennung');
+    return `'${id}'::uuid`;
+  };
+  if (A.id !== Testpaar.TESTKONTO || B.id !== Testpaar.PRUEFKONTO) {
+    throw new Error('Prüfkonten stimmen nicht mit dem Testpaar überein');
   }
-
-  // Prüfcommunity von B, öffentlich, zwei Unterthemen; A tritt bei.
-  const name = 'Prüfcommunity PTT ' + Date.now();
-  const { data: com, error: eCom } = await B.c.from('communities')
-    .insert({ name, topic: 'Prüflauf', visibility: 'public', created_by: B.id }).select().single();
-  pruefe('B legt Prüfcommunity an', !eCom && !!com, eCom?.message);
-  if (!com) return;
+  const konten = [A.id, B.id].map(uuid).join(', ');
+  const kontaktFilter = `art = 'follow' and user_id in (${konten})
+    and actor_id in (${konten}) and user_id <> actor_id`;
+  const vorher = await frage(`select id from public.notifications where ${kontaktFilter}`);
+  if (!Array.isArray(vorher)) throw new Error('Mitteilungsbestand des Testpaars nicht lesbar');
+  const pttPfade = [];
+  const unterthemen = [];
+  let com;
+  let zweierAnruf;
   try {
-    await B.c.from('community_members').insert({ community_id: com.id, user_id: B.id });
-    const k = async (slug) => (await B.c.from('community_channels')
-      .insert({ community_id: com.id, slug, name: slug, topics: [] }).select('id').single()).data;
+    const zweier = await Testpaar.testpaarSichern();
+    if (!zweier) throw new Error('Das Testpaar hat keinen Zweierchat');
+    const name = 'Prüfcommunity PTT ' + Date.now();
+    const { data, error } = await B.c.from('communities')
+      .insert({ name, topic: 'Prüflauf', visibility: 'public', created_by: B.id }).select().single();
+    com = data;
+    pruefe('B legt Prüfcommunity an', !error && !!com, error?.message);
+    if (!com) return;
+    const { data: mitglied } = await B.c.from('community_members').select('user_id')
+      .eq('community_id', com.id).eq('user_id', B.id).maybeSingle().throwOnError();
+    if (!mitglied) {
+      await B.c.from('community_members').insert({ community_id: com.id, user_id: B.id }).throwOnError();
+    }
+    const k = async (slug) => {
+      const { data } = await B.c.from('community_channels')
+        .insert({ community_id: com.id, slug, name: slug, topics: [] }).select('id').single().throwOnError();
+      unterthemen.push(data.id);
+      return data;
+    };
     const k1 = await k('ptt-aus');
     const k2 = await k('ptt-an');
     pruefe('Zwei Unterthemen angelegt', !!k1 && !!k2);
+    if (!k1 || !k2) return;
     const { error: eJoin } = await A.c.from('community_members').insert({ community_id: com.id, user_id: A.id });
     pruefe('A tritt bei', !eJoin, eJoin?.message);
 
@@ -218,32 +238,23 @@ async function teilB() {
     }
     const { error: eFake } = await B.c.from('community_channel_messages')
       .insert({ channel_id: k1.id, sender_id: B.id, text: '', anruf_art: 'audio', anruf_status: 'gestartet', anruf_dauer: 180 });
-    pruefe('5.1 „gestartet" mit Dauer wird abgewiesen', !!eFake);
+    pruefe('5.1 „gestartet" mit Dauer verletzt eine Prüfbedingung', eFake?.code === '23514', eFake?.message);
 
-    // Zweierchat A–B, falls vorhanden.
-    const { data: meineB } = await B.c.from('chat_members').select('chat_id, chats(is_group)').eq('user_id', B.id);
-    const kandidaten = (meineB || []).filter((m) => m.chats && !m.chats.is_group).map((m) => m.chat_id);
-    const { data: gemeinsam } = kandidaten.length
-      ? await A.c.from('chat_members').select('chat_id').eq('user_id', A.id).in('chat_id', kandidaten.slice(0, 100))
-      : { data: [] };
-    const zweier = (gemeinsam || [])[0]?.chat_id;
-    if (zweier) {
-      const { data: m, error: eM } = await B.c.from('messages')
-        .insert({ chat_id: zweier, sender_id: B.id, text: '', anruf_art: 'audio', anruf_status: 'gestartet', anruf_dauer: 0 })
-        .select('id').single();
-      pruefe('5.2 B vermerkt Sprachanruf im Zweierchat', !eM && !!m, eM?.message);
-      if (m) {
-        const { data: ms } = await A.c.from('messages').select('sender_id, anruf_status').eq('id', m.id).maybeSingle();
-        pruefe('5.4 A sieht ihn im selben Chat', ms && ms.sender_id === B.id && ms.anruf_status === 'gestartet');
-        await B.c.from('messages').delete().eq('id', m.id);
-      }
-    } else {
-      console.log('  --   kein Zweierchat A–B im Bestand, Messenger-Teil übersprungen');
+    // Den vorbereiteten Zweierchat verwenden und nur die eigene Probezeile entfernen.
+    const { data: m, error: eM } = await B.c.from('messages')
+      .insert({ chat_id: zweier, sender_id: B.id, text: '', anruf_art: 'audio', anruf_status: 'gestartet', anruf_dauer: 0 })
+      .select('id').single();
+    zweierAnruf = m?.id;
+    pruefe('5.2 B vermerkt Sprachanruf im Zweierchat', !eM && !!m, eM?.message);
+    if (m) {
+      const { data: ms } = await A.c.from('messages').select('sender_id, anruf_status')
+        .eq('id', m.id).maybeSingle().throwOnError();
+      pruefe('5.4 A sieht ihn im selben Chat', ms && ms.sender_id === B.id && ms.anruf_status === 'gestartet');
     }
 
     const mitteilungenA = async (kanal) =>
       ((await A.c.from('notifications').select('id, art, actor_id, target_type, target_id')
-        .eq('user_id', A.id).eq('art', 'ptt').eq('target_id', kanal)).data || []);
+        .eq('user_id', A.id).eq('art', 'ptt').eq('target_id', kanal).throwOnError()).data);
     // Seit Schema 117/118: nur ein eigener Upload unter der eigenen Adresse
     // (Platzhalter wie example.invalid lehnt die Datenbank ab).
     const pttMedium = await Testpaar.eigenesMedium(URL, B.id, 'ptt', 'k28-ptt-' + Date.now() + '.m4a', 'audio/mp4');
@@ -261,7 +272,6 @@ async function teilB() {
     // ---- 8.7 Schalter AUS → keine Mitteilung
     const p1 = await ptt(k1.id);
     pruefe('8.2 B spricht in Unterthema 1', !p1.error && !!p1.data?.sitzung_id, p1.error?.message);
-    await warte(800);
     pruefe('8.7 Schalter AUS: A bekommt KEINE Mitteilung', (await mitteilungenA(k1.id)).length === 0);
 
     // ---- 8.4 wirksam / 8.3 / 8.7 Schalter AN
@@ -271,12 +281,12 @@ async function teilB() {
     const p3 = await ptt(k2.id);
     pruefe('8.2 B spricht zweimal in Unterthema 2', !p2.error && !p3.error);
     pruefe('Sitzung: beide Wortmeldungen in derselben Sitzung', p2.data?.sitzung_id && p2.data.sitzung_id === p3.data?.sitzung_id);
-    await warte(800);
     const mA = await mitteilungenA(k2.id);
     pruefe('8.3/8.4 wirksam/8.7: A bekommt GENAU EINE Mitteilung „ptt" (erste Wortmeldung)', mA.length === 1, String(mA.length));
     pruefe('8.3 Absender B, Ziel Unterthema', mA[0] && mA[0].actor_id === B.id && mA[0].target_type === 'channel');
-    const { data: mB } = await B.c.from('notifications').select('id').eq('user_id', B.id).eq('art', 'ptt').eq('target_id', k2.id);
-    pruefe('8.3 nie an den Sprecher selbst', (mB || []).length === 0);
+    const { data: mB } = await B.c.from('notifications').select('id').eq('user_id', B.id)
+      .eq('art', 'ptt').eq('target_id', k2.id).throwOnError();
+    pruefe('8.3 nie an den Sprecher selbst', mB.length === 0);
 
     // ---- 8.5 eine Zeile je Sitzung, 8.6 Verlauf
     const { data: zeilen } = await A.c.from('community_channel_messages')
@@ -287,18 +297,55 @@ async function teilB() {
       const { data: verlauf } = await A.c.from('ptt_messages').select('id, sender_id').eq('sitzung_id', zeilen[0].id);
       pruefe('8.6 A sieht dahinter beide Wortmeldungen (wer, wann, was)', (verlauf || []).length === 2 && verlauf.every((v) => v.sender_id === B.id));
     }
+    const { data: normaleZeile } = await A.c.from('community_channel_messages')
+      .insert({ channel_id: k2.id, sender_id: A.id, text: 'PTT-Prüfzeile' })
+      .select('id').single().throwOnError();
+    pruefe('A darf im Unterthema eine normale Nachricht schreiben', Boolean(normaleZeile?.id));
     const { error: eSelbst } = await A.c.from('community_channel_messages')
-      .insert({ channel_id: k2.id, sender_id: A.id, text: '', ptt_sitzung: true });
-    pruefe('Eine Sitzungszeile kann niemand selbst schreiben', !!eSelbst);
+      .insert({ channel_id: k2.id, sender_id: A.id, text: 'PTT-Prüfzeile', ptt_sitzung: true });
+    pruefe('Eine manuelle Sitzungszeile wird von der Zugriffsregel abgewiesen',
+      eSelbst?.code === '42501', eSelbst?.message);
 
-    // Mitteilung von A wieder weg (falls erlaubt) — sonst räumt zuruecksetzen() auf.
-    await A.c.from('notifications').delete().eq('user_id', A.id).eq('art', 'ptt').eq('target_id', k2.id);
   } finally {
-    await B.c.from('communities').delete().eq('id', com.id);
-    for (const p of pttPfade) await Testpaar.eigenesMediumWeg(p).catch(() => {});
-    await Testpaar.testpaarLoesen().catch((e) => console.log('  FEHL Aufräumen: Testpaar-Kontakte — ' + e.message));
-    const { data: rest } = await B.c.from('communities').select('id').eq('id', com.id);
-    pruefe('Prüfcommunity ist wieder weg', (rest || []).length === 0);
+    try {
+      // Teilnehmer dürfen eigene Mitteilungen lesen, aber nicht löschen.
+      const alt = vorher.length ? ` and id not in (${vorher.map((m) => uuid(m.id)).join(', ')})` : '';
+      const filter = [`(${kontaktFilter}${alt})`];
+      if (com) {
+        filter.push(`(art = 'beitritt' and target_id = ${uuid(com.id)}
+          and actor_id = ${uuid(A.id)} and user_id = ${uuid(B.id)})`);
+      }
+      if (unterthemen.length) {
+        filter.push(`(art = 'ptt' and target_id in (${unterthemen.map(uuid).join(', ')})
+          and actor_id = ${uuid(B.id)} and user_id in (${konten}))`);
+      }
+      const wo = filter.join(' or ');
+      await frage(`delete from public.notifications where ${wo}`);
+      const rest = await frage(`select count(*) as anzahl from public.notifications where ${wo}`);
+      pruefe('Mitteilungen der Probe sind weg', Number(rest?.[0]?.anzahl) === 0);
+    } catch (e) {
+      pruefe('Mitteilungen der Probe sind weg', false, e.message);
+    }
+    if (com) {
+      const { error } = await B.c.from('communities').delete().eq('id', com.id);
+      const { data: rest, error: lesefehler } = await B.c.from('communities').select('id').eq('id', com.id);
+      pruefe('Prüfcommunity ist wieder weg', !error && !lesefehler && rest?.length === 0,
+        error?.message || lesefehler?.message);
+    }
+    if (zweierAnruf) {
+      try {
+        const filter = `id = ${uuid(zweierAnruf)} and sender_id = ${uuid(B.id)}`;
+        await frage(`delete from public.messages where ${filter}`);
+        const rest = await frage(`select count(*) as anzahl from public.messages where ${filter}`);
+        pruefe('Anrufzeile der Probe im Zweierchat ist weg', Number(rest?.[0]?.anzahl) === 0);
+      } catch (e) {
+        pruefe('Anrufzeile der Probe im Zweierchat ist weg', false, e.message);
+      }
+    }
+    for (const p of pttPfade) {
+      await Testpaar.eigenesMediumWeg(p).catch((e) => pruefe('Prüfmedium entfernen', false, e.message));
+    }
+    await Testpaar.testpaarLoesen().catch((e) => pruefe('Testpaar aufräumen', false, e.message));
   }
 }
 

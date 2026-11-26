@@ -19,7 +19,8 @@
  * Supabase.
  */
 import React, { useRef, useState } from 'react';
-import { PanResponder, Platform, ScrollView, Switch, Text, View, type ViewInstance } from 'react-native';
+import { PanResponder, Platform, ScrollView, Text, View, type ViewInstance } from 'react-native';
+import { Schalter } from './Schalter';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -75,10 +76,9 @@ export const FarbfilterSheet = ({ onClose, onNotice }: Props) => {
         <View style={styles.zeile}>
           <Ionicons name="color-palette-outline" size={20} color={colors.text2} />
           <Text style={styles.zeileText}>Farbfilter</Text>
-          <Switch
+          <Schalter
             value={konfig.an}
             onValueChange={(an) => void sichern(S.an, an ? 'an' : 'aus')}
-            trackColor={{ true: colors.brand, false: colors.surface3 }}
             accessibilityLabel="Farbfilter"
           />
         </View>

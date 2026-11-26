@@ -72,3 +72,6 @@ export function auffaechern<T extends Rangfaehig>(
 export function neulingsliste(zeilen: readonly Rangzeile[] | null | undefined): Set<string>;
 
 export function punktekarte(zeilen: readonly Rangzeile[] | null | undefined): Map<string, number>;
+
+export function negativFaktor(eigen: boolean, autor: boolean, thema: boolean): number;
+export function reaktion<T extends { liked?: boolean; disliked?: boolean; likes?: number }>(beitrag: T, art: 'like' | 'dislike'): T;

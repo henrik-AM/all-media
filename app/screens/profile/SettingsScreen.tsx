@@ -1,5 +1,9 @@
+import {EngeFreundeSheet} from '../../components/InstantsBereich';
+import * as Analyse from '../../../gemeinsam/analyse';
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View, type ScrollViewInstance } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
+import { Schalter } from '../../components/Schalter';
+import { OberthemaKontext } from '../../components/Oberthema';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -101,7 +105,7 @@ interface Item {
   sichtbar?: SichtbarkeitBereich;
   info?: string;
   bestaetigen?: string;
-  aktion?: 'profilseite' | 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden' | 'lenkung' | 'farbfilter' | 'entsperrcode' | 'problem' | 'meinemeldungen' | 'kontostatus' | 'kontoLoeschen';
+  aktion?: 'profilseite' | 'sicherung' | 'einladen' | 'alter' | 'datenauskunft' | 'passwort' | 'telefon' | 'spendencode' | 'zahlungsmethoden' | 'lenkung' | 'farbfilter' | 'entsperrcode' | 'problem' | 'meinemeldungen' | 'kontostatus' | 'kontoLoeschen' | 'engefreunde';
   /** Kasten RS 1: öffnet einen Rechtstext (gemeinsam/rechtstexte.js). */
   rechtstext?: string;
   /** Kasten 22: öffnet das Bildschirmzeit-Blatt auf dieser Unterseite. */
@@ -124,6 +128,9 @@ interface Section {
 // Mehrfach gebrauchte Auswahlen - einmal benannt statt viermal getippt.
 const WER = ['Alle', 'Meine Kontakte', 'Niemand'];
 const STATUS = ['Aktiv', 'Beschäftigt', 'Unsichtbar'];
+// Kasten E16-1.3: „Über All Media“ steht jetzt unter Hilfe und sagt, was läuft.
+const VERSION = (require('../../app.json') as { expo: { version: string } }).expo.version;
+const UEBER_TEXT = `All Media, Version ${VERSION}.\n\nEin Konto für Messenger, Videos und Communitys. Nutzungsbedingungen, Datenschutzerklärung und Impressum findest du oben im Abschnitt Hilfe; Fragen und Fehler schickst du über „Problem melden“.`;
 
 /*
  * Kasten 13 (Feedback 21.09.2026): bis hierher ein Formular, das
@@ -377,22 +384,15 @@ const SECTIONS: Section[] = [
     ],
   },
   {
-    id: 'speicher',
-    title: 'Speicher',
-    items: [
-      { label: 'Automatischer Download', icon: 'download-outline', wahlKey: 'autoDownload', wahl: ['Nie', 'Nur im WLAN', 'Immer'], standard: 'Nur im WLAN' },
-      { label: 'Speicher verwalten', icon: 'pie-chart-outline', liste: 'speicher' },
-      { label: 'Datensparmodus', icon: 'cellular-outline', toggle: 'datensparen' },
-      { label: 'Medienqualität', icon: 'options-outline', wahlKey: 'medienqualitaet', wahl: ['Standard', 'Hoch'], standard: 'Standard' },
-    ],
-  },
-  {
     id: 'videos',
     title: 'Videos',
     items: [
       { label: 'Privates Profil', icon: 'lock-closed-outline', toggle: 'videoPrivate' },
       SPENDENCODE,
       { label: 'Insights', icon: 'compass-outline', liste: 'insights' },
+      { label: 'Enge Freunde', icon: 'people-outline', aktion: 'engefreunde' },
+      { label: 'Instants empfangen', icon: 'camera-outline', toggle: 'instantsEmpfangen' },
+      { label: 'Konto-Analysen', icon: 'analytics-outline', liste: 'kontoanalysen' },
       { label: 'Wem ich folge', icon: 'person-outline', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'notifications-outline', liste: 'glocke' },
       /*
@@ -438,6 +438,34 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    id: 'communitys',
+    title: 'Communitys',
+    items: [
+      SPENDENCODE,
+      { label: 'Nutzerstatus', icon: 'person-outline', wahlKey: 'nutzerstatus', wahl: STATUS, standard: 'Aktiv' },
+      { label: 'Privates Profil', icon: 'lock-closed-outline', toggle: 'commPrivate' },
+      { label: 'Nachrichten erlaubt von', icon: 'chatbubble-outline', sichtbar: 'dm' },
+      { label: 'Push-to-Talk Benachrichtigung', icon: 'mic-outline', sichtbar: 'ptt' },
+      { label: 'Gestummte Communitys', icon: 'volume-mute-outline', liste: 'stummeKanaele' },
+      { label: 'Gestummte Profile', icon: 'ban-outline', liste: 'stummeProfile' },
+    ],
+  },
+  /*
+   * Einstellungen 16.11., Q04 (Kasten 1.3): „Speicher“ und „Hilfe“ als eigene
+   * Oberbegriffe unterhalb von Videos und Communitys. Gleiche Reihenfolge in
+   * web/public/app.js (SETTINGS).
+   */
+  {
+    id: 'speicher',
+    title: 'Speicher',
+    items: [
+      { label: 'Automatischer Download', icon: 'download-outline', wahlKey: 'autoDownload', wahl: ['Nie', 'Nur im WLAN', 'Immer'], standard: 'Nur im WLAN' },
+      { label: 'Speicher verwalten', icon: 'pie-chart-outline', liste: 'speicher' },
+      { label: 'Datensparmodus', icon: 'cellular-outline', toggle: 'datensparen' },
+      { label: 'Medienqualität', icon: 'options-outline', wahlKey: 'medienqualitaet', wahl: ['Standard', 'Hoch'], standard: 'Standard' },
+    ],
+  },
+  {
     id: 'hilfe',
     title: 'Hilfe',
     items: [
@@ -468,19 +496,12 @@ const SECTIONS: Section[] = [
       { label: 'Für Eltern', icon: 'heart-outline', rechtstext: 'eltern_info' },
       { label: 'Impressum', icon: 'information-circle-outline', rechtstext: 'impressum' },
       { label: 'Freunde einladen', icon: 'share-social-outline', aktion: 'einladen' },
-    ],
-  },
-  {
-    id: 'communitys',
-    title: 'Communitys',
-    items: [
-      SPENDENCODE,
-      { label: 'Nutzerstatus', icon: 'person-outline', wahlKey: 'nutzerstatus', wahl: STATUS, standard: 'Aktiv' },
-      { label: 'Privates Profil', icon: 'lock-closed-outline', toggle: 'commPrivate' },
-      { label: 'Nachrichten erlaubt von', icon: 'chatbubble-outline', sichtbar: 'dm' },
-      { label: 'Push-to-Talk Benachrichtigung', icon: 'mic-outline', sichtbar: 'ptt' },
-      { label: 'Gestummte Communitys', icon: 'volume-mute-outline', liste: 'stummeKanaele' },
-      { label: 'Gestummte Profile', icon: 'ban-outline', liste: 'stummeProfile' },
+      /*
+       * Einstellungen 16.11., Q78 (Kasten 1.3): „Über All Media“ stand ohne
+       * Abschnitt unter Communitys und sah aus wie ein Teil davon. Jetzt
+       * gehört es zur Hilfe und sagt, was ausgeliefert ist.
+       */
+      { label: 'Über All Media', icon: 'information-circle-outline', info: UEBER_TEXT },
     ],
   },
 ];
@@ -535,7 +556,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   const [kontoLoeschenOffen, setKontoLoeschenOffen] = useState(false);
 
   /** Inhalt der Listen-Punkte. Alles kommt aus dem echten Zustand. */
-  const listeVon = (art: string): { zeilen: ListenZeile[]; leer: string } => {
+  const listeVon = (art: string): { zeilen: ListenZeile[]; leer: string; fehler?: boolean } => {
     /*
      * Kasten RS 1 (L11): hier standen „All Media Web — zuletzt heute“ und ein
      * Knopf „Gerät verknüpfen“, beide fest im Quelltext. Verknüpfen gibt es
@@ -623,8 +644,13 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
      * Aufgeteilt in drei Blöcke, weil eine Liste aus neun gleich aussehenden
      * Zeilen niemand liest.
      */
+    if (art === 'kontoanalysen') {
+      if(analyseFehler)return {leer:analyseFehler,zeilen:[],fehler:true};
+      if(!analyse || analyse.konto!==ichId)return {leer:'Wird geladen …',zeilen:[]};
+      return {leer:'',zeilen:Analyse.zeilen(analyse.daten)};
+    }
     if (art === 'insights') {
-      if (!statistik) return { leer: 'Wird geladen …', zeilen: [] };
+      if (!statistik) return ladeFehler.statistik ? { leer: 'Konnte gerade nicht geladen werden.', zeilen: [], fehler: true } : { leer: 'Wird geladen …', zeilen: [] };
       const z = (n: number) => n.toLocaleString('de-DE');
       return {
         leer: '',
@@ -661,7 +687,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
      * Uhrzeit. Antippen schließt das Blatt und öffnet den Beitrag.
      */
     if (art === 'verlauf') {
-      if (verlaufFehler) return { leer: 'Verlauf konnte nicht geladen werden.', zeilen: [] };
+      if (verlaufFehler) return { leer: 'Verlauf konnte nicht geladen werden.', zeilen: [], fehler: true };
       if (!verlauf) return { leer: 'Wird geladen …', zeilen: [] };
       return {
         leer: 'Du hast noch nichts geliked, kommentiert, geteilt, repostet oder gespeichert.',
@@ -674,7 +700,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       };
     }
     if (art === 'gelikt') {
-      if (!gelikt) return { leer: 'Wird geladen …', zeilen: [] };
+      if (!gelikt) return ladeFehler.gelikt ? { leer: 'Konnte gerade nicht geladen werden.', zeilen: [], fehler: true } : { leer: 'Wird geladen …', zeilen: [] };
       return {
         leer: 'Dir hat noch nichts gefallen.',
         zeilen: gelikt.map((b) => ({
@@ -690,7 +716,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
      * die Website daneben nicht ihre eigene Fassung baut.
      */
     if (art === 'kommentiert') {
-      if (!kommentiert) return { leer: 'Wird geladen …', zeilen: [] };
+      if (!kommentiert) return ladeFehler.kommentiert ? { leer: 'Konnte gerade nicht geladen werden.', zeilen: [], fehler: true } : { leer: 'Wird geladen …', zeilen: [] };
       return {
         leer: 'Du hast noch nichts kommentiert.',
         zeilen: kommentiert.map((k) => ({
@@ -731,7 +757,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
       : undefined;
 
   const spendenweg = useSpendenweg();
-  const oeffne = (item: Item) => {
+  const oeffne = (item: Item, thema?: string) => {
     if (item.aktion === 'profilseite') {
       return onProfilBearbeiten ? onProfilBearbeiten() : onNotice('Profil bearbeiten ist hier nicht verfügbar');
     }
@@ -740,8 +766,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     if (item.aktion === 'meinemeldungen') return setKontostatus('meine');
     if (item.aktion === 'kontostatus') return setKontostatus('kontostatus');
     if (item.aktion === 'kontoLoeschen') return setKontoLoeschenOffen(true);
-    if (item.aktion === 'spendencode') return spendenweg.verwalten('code');
-    if (item.aktion === 'zahlungsmethoden') return spendenweg.verwalten('methoden');
+    if (item.aktion === 'spendencode') return spendenweg.verwalten('code', thema);
+    if (item.aktion === 'zahlungsmethoden') return spendenweg.verwalten('methoden', thema);
     if (item.aktion === 'farbfilter') return setFarbfilterOffen(true);
     if (item.rechtstext) return setRechtstext(item.rechtstext);
     if (item.aktion === 'sicherung') {
@@ -815,6 +841,8 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   };
 
   const [sichtOffen, setSichtOffen] = useState<Item | null>(null);
+  const [wahlFehler, setWahlFehler] = useState<string | null>(null);
+  useEffect(() => setWahlFehler(null), [offen]);
   const [farbfilterOffen, setFarbfilterOffen] = useState(false);
   const [rechtstext, setRechtstext] = useState<string | null>(null);
   const { konfig: farbfilter } = useFarbfilter();
@@ -836,6 +864,29 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
    */
   const [nurAbschnitt, setNurAbschnitt] = useState<string | null>(null);
   const nur = SECTIONS.find((s) => s.id === nurAbschnitt) ?? null;
+
+  /*
+   * Kasten E16-1.4: welcher Abschnitt gerade oben steht. null = noch über dem
+   * ersten Abschnitt (Kontokarte), dann heißt der Kopf „Einstellungen“.
+   */
+  const [aktiv, setAktiv] = useState<string | null>(null);
+  const aktivRef = useRef<string | null>(null);
+  const pillen = useRef<ScrollViewInstance>(null);
+  const pillenX = useRef<Record<string, number>>({});
+  const abschnittVerfolgen = (y: number) => {
+    let id: string | null = null;
+    for (const sec of SECTIONS) {
+      const o = offsets.current[sec.id];
+      if (o !== undefined && o <= y + 12) id = sec.id;
+    }
+    if (id === aktivRef.current) return;
+    aktivRef.current = id;
+    setAktiv(id);
+    pillen.current?.scrollTo({ x: Math.max(0, (id ? pillenX.current[id] ?? 0 : 0) - spacing.lg), animated: true });
+  };
+  /** Kasten E16-1.4: Oberthema des gerade geöffneten Blatts (über dessen Titel). */
+  const [blattThema, setBlattThema] = useState<string | null>(null);
+  const themaVon = (pruef: (i: Item) => boolean) => SECTIONS.find((sec) => sec.items.some(pruef))?.title ?? null;
   const [banne, setBanne] = useState<
     { id: string; bereich: string; grund: string; von: string; laeuft: boolean }[]
   >([]);
@@ -844,6 +895,18 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
    * Die Statistik hinter "Insights". Sie stand bis zum 02.09.2026 in App und
    * Website als dieselben vier erfundenen Zahlen im Code.
    */
+  const [analyse,setAnalyse]=useState<{konto:string;daten:unknown}|null>(null);
+  const [analyseFehler,setAnalyseFehler]=useState('');
+  useEffect(()=>{
+    if(offen?.liste!=='kontoanalysen'||!supabase)return;
+    let aktiv=true;setAnalyse(null);setAnalyseFehler('');
+    supabase.rpc('meine_kontoanalysen').then(({data,error})=>{
+      if(!aktiv)return;
+      try{if(error)throw error;Analyse.zeilen(data);setAnalyse({konto:ichId,daten:data});}
+      catch{setAnalyseFehler('Analysen konnten nicht geladen werden.');}
+    },()=>{if(aktiv)setAnalyseFehler('Analysen konnten nicht geladen werden.');});
+    return ()=>{aktiv=false;};
+  },[offen,supabase,ichId]);
   const [statistik, setStatistik] = useState<Statistik | null>(null);
 
   /*
@@ -877,21 +940,30 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     if (offen?.liste === 'verlauf') verlaufLaden();
   }, [offen, verlaufLaden]);
 
+  /*
+   * Kasten E16-1.6 (Gegenprüfung 24.11.): ein Ladefehler landete nur im Log,
+   * das Blatt zeigte für immer „Wird geladen …“. Jetzt merkt sich jede Liste
+   * ihren Fehler; das Blatt sagt es und bietet „Erneut versuchen“.
+   */
+  const [ladeFehler, setLadeFehler] = useState<{ statistik?: boolean; gelikt?: boolean; kommentiert?: boolean }>({});
+  const listenLaden = useCallback(() => {
+    if (!supabase || !ichId) return;
+    setLadeFehler({});
+    const fehler = (name: 'statistik' | 'gelikt' | 'kommentiert') => (e: any) => {
+      console.error(`${name} laden fehlgeschlagen:`, e?.message ?? e);
+      setLadeFehler((f) => ({ ...f, [name]: true }));
+    };
+    ladeStatistik(supabase, ichId).then(setStatistik).catch(fehler('statistik'));
+    gelikteVon(supabase, ichId).then(setGelikt).catch(fehler('gelikt'));
+    kommentierteVon(supabase, ichId).then(setKommentiert).catch(fehler('kommentiert'));
+  }, [supabase, ichId]);
   useEffect(() => {
     if (!supabase || !ichId) return;
     ladeBanne(supabase, ichId)
       .then(setBanne)
       .catch((e: any) => console.error('Bann-Verlauf laden fehlgeschlagen:', e?.message ?? e));
-    ladeStatistik(supabase, ichId)
-      .then(setStatistik)
-      .catch((e: any) => console.error('Statistik laden fehlgeschlagen:', e?.message ?? e));
-    gelikteVon(supabase, ichId)
-      .then(setGelikt)
-      .catch((e: any) => console.error('Gelikte Beitraege laden fehlgeschlagen:', e?.message ?? e));
-    kommentierteVon(supabase, ichId)
-      .then(setKommentiert)
-      .catch((e: any) => console.error('Eigene Kommentare laden fehlgeschlagen:', e?.message ?? e));
-  }, [supabase, ichId]);
+    listenLaden();
+  }, [supabase, ichId, listenLaden]);
 
   /*
    * Kasten 9.1: Wer bei der Likes-Sichtbarkeit zur Wahl steht. Die
@@ -936,6 +1008,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     if (!sprung) return;
     // Kasten RS 3: aus einer Rechtsmitteilung — das Blatt öffnen, nicht nur hinscrollen.
     if (sprung === 'kontostatus' || sprung === 'meinemeldungen') {
+      setBlattThema('Hilfe');
       setKontostatus(sprung === 'kontostatus' ? 'kontostatus' : 'meine');
       onSprungFertig?.();
       return;
@@ -954,6 +1027,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
     if (!pruefSicht) return;
     const punkt = SECTIONS.flatMap((s) => s.items).find((i) => i.sichtbar === pruefSicht);
     if (punkt) setSichtOffen(punkt);
+    setBlattThema(themaVon((i) => i.sichtbar === pruefSicht));
   }, [pruefSicht]);
 
   /*
@@ -968,6 +1042,15 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   useEffect(() => {
     if (!pruefListe) return;
     // Kasten 24: „settings#liste:lenkung" öffnet „Feed steuern" fürs Prüfbild.
+    setBlattThema(
+      pruefListe === 'lenkung'
+        ? 'Videos'
+        : pruefListe === 'farbfilter'
+        ? 'Farbfilter'
+        : pruefListe.startsWith('bz-')
+        ? 'Bildschirmzeit'
+        : themaVon((i) => i.liste === pruefListe)
+    );
     if (pruefListe === 'lenkung') return setLenkenOffen(true);
     // Kasten 21/22: Farbfilter und Bildschirmzeit ebenso („liste:farbfilter",
     // „liste:bz-bereiche", „liste:bz-uebersicht" …).
@@ -978,7 +1061,9 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
   }, [pruefListe]);
 
   return (
+    <OberthemaKontext.Provider value={blattThema}>
     <View style={styles.screen}>
+      <EngeFreundeSheet key={ichId} visible={offen?.aktion === "engefreunde"} onClose={()=>setOffen(null)}/>
       {/*
         Einstellungen ist der einzige Bereich ohne obere Leiste (so steht es im
         Prototyp). Damit fehlt aber auch derjenige, der sonst den Platz für
@@ -987,87 +1072,100 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
         nehmen.
       */}
       <View style={[styles.head, { paddingTop: insets.top + spacing.sm }]}>
-        {nur ? (
-          <>
-            <Druck style={styles.back} onPress={() => setNurAbschnitt(null)} hitSlop={8} accessibilityLabel="Zurück zu allen Einstellungen">
+        {/*
+          Einstellungen 16.11., Kasten 1.4 (Henrik, 24.11.2026): oben steht
+          immer, wo man ist — beim Blättern der aktuelle Abschnitt, in der
+          Einzelansicht dessen Name. Die Pille des Abschnitts ist hervorgehoben
+          und rückt ins Bild. Gleicher Kopf auf der Website (renderSettings).
+        */}
+        <View style={styles.kopfZeile}>
+          {(nur || onBack) && (
+            <Druck
+              style={styles.back}
+              onPress={nur ? () => setNurAbschnitt(null) : onBack}
+              hitSlop={8}
+              accessibilityLabel={nur ? 'Zurück zu allen Einstellungen' : 'Zurück'}
+            >
               <Ionicons name="chevron-back" size={24} color={colors.text} />
             </Druck>
-            <Text style={styles.nurTitel} numberOfLines={1}>{nur.title}</Text>
-          </>
-        ) : (
-        <>
-        {onBack && (
-          <Druck style={styles.back} onPress={onBack} hitSlop={8}>
-            <Ionicons name="chevron-back" size={24} color={colors.text} />
-          </Druck>
-        )}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.pillsBox}
-          contentContainerStyle={[styles.pills, !!onBack && styles.pillsMitPfeil]}
-        >
-          {SECTIONS.map((section) => (
-            <Druck
-              key={section.id}
-              style={styles.pill}
-              onPress={() => scroll.current?.scrollTo({ y: offsets.current[section.id] ?? 0, animated: true })}
+          )}
+          <View style={[styles.kopfTexte, !(nur || onBack) && styles.kopfTexteOhnePfeil]}>
+            {(nur || aktiv) && <Text style={styles.kopfOber} numberOfLines={1}>Einstellungen</Text>}
+            <Text style={styles.kopfTitel} numberOfLines={1} testID="einstellungen-oberthema" accessibilityRole="header">
+              {nur ? nur.title : aktiv ? SECTIONS.find((x) => x.id === aktiv)?.title : 'Einstellungen'}
+            </Text>
+          </View>
+        </View>
+        {!nur && (
+          <View>
+            <ScrollView
+              ref={pillen}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.pills}
             >
-              <Text style={styles.pillText}>{section.title}</Text>
-            </Druck>
-          ))}
-        </ScrollView>
-
-        {/*
-          Ein weicher Auslauf an der rechten Kante.
-          Die Reiterreihe ist breiter als der Bildschirm — die vierte Pille
-          wurde bis zum 03.09.2026 mitten im Wort gekappt, und ein halbes „M"
-          liest sich wie ein Layoutfehler, nicht wie „hier geht es weiter".
-          Der Verlauf nimmt keinen Platz weg und faengt keine Tipps ab
-          (`pointerEvents="none"`).
-        */}
-        <LinearGradient
-          colors={[verlaufAus(colors.surface), colors.surface]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.auslauf}
-          pointerEvents="none"
-        />
-        </>
+              {SECTIONS.map((section) => {
+                const istAktiv = section.id === aktiv;
+                return (
+                  <Druck
+                    key={section.id}
+                    onLayout={(e) => {
+                      pillenX.current[section.id] = e.nativeEvent.layout.x;
+                    }}
+                    style={[styles.pill, istAktiv && styles.pillAktiv]}
+                    onPress={() => scroll.current?.scrollTo({ y: offsets.current[section.id] ?? 0, animated: true })}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: istAktiv }}
+                  >
+                    <Text style={[styles.pillText, istAktiv && styles.pillTextAktiv]}>{section.title}</Text>
+                  </Druck>
+                );
+              })}
+            </ScrollView>
+            {/* Weicher Auslauf rechts: „hier geht es weiter“ statt gekappter Pille. */}
+            <LinearGradient
+              colors={[verlaufAus(colors.surface2), colors.surface2]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.auslauf}
+              pointerEvents="none"
+            />
+          </View>
         )}
       </View>
 
-      <ScrollView ref={scroll} contentContainerStyle={styles.content}>
+      <ScrollView
+        ref={scroll}
+        contentContainerStyle={styles.content}
+        scrollEventThrottle={32}
+        onScroll={(e) => (nur ? undefined : abschnittVerfolgen(e.nativeEvent.contentOffset.y))}
+      >
         {/*
           Der Kontowechsel gehoert nach ganz oben: Es ist die Einstellung, die
           das ganze uebrige Bild veraendert.
         */}
         {!nur && (
-        <>
-        <Druck style={styles.konto} onPress={onSwitchAccount}>
-          <Avatar
-            id={user?.profile.id ?? 'me'}
-            name={user?.profile.name ?? 'Konto'}
-            size={sizes.avatarLg}
-          />
-          <View style={styles.kontoBody}>
-            <Text style={styles.kontoName}>{user?.profile.name ?? 'Nicht angemeldet'}</Text>
-            <Text style={styles.kontoSub}>
-              {user?.email ?? '—'}
-              {konten.length > 1 ? `  ·  ${konten.length} Konten` : ''}
-            </Text>
+          <View style={styles.karte}>
+            <Druck style={styles.konto} onPress={onSwitchAccount} accessibilityRole="button" accessibilityLabel="Konto wechseln oder hinzufügen">
+              <Avatar id={user?.profile.id ?? 'me'} name={user?.profile.name ?? 'Konto'} size={sizes.avatarLg} />
+              <View style={styles.kontoBody}>
+                <Text style={styles.kontoName} numberOfLines={1}>{user?.profile.name ?? 'Nicht angemeldet'}</Text>
+                <Text style={styles.kontoSub} numberOfLines={1}>
+                  {user?.email ?? '—'}
+                  {konten.length > 1 ? `  ·  ${konten.length} Konten` : ''}
+                </Text>
+              </View>
+            </Druck>
+            <Druck style={styles.wechselBtn} onPress={onSwitchAccount} accessibilityRole="button">
+              <Ionicons name="swap-horizontal-outline" size={18} color={colors.brand} />
+              <Text style={styles.wechselText}>Konto wechseln oder hinzufügen</Text>
+            </Druck>
           </View>
-          <Ionicons name="swap-horizontal-outline" size={22} color={colors.brand} />
-        </Druck>
-
-        <Druck style={styles.wechselBtn} onPress={onSwitchAccount}>
-          <Ionicons name="people-outline" size={18} color={colors.brand} />
-          <Text style={styles.wechselText}>Konto wechseln oder hinzufügen</Text>
-        </Druck>
-        </>
         )}
 
-        {(nur ? [nur] : SECTIONS).map((section) => (
+        {(nur ? [nur] : SECTIONS).map((section) => {
+          const punkte = section.items.filter((item) => !item.nurEltern || (bz.stand?.kinder.length ?? 0) > 0);
+          return (
           <View
             key={section.id}
             onLayout={(e) => {
@@ -1078,6 +1176,7 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
               <View style={styles.nurAbstand} />
             ) : (
               <Druck
+                style={styles.sectionKopf}
                 onPress={() => {
                   setNurAbschnitt(section.id);
                   scroll.current?.scrollTo({ y: 0, animated: false });
@@ -1085,27 +1184,25 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                 accessibilityRole="button"
                 accessibilityLabel={`${section.title}, alle anzeigen`}
               >
-                <Text style={styles.sectionHead}>{section.title} →</Text>
+                <Text style={styles.sectionHead}>{section.title}</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.text3} />
               </Druck>
             )}
-            <View style={styles.group}>
-              {section.items.filter((item) => !item.nurEltern || (bz.stand?.kinder.length ?? 0) > 0).map((item) => (
-                <Druck
-                  key={`${section.id}-${item.label}`}
-                  style={styles.item}
-                  onPress={() => {
-                    if (item.toggle) return;
-                    if (item.sichtbar) return setSichtOffen(item);
-                    if (item.bz) return setBzOffen(item.bz);
-                    oeffne(item);
-                  }}
-                >
-                  <Ionicons name={item.icon} size={20} color={item.gefahr ? colors.danger : colors.text2} />
-                  <Text style={[styles.itemLabel, item.gefahr && styles.danger]} numberOfLines={1}>{item.label}</Text>
-                  {item.toggle ? (
-                    <Switch
-                      value={item.toggle === 'theme' ? isDark : schalter(item.toggle)}
-                      onValueChange={(next) => {
+            <View style={styles.karte}>
+              {punkte.map((item, nr) => {
+                const rechts = item.wahl
+                  ? wert(item)
+                  : item.sichtbar
+                  ? sichtText(item.sichtbar)
+                  : item.aktion === 'entsperrcode' && bz.stand
+                  ? bz.stand.eigene_art === 'eigen' ? 'Eigener Code' : 'Spenden-PIN'
+                  : item.aktion === 'farbfilter'
+                  ? Farbfilter.statusText(farbfilter)
+                  : item.bz
+                  ? bzText(item.bz)
+                  : '';
+                const schalterAn = item.toggle ? (item.toggle === 'theme' ? isDark : schalter(item.toggle)) : false;
+                const umlegen = (next: boolean) => {
                         if (item.toggle === 'theme') {
                           setTheme(next ? 'dark' : 'light');
                           /*
@@ -1140,43 +1237,77 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
                         // 'an'/'aus' statt true/false: der Wert ist Text in
                         // der Datenbank, und beide Seiten schreiben dasselbe.
                         void einstellungSetzen(item.toggle as string, next ? 'an' : 'aus');
-                      }}
-                      trackColor={{ true: colors.brand, false: colors.surface3 }}
-                    />
-                  ) : (
-                    <>
-                      {!!item.wahl && <Text style={styles.itemValue}>{wert(item)}</Text>}
-                      {!!item.sichtbar && (
-                        <Text style={styles.itemValue}>{sichtText(item.sichtbar)}</Text>
+                };
+                return (
+                  <Druck
+                    key={`${section.id}-${item.label}`}
+                    style={({ pressed }) => [styles.item, pressed && styles.itemGedrueckt]}
+                    onPress={() => {
+                      if (item.toggle) return umlegen(!schalterAn);
+                      setBlattThema(section.title);
+                      if (item.sichtbar) return setSichtOffen(item);
+                      if (item.bz) return setBzOffen(item.bz);
+                      oeffne(item, section.title);
+                    }}
+                    accessibilityRole={item.toggle ? 'switch' : 'button'}
+                    accessibilityState={item.toggle ? { checked: schalterAn } : undefined}
+                    accessibilityLabel={rechts ? `${item.label}, ${rechts}` : item.label}
+                  >
+                    <View style={[styles.iconKachel, item.gefahr && styles.iconKachelGefahr]}>
+                      <Ionicons name={item.icon} size={17} color={item.gefahr ? colors.danger : colors.brand} />
+                    </View>
+                    <View style={[styles.itemInnen, nr < punkte.length - 1 && styles.itemTrenner]}>
+                      <Text style={[styles.itemLabel, item.gefahr && styles.danger]} numberOfLines={2}>
+                        {item.label}
+                      </Text>
+                      {item.toggle ? (
+                        <Schalter value={schalterAn} onValueChange={umlegen} accessibilityLabel={item.label} />
+                      ) : (
+                        <>
+                          {!!rechts && (
+                            <Text style={styles.itemValue} numberOfLines={2}>
+                              {rechts}
+                            </Text>
+                          )}
+                          <Ionicons name="chevron-forward" size={17} color={colors.text3} />
+                        </>
                       )}
-                      {item.aktion === 'entsperrcode' && !!bz.stand && (
-                        <Text style={styles.itemValue}>{bz.stand.eigene_art === 'eigen' ? 'Eigener Code' : 'Spenden-PIN'}</Text>
-                      )}
-                      {item.aktion === 'farbfilter' && (
-                        <Text style={styles.itemValue}>{Farbfilter.statusText(farbfilter)}</Text>
-                      )}
-                      {!!item.bz && <Text style={styles.itemValue} numberOfLines={1}>{bzText(item.bz)}</Text>}
-                      <Ionicons name="chevron-forward" size={18} color={colors.text3} />
-                    </>
-                  )}
-                </Druck>
-              ))}
+                    </View>
+                  </Druck>
+                );
+              })}
             </View>
           </View>
-        ))}
+          );
+        })}
 
+        {/*
+          Einstellungen 16.11., Q79 (Kasten 1.3): „Abmelden“ stand direkt unter
+          Communitys und las sich wie ein Teil davon. Jetzt ein eigener Block
+          mit Satz dazu — es betrifft das ganze Konto auf diesem Gerät.
+        */}
         {!nur && (
-        <View style={styles.group}>
-          <View style={styles.item}>
-            <Ionicons name="information-circle-outline" size={20} color={colors.text2} />
-            <Text style={styles.itemLabel}>Über All Media</Text>
-            <Text style={styles.itemValue}>1.0.0</Text>
+          <View style={styles.abmeldenBlock}>
+            <Text style={styles.sectionHeadFrei}>Konto auf diesem Gerät</Text>
+            <View style={styles.karte}>
+              <Druck
+                style={({ pressed }) => [styles.item, pressed && styles.itemGedrueckt]}
+                onPress={onLogout}
+                accessibilityRole="button"
+                accessibilityLabel="Abmelden"
+              >
+                <View style={[styles.iconKachel, styles.iconKachelGefahr]}>
+                  <Ionicons name="log-out-outline" size={17} color={colors.danger} />
+                </View>
+                <View style={styles.itemInnen}>
+                  <Text style={[styles.itemLabel, styles.danger]}>Abmelden</Text>
+                </View>
+              </Druck>
+            </View>
+            <Text style={styles.fussText}>
+              Meldet nur dieses Konto ab. Weitere Konten auf diesem Gerät bleiben angemeldet.
+            </Text>
           </View>
-          <Druck style={styles.item} onPress={onLogout}>
-            <Ionicons name="log-out-outline" size={20} color={colors.danger} />
-            <Text style={[styles.itemLabel, styles.danger]}>Abmelden</Text>
-          </Druck>
-        </View>
         )}
       </ScrollView>
 
@@ -1335,49 +1466,67 @@ export const SettingsScreen = ({ onNotice, onLogout, onSwitchAccount, sprung, on
         />
       )}
 
-      {offen && !offen.eingabe && (
+      {offen && offen.aktion !== "engefreunde" && !offen.eingabe && (
         <EinstellungSheet
           titel={offen.label}
           wahl={offen.wahl}
           aktuell={wert(offen)}
+          /*
+           * Nach Runde 3 (E16-1.6): erst speichern, dann schließen. Scheitert
+           * es, bleibt das Blatt offen, sagt es und die Auswahl springt zurück
+           * (der EinstellungenContext dreht den Wert selbst zurück).
+           */
           onWahl={(w) => {
-            setOffen(null);
-            if (!offen.wahlKey) return onNotice(`${offen.label}: ${w}`);
+            if (!offen.wahlKey) {
+              setOffen(null);
+              return onNotice(`${offen.label}: ${w}`);
+            }
+            setWahlFehler(null);
             void (async () => {
-              const ok = await einstellungSetzen(offen.wahlKey as string, w);
-              if (ok) onNotice(`${offen.label}: ${w}`);
+              const ok = await setzen(offen.wahlKey as string, w);
+              if (!ok) return setWahlFehler('Das ließ sich gerade nicht speichern. Bitte versuch es noch einmal.');
+              setOffen(null);
+              onNotice(`${offen.label}: ${w}`);
             })();
           }}
+          fehler={wahlFehler}
           zeilen={offen.liste ? listeVon(offen.liste).zeilen : undefined}
           leer={offen.liste ? listeVon(offen.liste).leer : undefined}
+          knopf={offen.liste && listeVon(offen.liste).fehler ? 'Erneut versuchen' : undefined}
+          onKnopf={() =>
+            offen.liste === 'verlauf'
+              ? verlaufLaden()
+              : offen.liste === 'kontoanalysen'
+              ? setOffen({ ...offen }) // lädt die Analysen neu (Effekt hängt an `offen`)
+              : listenLaden()
+          }
           info={offen.info}
           onClose={() => setOffen(null)}
         />
       )}
     </View>
+    </OberthemaKontext.Provider>
   );
 };
 
+/*
+ * Einstellungen 16.11., Kasten 1.1 (Henrik: „Design muss hochqualitativ
+ * aussehen, grundlegend neu“). Aufbau wie die Systemeinstellungen von iOS:
+ * graue Seite, weiße Karten mit runden Ecken, farbige Symbolkachel je Zeile,
+ * Trennlinie erst ab dem Text. Zeilen haben eine Mindest- statt fester Höhe,
+ * damit lange Beschriftungen und große Schrift umbrechen statt abzuschneiden
+ * (Kasten 1.6). Gleiche Gestaltung auf der Website (.einst-* in styles.css).
+ */
 const styles = themenStyles((colors) => ({
-  screen: { flex: 1, backgroundColor: colors.surface },
-  /*
-   * Kopfzeile als Reihe: erst der Zurueck-Pfeil, dann die Reiter.
-   *
-   * Bis zum 09.09.2026 lag der Pfeil `position: absolute` bei `left: 16`
-   * ueber der Reiterreihe — er verdeckte die erste Pille („Allgemein"), und
-   * sein `top` rechnete mit einem festen Abstand, waehrend die Kopfzeile
-   * seit der Notch-Korrektur `insets.top` benutzt. Henrik am 07.09.2026:
-   * „Zurueck-Pfeil dort fehlplatziert/defekt."
-   */
-  head: { flexDirection: 'row', alignItems: 'center', paddingTop: spacing.md, paddingBottom: spacing.sm, position: 'relative' },
-  back: { paddingLeft: spacing.lg, paddingRight: spacing.xs },
-  nurTitel: { flex: 1, ...typography.h3, fontSize: 17, color: colors.text, paddingLeft: spacing.sm },
-  nurAbstand: { height: spacing.md },
-  pillsBox: { flex: 1 },
-  pills: { gap: spacing.sm, paddingHorizontal: spacing.lg },
-  /* Steht der Pfeil davor, braucht die erste Pille links keinen eigenen
-     Abstand mehr - sonst klafft eine Luecke. */
-  pillsMitPfeil: { paddingLeft: 0 },
+  screen: { flex: 1, backgroundColor: colors.surface2 },
+  head: { backgroundColor: colors.surface2, paddingBottom: spacing.sm },
+  kopfZeile: { flexDirection: 'row', alignItems: 'center', minHeight: 48, paddingRight: spacing.lg },
+  back: { paddingLeft: spacing.md, paddingRight: spacing.xs, paddingVertical: spacing.xs },
+  kopfTexte: { flex: 1, minWidth: 0, paddingLeft: spacing.xs },
+  kopfTexteOhnePfeil: { paddingLeft: spacing.lg },
+  kopfOber: { ...typography.overline, color: colors.text3, textTransform: 'uppercase' },
+  kopfTitel: { ...typography.title, fontSize: 24, color: colors.text },
+  pills: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   auslauf: { position: 'absolute', right: 0, bottom: 0, width: 28, top: 0 },
   pill: {
     paddingHorizontal: 14,
@@ -1387,51 +1536,91 @@ const styles = themenStyles((colors) => ({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  pillAktiv: { backgroundColor: colors.brand, borderColor: colors.brand },
   pillText: { ...typography.small, fontWeight: '600', color: colors.text2 },
-  content: { paddingBottom: spacing.xxl },
-  sectionHead: {
+  pillTextAktiv: { color: colors.white },
+  content: { paddingBottom: spacing.xxl + spacing.xl, paddingTop: spacing.sm },
+  nurAbstand: { height: spacing.sm },
+  sectionKopf: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.lg + spacing.md,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  sectionHead: { ...typography.overline, color: colors.text3, textTransform: 'uppercase' },
+  sectionHeadFrei: {
     ...typography.overline,
     color: colors.text3,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    textTransform: 'uppercase',
+    paddingHorizontal: spacing.lg + spacing.md,
     paddingBottom: spacing.sm,
+  },
+  karte: {
+    marginHorizontal: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   konto: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
   },
   kontoBody: { flex: 1, minWidth: 0 },
-  kontoName: { color: colors.text, ...typography.h3 },
-  kontoSub: { color: colors.text3, marginTop: 2, ...typography.small },
+  kontoName: { color: colors.text, ...typography.h2 },
+  kontoSub: { color: colors.text3, marginTop: 2, ...typography.preview },
   wechselBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.sm,
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 11,
+    marginBottom: spacing.lg,
+    minHeight: 44,
     borderRadius: radius.md,
     backgroundColor: colors.brandSoft,
   },
   wechselText: { color: colors.brand, ...typography.name },
-
-  group: { backgroundColor: colors.surface },
-  item: {
+  item: { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.lg, minHeight: 52 },
+  itemGedrueckt: { backgroundColor: colors.surface3 },
+  iconKachel: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconKachelGefahr: { backgroundColor: colors.dangerSoft },
+  itemInnen: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    height: 54,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    gap: spacing.sm,
+    marginLeft: spacing.md,
+    paddingRight: spacing.lg,
+    paddingVertical: 10,
   },
+  itemTrenner: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   itemLabel: { flex: 1, ...typography.body, color: colors.text },
-  itemValue: { ...typography.preview, color: colors.text3 },
-  rechts: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  itemValue: { ...typography.preview, color: colors.text3, maxWidth: '45%', textAlign: 'right' },
   danger: { color: colors.danger },
+  abmeldenBlock: { marginTop: spacing.xxl },
+  fussText: {
+    ...typography.small,
+    fontWeight: '400',
+    color: colors.text3,
+    paddingHorizontal: spacing.lg + spacing.md,
+    paddingTop: spacing.sm,
+  },
 }));

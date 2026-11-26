@@ -1,0 +1,7 @@
+OK 1 Bunny-Altbestand signiert zweimaligen Abruf nur einmal, Rechte zweimal
+OK 2 Anderer Nutzer bekommt eine eigene Signatur
+OK 3 Entzogenes Leserecht erhält keinen Cache-Link
+OK 4 App-Servermodus behält gemeinsame Cache-Adresse für Liste und Einzelmedium
+OK 5 App-Kontowechsel verwirft alten Cache
+OK 6 App respektiert tatsächlichen Server-Ablauf
+6/6 Prüfungen bestanden

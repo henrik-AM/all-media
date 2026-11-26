@@ -1,0 +1,16 @@
+const S=require('./_af_fix_sql'),{id,schema,check,als,admin,konto}=S;
+const A=id(1),B=id(2),pfad=`instants/${A}/privat.jpg`;
+let sql=S.anfang();for(const n of [89,90,94,97,98,99,107,109,110,111,113])sql+=schema(n,true);sql+=konto(1)+konto(2);
+sql+=`insert into public.follows(follower_id,followee_id) values('${A}','${B}'),('${B}','${A}');insert into storage.objects(bucket_id,name,owner_id,metadata) values('media','${pfad}','${A}','{"size":1000,"mimetype":"image/jpeg"}');`;
+sql+=als(A,`insert into public.enge_freunde(user_id,freund_id) values(auth.uid(),'${B}');`+check('B6_vorher_Zahl_eins',`public.instant_empfaengerzahl()=1`));
+sql+=als(B,`insert into public.user_settings(user_id,schluessel,wert) values(auth.uid(),'instantsEmpfangen','aus') on conflict(user_id,schluessel) do update set wert='aus';`);
+sql+=als(A,check('B6_vorher_Abwahl_durch_Null_verraten',`public.instant_empfaengerzahl()=0`));
+sql+=schema(111)+schema(113);
+sql+=als(A,check('B6_nachher_Listengroesse_trotz_Abwahl_eins',`public.instant_empfaengerzahl()=1`)+`v:=public.instant_senden('${pfad}','Privat');perform set_config('probe.instant',v::text,true);`+check('B6_nachher_keine_Zustellquittung',`v is not null`));
+sql+=als(B,check('B6_Abwahl_verhindert_Postfach',`not exists(select 1 from public.instant_postfach())`)+check('B6_Abwahl_verhindert_Mitteilung',`not exists(select 1 from public.notifications where user_id=auth.uid() and target_type='instant')`));
+sql+=admin(check('B6_tatsaechlich_keine_Empfaengerzeile',`not exists(select 1 from public.instant_empfaenger where instant_id=current_setting('probe.instant')::uuid)`)+check('B6_leerer_Versand_nicht_vorzeitig_entfernt',`not exists(select 1 from public.instant_loeschkandidaten() where bild_pfad='${pfad}')`));
+sql+=`update public.instants set expires_at=now()-interval '1 second' where id=current_setting('probe.instant')::uuid;`;
+sql+=admin(check('B6_nach_24h_aufraeumbar',`exists(select 1 from public.instant_loeschkandidaten() where bild_pfad='${pfad}')`));
+sql+=als(B,`update public.user_settings set wert='an' where user_id=auth.uid() and schluessel='instantsEmpfangen';`);
+sql+=als(A,check('B6_Einschalten_aendert_Zahl_nicht',`public.instant_empfaengerzahl()=1`));
+S.ausfuehren(sql).catch(e=>{console.error(e.message);process.exitCode=1;});

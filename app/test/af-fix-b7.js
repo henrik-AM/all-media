@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict'),vm=require('node:vm'),ts=require('typescript'),{quelle}=require('./_af_fix_quelle'),{instants,texte,finde}=require('./_af_fix_ui');
+const tick=()=>new Promise(setImmediate),warten=()=>new Promise(r=>setTimeout(r,230));let n=0;async function test(name,f){await f();console.log(`OK ${++n} ${name}`);}
+function web(api){const tree=ts.createSourceFile('app.js',quelle('web/public/app.js'),ts.ScriptTarget.Latest,true,ts.ScriptKind.JS),f=tree.statements.find(s=>ts.isFunctionDeclaration(s)&&s.name?.text==='openEngeFreunde');
+ const felder={'#efSuche':{value:'',addEventListener(){}},'#efZahl':{},'#efFehler':{},'#efListe':{}};
+ const env={Instants:require('../../gemeinsam/instants'),esc:String,instantApi:api,setTimeout,clearTimeout,openSheet:(_t,html,mount)=>{felder['#efZahl'].textContent=html.match(/id="efZahl">([^<]*)/)[1];const sheet={isConnected:true,querySelector:id=>felder[id],querySelectorAll:()=>[]};mount(sheet);return sheet;}};
+ vm.createContext(env);vm.runInContext(f.getText(tree),env);env.openEngeFreunde();return felder;
+}
+(async()=>{
+ await test('App Instants zeigt vor Antwort keine erfundene Null',async()=>{const x=instants();const t=texte(x.h.render(()=>x.ex.InstantsBereich({})));assert.ok(!t.includes('bearbeiten · 0'));assert.ok(!t.includes('Liste · 0'));assert.ok(t.includes('Wird geladen'));x.h.stop();});
+ await test('App Instants zeigt nach Fehler unbekannt und sperrt die Kamera',async()=>{const x=instants({empfaengerzahl:async()=>{throw Error('Offline');}});let tree=x.h.render(()=>x.ex.InstantsBereich({}));finde(tree,t=>t.props.accessibilityLabel==='Instants öffnen').props.onPress();await tick();tree=x.h.render(()=>x.ex.InstantsBereich({}));assert.match(texte(tree),/An deine Liste · derzeit nicht verfügbar/);assert.equal(finde(tree,t=>t.type==='Druck'&&texte(t)==='Instant aufnehmen').props.disabled,true);x.h.stop();});
+ await test('App Enge Freunde vor Laden und nach Fehler ohne feste Null',async()=>{const x=instants({freunde:async()=>{throw Error('Offline');}});const render=()=>x.h.render(()=>x.ex.EngeFreundeSheet({visible:true,onClose(){}}));assert.ok(!texte(render()).includes('0 Personen'));await x.h.flush();await warten();assert.match(texte(render()),/privat · derzeit nicht verfügbar/);x.h.stop();});
+ await test('App Enge Freunde zeigt bestätigte leere Liste als echte Null',async()=>{const x=instants({freunde:async()=>({freunde:[],vorschlaege:[]})});const render=()=>x.h.render(()=>x.ex.EngeFreundeSheet({visible:true,onClose(){}}));render();await x.h.flush();await warten();assert.match(texte(render()),/0 Personen/);x.h.stop();});
+ await test('Website Enge Freunde zeigt während Antwort Laden und nach Fehler unbekannt',async()=>{let fehler;const f=web(()=>new Promise((_r,j)=>fehler=j));assert.match(f['#efZahl'].textContent,/Wird geladen/);fehler(Error('Offline'));await tick();assert.equal(f['#efZahl'].textContent,'derzeit nicht verfügbar');});
+ await test('Website bestätigte leere Liste zeigt echte Null',async()=>{const f=web(async()=>({freunde:[],vorschlaege:[]}));await tick();assert.equal(f['#efZahl'].textContent,'0 Personen');});
+ await test('Website falsch geformte Antwort zeigt keine Zahl',async()=>{const f=web(async()=>({}));await tick();assert.equal(f['#efZahl'].textContent,'derzeit nicht verfügbar');});
+ console.log(`${n}/${n} Prüfungen bestanden`);
+})().catch(e=>{console.error(e);process.exitCode=1;});

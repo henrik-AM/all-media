@@ -8,6 +8,15 @@
 //         ZIEL=https://all-media-website.onrender.com node test/_erstellen.js
 
 const { chromium } = require('playwright-core');
+
+/** Paket 9 (AF4): Beiträge wählen Medien zuerst im Karussell-Editor. */
+async function karussellDatei(page, datei) {
+  await page.waitForSelector('.karusselleditor [data-add]', { timeout: 10000 });
+  const [auswahl] = await Promise.all([page.waitForEvent('filechooser'), page.click('.karusselleditor [data-add]')]);
+  await auswahl.setFiles(datei);
+  await page.waitForSelector('.karusselleditor li', { timeout: 5000 });
+  await page.click('.karusselleditor [data-fertig]');
+}
 const { anmelden, zuruecksetzen, beenden } = require('./_konto');
 const path = require('path');
 
@@ -254,10 +263,8 @@ require('./_fixtures').bereiteFixturesVor();
   });
 
   await pruefe('Beitrag mit Foto landet im Feed und im eigenen Raster', async () => {
-    const wartet = page.waitForEvent('filechooser');
     await erstellen('post');
-    const auswahl = await wartet;
-    await auswahl.setFiles(BILD);
+    await karussellDatei(page, BILD);
 
     await page.waitForSelector('#f_beschreibung', { timeout: 3000 });
     await page.fill('#f_beschreibung', 'Testbeitrag aus der Pruefung');
@@ -308,9 +315,8 @@ require('./_fixtures').bereiteFixturesVor();
     const vorher = await zahl();
     await page.evaluate(() => document.querySelector('#expBack')?.click());
 
-    const wartet = page.waitForEvent('filechooser');
     await erstellen('post');
-    await (await wartet).setFiles(BILD);
+    await karussellDatei(page, BILD);
     await page.waitForSelector('#f_soundAb', { timeout: 3000 });
     const wahl = await page.$$eval('#f_soundAb option', (els) => els.map((e) => e.value));
     if (wahl[0] !== '0:00' || !wahl.includes('0:25')) throw new Error('Auswahl: ' + wahl.join(' '));

@@ -272,7 +272,9 @@ async function teilBC() {
 
   await pruefeAsync('Benutzername eines anderen Kontos → „vergeben“, Fertig → Fehler auf der Seite', async () => {
     if (!fremderHandle) throw new Error('kein fremder Benutzername bekannt');
-    await zurSeite();
+    await page.click('#profilBearbeiten');
+    await page.click('#pbEinstellungen');
+    await page.waitForSelector('[data-testid="profilseite"]');
     await feldOeffnen('benutzername');
     await page.fill('#psEingabe', fremderHandle.replace(/^@/, ''));
     await page.waitForFunction(() => /vergeben/.test(document.querySelector('#psNamensstand')?.textContent || ''), null, { timeout: 5000 });

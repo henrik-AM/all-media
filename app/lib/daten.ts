@@ -17,6 +17,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { signiereMedien } from './medien';
+const Beitragschema = require('../../gemeinsam/beitragschema') as typeof import('../../gemeinsam/beitragschema');
 import { SUPABASE_CONFIG } from '../constants/supabase';
 import {
   Chat,
@@ -1144,6 +1145,7 @@ export async function ladeStorys(client: SupabaseClient, ichId: string): Promise
 // ============================================================================
 
 interface RohBeitrag {
+  medien?: import("../../gemeinsam/karussell").Medium[];
   id: string;
   userId: string;
   kind: 'post' | 'reel' | 'clip';
@@ -1166,6 +1168,7 @@ interface RohBeitrag {
   shares: number;
   liked: boolean;
   likedBy: string;
+  disliked?: boolean;
   saved: boolean;
   reposted: boolean;
   notify: boolean;
@@ -1183,11 +1186,13 @@ interface RohBeitrag {
  */
 export async function ladeBeitraege(
   client: SupabaseClient,
-  ichId: string
+  ichId: string,
+  nurId?:string
 ): Promise<{ posts: Post[]; videos: Video[]; clips: Clip[] }> {
-  const { data, error } = await client
+  const {data,error}=await Beitragschema.lesen((mitMedien:boolean)=>{
+    let abfrage = client
     .from('posts')
-    .select(BEITRAG_SPALTEN)
+    .select(Beitragschema.spalten(BEITRAG_SPALTEN,mitMedien))
     /*
      * "Spaeter posten": ein Beitrag mit einem Zeitpunkt in der Zukunft ist
      * angelegt, aber noch nicht sichtbar. Ohne diesen Filter erschiene er
@@ -1195,11 +1200,17 @@ export async function ladeBeitraege(
      */
     .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
     .order('created_at', { ascending: false })
-    .limit(300);
+    .limit(nurId?1:300);
+  if(nurId)abfrage=abfrage.eq('id',nurId);
+    return abfrage;
+  });
   if (error) throw error;
 
   const zeilen = (data ?? []) as any[];
   const ids = zeilen.map((b) => b.id);
+
+  const { data: negativ } = ids.length ? await client.from('post_dislikes').select('post_id').eq('user_id', ichId).in('post_id', ids) : { data: [] };
+  const abgelehnt = new Set((negativ || []).map((z: any) => z.post_id));
 
   const leer = { data: [] as any[] };
   const [{ data: likes }, { data: gespeichert }, { data: geteilt }, { data: hinweise }, lenkung] =
@@ -1277,10 +1288,12 @@ export async function ladeBeitraege(
     // auf der Website hochging (web/server/supabase-api.js zaehlt beides).
     shares: Number(b.shares_basis ?? 0) + (b.shares?.[0]?.count ?? 0),
     liked: gemocht.has(b.id),
+    disliked: abgelehnt.has(b.id),
     likedBy: likerNamen.get(b.id) ?? '',
     saved: gemerkt.has(b.id),
     reposted: repostet.has(b.id),
     notify: benachrichtigt.has(b.id),
+    medien: b.medien || [],
     mediaUri: b.media_url ?? undefined,
     standbild: b.thumbnail_url ?? undefined,
   }));
@@ -1346,11 +1359,13 @@ export async function ladeBeitraege(
         likes: b.likes,
         comments: b.comments,
         liked: b.liked,
+        disliked: b.disliked,
         saved: b.saved,
         following: false, // kommt aus `gefolgt`, nicht vom Beitrag
         notify: b.notify,
         reposts: b.shares,
         reposted: b.reposted,
+        medien: b.medien,
         mediaUri: b.mediaUri,
         standbild: b.standbild,
         tags: b.tags,
@@ -1368,6 +1383,7 @@ export async function ladeBeitraege(
         comments: b.comments,
         shares: b.shares,
         liked: b.liked,
+        disliked: b.disliked,
         saved: b.saved,
         reposted: b.reposted,
         notify: b.notify,
@@ -1397,6 +1413,7 @@ export async function ladeBeitraege(
         likedBy: b.likedBy,
         comments: b.comments,
         liked: b.liked,
+        disliked: b.disliked,
         saved: b.saved,
         reposted: b.reposted,
         mediaUri: b.mediaUri,
@@ -1498,11 +1515,14 @@ const COMMUNITY_SPALTEN =
  * nicht geladen und nicht vorgeschlagen ist. Gleiche Regel in
  * web/server/supabase-api.js (ladeCommunities).
  */
-export async function ladeCommunities(client: SupabaseClient, ichId: string, suche = ''): Promise<Community[]> {
+export async function ladeCommunities(
+  client: SupabaseClient, ichId: string, suche = '', communityId?: string,
+): Promise<Community[]> {
   const abfrage = (zaehlung: string) => {
     let q = client.from('communities').select(COMMUNITY_SPALTEN + zaehlung);
     const filter = Beitritt.suchFilter(['name', 'topic'], suche);
     if (filter) q = q.or(filter);
+    if (communityId) q = q.eq('id', communityId);
     return q.order('created_at', { ascending: true }).limit(filter ? 30 : 100);
   };
   let { data, error } = await abfrage(', mitglieder_anzahl');
@@ -1563,6 +1583,17 @@ export async function ladeCommunities(client: SupabaseClient, ichId: string, suc
       .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0) || String(a.created_at).localeCompare(String(b.created_at)))
       .map((k: any) => ({ id: k.id, name: k.name, themen: k.topics ?? [], ...Erstellen.kanalFelder(zusatz, k.id, ichId) })),
   })));
+}
+
+export async function ladeCommunityZuUnterthema(
+  client: SupabaseClient, ichId: string, kanalId: string,
+): Promise<Community | undefined> {
+  const { data, error } = await client.from('community_channels')
+    .select('community_id').eq('id', kanalId).maybeSingle();
+  if (error) throw error;
+  if (!data) return undefined;
+  const [community] = await ladeCommunities(client, ichId, '', data.community_id);
+  return community;
 }
 
 export async function ladeKanalNachrichten(
@@ -1781,14 +1812,20 @@ export async function ladeStandorte(client: SupabaseClient): Promise<Place[]> {
 
 export async function ladeMitteilungen(
   client: SupabaseClient,
-  ichId: string
+  ichId: string,
+  ptt?: { seit?: string },
 ): Promise<Mitteilung[]> {
-  const { data, error } = await client
+  const abfrage = client
     .from('notifications')
     .select('id, actor_id, art, bereich, target_type, target_id, text, read_at, created_at')
-    .eq('user_id', ichId)
+    .eq('user_id', ichId);
+  if (ptt) {
+    abfrage.eq('art', 'ptt');
+    if (ptt.seit) abfrage.gte('created_at', ptt.seit);
+  }
+  const { data, error } = await abfrage
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(ptt ? 20 : 100);
   if (error) throw error;
 
   return (data ?? []).map((b: any) => ({
@@ -1800,6 +1837,7 @@ export async function ladeMitteilungen(
     text: b.text || undefined,
     ziel: { art: b.target_type, id: b.target_id },
     minuten: Math.max(0, Math.floor((Date.now() - new Date(b.created_at).getTime()) / 60000)),
+    zeitpunkt: b.created_at,
     gelesen: Boolean(b.read_at),
   }));
 }

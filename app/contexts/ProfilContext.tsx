@@ -1,3 +1,5 @@
+import * as Reel from '../../gemeinsam/reel';
+import { reaktion } from '../../gemeinsam/rang';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Clip,
@@ -133,6 +135,7 @@ const mitteilungText = (
     // Kasten 28/15.4 (Schema 98). Gleicher Satz in web/server/app.js (mitteilungText).
     case 'freund_anfrage':
       return `${name} möchte mit dir befreundet sein.`;
+    case 'instant': return `${name} hat dir ein Instant gesendet.`;
     case 'freund_ok':
       return `Du und ${name} seid jetzt befreundet.`;
     case 'nachricht':
@@ -149,6 +152,7 @@ const mitteilungText = (
 };
 
 interface NeuesVideo {
+  sekunden?: number;
   beschreibung: string;
   ort: string;
   quer: boolean;
@@ -161,6 +165,7 @@ interface NeuesVideo {
 
 interface ProfilWert {
   /* --- Glocke --- */
+  pttMitteilungenErgaenzen: (liste: Mitteilung[]) => void;
   mitteilungen: (bereich: MitteilungsBereich) => MitteilungAnzeige[];
   ungelesen: (bereich: MitteilungsBereich) => number;
   alsGelesen: (id: string) => void;
@@ -184,14 +189,14 @@ interface ProfilWert {
   spende: Spende | null;
   raster: RasterEintrag[];
 
-  beitragAnlegen: (werte: { beschreibung: string; ort: string; mediaUri?: string; music?: string; soundAb?: number }) => Promise<void>;
+  beitragAnlegen: (werte: { beschreibung: string; ort: string; mediaUri?: string; medien?: import('../../gemeinsam/karussell').Medium[]; music?: string; soundAb?: number }) => Promise<void>;
   videoAnlegen: (werte: NeuesVideo) => Promise<void>;
   highlightAnlegen: (name: string) => string | null;
   playlistAnlegen: (name: string) => string | null;
   spendeSetzen: (spende: Spende) => void;
 
   /** Like, Merken oder Repost bei einem Querformat-Video umschalten. */
-  clipUmschalten: (id: string, was: 'like' | 'save' | 'repost') => void;
+  clipUmschalten: (id: string, was: 'like' | 'dislike' | 'save' | 'repost') => void;
 
   /* --- Kontaktinfo (Prototyp "MC + Kontakteinstellungen") --- */
   /** Mit einem Stern markierte Nachrichten. */
@@ -260,7 +265,7 @@ interface ProfilWert {
   /** Beim Oeffnen: die ungelesenen Nachrichten des Kanals auf null setzen. */
   kanalGelesen: (id: string) => void;
   /** Kasten 28/15.5: eine Community aus der Datenbanksuche in die Liste aufnehmen. */
-  communityMerken: (community: Community) => void;
+  communityMerken: (community: Community, unterthemenAktualisieren?: boolean) => void;
 
   /* --- Folgen --- */
   /*
@@ -368,6 +373,15 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   const [alle, setAlle] = useState<Mitteilung[]>([]);
+  useEffect(() => setAlle(daten.mitteilungen), [daten.mitteilungen]);
+  const pttMitteilungenErgaenzen = useCallback((liste: Mitteilung[]) => {
+    setAlle((vorher) => {
+      const bekannt = new Set(vorher.map((m) => m.id));
+      const neu = liste.filter((m) => !bekannt.has(m.id));
+      return neu.length ? [...neu, ...vorher].slice(0, 100) : vorher;
+    });
+  }, []);
+
   const [communities, setCommunities] = useState<Community[]>([]);
 
   const [eigeneBeitraege, setEigeneBeitraege] = useState<Post[]>([]);
@@ -419,7 +433,6 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
    */
   useEffect(() => {
     if (!daten.geladen) return;
-    setAlle(daten.mitteilungen);
     setCommunities(daten.communities);
     setClips(daten.clips);
     setHighlights(daten.highlights);
@@ -440,8 +453,10 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
         .filter((e) => e.userId === 'me')
         .map((e) => ({
           id: e.id,
+          art: daten.posts.some(p=>p.id===e.id)?'post':daten.clips.some(p=>p.id===e.id)?'clip':'reel',
           kind: daten.posts.some((p) => p.id === e.id) ? 'image' : 'video',
           eigen: true,
+          medienAnzahl: (e as {medien?:unknown[]}).medien?.length,
           mediaUri: (e as { mediaUri?: string }).mediaUri,
           standbild: (e as { standbild?: string }).standbild,
         }))
@@ -587,8 +602,8 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     return beitragSpeichern(supabase, daten.ichId, felder);
   }, [supabase, daten.ichId]);
 
-  const beitragAnlegen: ProfilWert['beitragAnlegen'] = useCallback(async ({ beschreibung, ort, mediaUri, music, soundAb }) => {
-    const gespeichert = await inDatenbank({ art: 'post', beschreibung, ort: ort || '', musik: music || 'Originalton', soundAb, mediaUrl: mediaUri });
+  const beitragAnlegen: ProfilWert['beitragAnlegen'] = useCallback(async ({ beschreibung, ort, mediaUri, medien, music, soundAb }) => {
+    const gespeichert = await inDatenbank({ art: 'post', beschreibung, ort: ort || '', musik: music || 'Originalton', soundAb, mediaUrl: mediaUri, medien });
     const id = gespeichert.id;
     mediaUri = gespeichert.mediaUri;
     setEigeneBeitraege((prev) => [
@@ -607,22 +622,22 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
         notify: false,
         reposts: 0,
         reposted: false,
-        mediaUri,
+        mediaUri, medien,
       },
       ...prev,
     ]);
-    setRaster((prev) => [{ id, kind: 'image', eigen: true, mediaUri }, ...prev]);
+    setRaster((prev) => [{ id, kind: 'image',art:'post', eigen: true, mediaUri,medienAnzahl:medien?.length }, ...prev]);
 
   }, [inDatenbank]);
 
-  const videoAnlegen: ProfilWert['videoAnlegen'] = useCallback(async ({ beschreibung, ort, quer, mediaUri, music, soundAb }) => {
-    const gespeichert = await inDatenbank({ art: quer ? 'clip' : 'reel', titel: quer ? beschreibung : '', beschreibung, ort: ort || '', musik: music || 'Originalton', soundAb, mediaUrl: mediaUri });
+  const videoAnlegen: ProfilWert['videoAnlegen'] = useCallback(async ({ beschreibung, ort, quer, mediaUri, music, soundAb, sekunden }) => {
+    const gespeichert = await inDatenbank({ art: quer ? 'clip' : 'reel', titel: quer ? beschreibung : '', beschreibung, ort: ort || '', musik: music || 'Originalton', soundAb, mediaUrl: mediaUri, sekunden, dauer: Reel.zeit(sekunden || 0) });
     const id = gespeichert.id;
     mediaUri = gespeichert.mediaUri;
 
     if (quer) {
       setClips((prev) => [
-        { id, userId: 'me', title: beschreibung, duration: '', views: 0, age: 'gerade eben', art: 'standard' },
+        { id, userId: 'me', title: beschreibung, duration: Reel.zeit(sekunden || 0), views: 0, age: 'gerade eben', art: 'standard', mediaUri },
         ...prev,
       ]);
     } else {
@@ -645,7 +660,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
         ...prev,
       ]);
     }
-    setRaster((prev) => [{ id, kind: 'video', eigen: true, mediaUri }, ...prev]);
+    setRaster((prev) => [{ id, kind: 'video', art:quer?'clip':'reel',eigen: true, mediaUri }, ...prev]);
 
   }, [inDatenbank]);
 
@@ -913,16 +928,23 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
     setCommunities((prev) => prev.map((c) => (c.id === id ? { ...c, pttBenachrichtigung: an } : c)));
   }, []);
 
+  // Gezielt nachgeladene Clips ändern keinen Bootstrap-Zeitstempel.
+  // Im Spieler verfügbar halten, in der normalen Querformatliste ausfiltern.
+  useEffect(() => {
+    setClips(prev => {
+      const neue=daten.clips.filter(c=>c.nurEinzeln&&!prev.some(p=>p.id===c.id));
+      return neue.length?[...prev,...neue]:prev;
+    });
+  },[daten.clips]);
+
   const clipUmschalten = useCallback(
-    (id: string, was: 'like' | 'save' | 'repost') => {
+    (id: string, was: 'like' | 'dislike' | 'save' | 'repost') => {
+      const vorher = clips.find((c) => c.id === id);
       const drehen = () =>
         setClips((prev) =>
           prev.map((c) => {
             if (c.id !== id) return c;
-            if (was === 'like') {
-              const jetzt = !c.liked;
-              return { ...c, liked: jetzt, likes: Math.max(0, (c.likes ?? 0) + (jetzt ? 1 : -1)) };
-            }
+            if (was === 'like' || was === 'dislike') return reaktion(c, was);
             if (was === 'save') return { ...c, saved: !c.saved };
             return { ...c, reposted: !c.reposted };
           })
@@ -932,15 +954,17 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
 
       // Dasselbe noch einmal umschalten stellt den alten Stand wieder her.
       const tun =
-        was === 'like'
+        was === 'dislike'
+          ? Aktion.dislike
+          : was === 'like'
           ? Aktion.like
           : was === 'save'
             ? Aktion.speichern
             : Aktion.repost;
-      schreiben(was === 'like' ? 'Das Like' : was === 'save' ? 'Das Speichern' : 'Der Repost',
-        (c, ich) => tun(c, ich, id), drehen);
+      schreiben(was === 'dislike' ? 'Die Negativreaktion' : was === 'like' ? 'Das Like' : was === 'save' ? 'Das Speichern' : 'Der Repost',
+        (c, ich) => tun(c, ich, id), () => { if (vorher) setClips((prev) => prev.map((c) => c.id === id ? vorher : c)); });
     },
-    [schreiben]
+    [schreiben, clips]
   );
 
   /** Umschalten. Gibt zurueck, was danach gilt. */
@@ -1153,12 +1177,17 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
    * ersten 100 geladenen stehen. Wer eine davon öffnet, braucht sie hier —
    * Community-Seite und Beitreten suchen in dieser Liste.
    */
-  const communityMerken = useCallback((community: Community) => {
-    setCommunities((prev) => (prev.some((c) => c.id === community.id) ? prev : [...prev, community]));
+  const communityMerken = useCallback((community: Community, unterthemenAktualisieren = false) => {
+    setCommunities((prev) => {
+      if (!prev.some((c) => c.id === community.id)) return [...prev, community];
+      if (!unterthemenAktualisieren) return prev;
+      return prev.map((c) => c.id === community.id ? { ...c, unterthemen: community.unterthemen } : c);
+    });
   }, []);
 
   const wert = useMemo<ProfilWert>(
     () => ({
+      pttMitteilungenErgaenzen,
       mitteilungen,
       ungelesen,
       alsGelesen,
@@ -1213,7 +1242,7 @@ export const ProfilProvider = ({ children }: { children: React.ReactNode }) => {
       profilSpeichernWarten,
     }),
     [
-      mitteilungen, ungelesen, alsGelesen, mitteilungWeg, alleGelesen,
+      pttMitteilungenErgaenzen, mitteilungen, ungelesen, alsGelesen, mitteilungWeg, alleGelesen,
       eigeneBeitraege, eigeneVideos, clips, highlights, playlists, spende, raster,
       sammlungen, sammlungOeffnen, sammlungLoeschen, sammlungenLaden,
       beitragAnlegen, videoAnlegen, highlightAnlegen, playlistAnlegen, spendeSetzen,

@@ -39,6 +39,7 @@ type Rueckweg = () => void;
 
 export interface Aktionen {
   like: (beitragId: string, zurueck: Rueckweg) => Promise<void>;
+  dislike: (beitragId: string, zurueck: Rueckweg) => Promise<void>;
   speichern: (beitragId: string, zurueck: Rueckweg) => Promise<void>;
   repost: (beitragId: string, zurueck: Rueckweg) => Promise<void>;
   hinweis: (beitragId: string, zurueck: Rueckweg) => Promise<void>;
@@ -416,6 +417,7 @@ export function useAktionen(melden?: (text: string) => void): Aktionen {
   return useMemo<Aktionen>(
     () => ({
       bereit: Boolean(supabase && ichId),
+      dislike: (id, zurueck) => schreiben('Die Negativreaktion', (c, i) => A.dislike(c, i, id), zurueck),
       like: (id, zurueck) => schreiben('Das Like', (c, i) => A.like(c, i, id), zurueck),
       speichern: (id, zurueck) => schreiben('Das Speichern', (c, i) => A.speichern(c, i, id), zurueck),
       repost: (id, zurueck) => schreiben('Der Repost', (c, i) => A.repost(c, i, id), zurueck),

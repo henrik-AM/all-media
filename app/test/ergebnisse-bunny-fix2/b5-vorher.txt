@@ -1,0 +1,17 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ null
+- [
+-   'beitrag',
+-   'p_123'
+- ]
+
+    at /Users/henrik.dikta/allmedia-wt-codex/bunny-anschluss/app/test/bunny-fix-b5.js:3:542 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: null,
+  expected: [Array],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}

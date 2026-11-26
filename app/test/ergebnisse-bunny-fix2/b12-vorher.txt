@@ -1,0 +1,5 @@
+FEHL B12_GIN_Index_mit_jsonb_path_ops
+FEHL B12_OR_Abfrage_kann_GIN_und_Altindex_kombinieren
+0/2 Rollenprüfungen, verworfen
+Rollback-Kontrolle 1/1
+{"message":"Failed to run sql query: ERROR:  P0001: PRUEFFEHLER:B12_GIN_Index_mit_jsonb_path_ops\nCONTEXT:  PL/pgSQL function pg_temp_12.pruefe(text,boolean) line 1 at RAISE\nSQL statement \"SELECT pg_temp.pruefe('B12_GIN_Index_mit_jsonb_path_ops',(exists(select 1 from pg_indexes where schemaname='public' and tablename='posts' and indexname='posts_medien_gin' and indexdef like '%USING gin (medien jsonb_path_ops)%')))\"\nPL/pgSQL function inline_code_block line 1 at PERFORM\n"}

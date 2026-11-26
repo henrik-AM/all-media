@@ -1,0 +1,19 @@
+Der Beitrag fehlgeschlagen: DB abgelehnt
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ []
+- [
+-   'posts/neu.jpg'
+- ]
+
+    at /Users/henrik.dikta/allmedia-wt-codex/bunny-anschluss/app/test/bunny-fix-b3.js:6:239
+    at async test (/Users/henrik.dikta/allmedia-wt-codex/bunny-anschluss/app/test/bunny-fix-b3.js:5:45)
+    at async /Users/henrik.dikta/allmedia-wt-codex/bunny-anschluss/app/test/bunny-fix-b3.js:6:2 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [],
+  expected: [Array],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}

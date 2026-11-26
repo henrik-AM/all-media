@@ -51,6 +51,12 @@ let GERAET = null;
 // Bereich/Unterpunkt, Name des Bildes. Dieselbe Liste wie test/_ansehen.js
 // fuer die Website, damit sich beide Seiten nebeneinander vergleichen lassen.
 const SEITEN = [
+  // Paket 9 (20.11.2026): Karussell, Reels mit Sprungleiste und „Gefällt mir nicht",
+  // Konto-Analysen, Instants im Messenger.
+  ['videos/home', 'p9-karussell'],
+  ['videos/portrait', 'p9-reel'],
+  ['settings#liste:kontoanalysen', 'p9-kontoanalysen'],
+  ['messenger/chats', 'p9-instants'],
   ['messenger/chats', 'messenger-chats'],
   ['messenger/friendmap', 'messenger-karte'],
   ['messenger/camera', 'messenger-kamera'],

@@ -361,7 +361,21 @@
       Object.prototype.hasOwnProperty.call(punkte, id) ? punkte[id] : null;
   }
 
+  function negativFaktor(eigen, autor, thema) {
+    return eigen ? 0.02 : autor ? 0.3 : thema ? 0.5 : 1;
+  }
+
+  function reaktion(beitrag, art) {
+    const an = !beitrag[art === 'dislike' ? 'disliked' : 'liked'];
+    const liked = art === 'like' && an;
+    const disliked = art === 'dislike' && an;
+    return Object.assign({}, beitrag, { liked, disliked,
+      likes: Math.max(0, (beitrag.likes || 0) + Number(liked) - Number(!!beitrag.liked)) });
+  }
+
   return {
+    negativFaktor: negativFaktor,
+    reaktion: reaktion,
     ABSTAND: ABSTAND,
     ERPROBUNG: ERPROBUNG,
     ERPROBUNG_AB: ERPROBUNG_AB,

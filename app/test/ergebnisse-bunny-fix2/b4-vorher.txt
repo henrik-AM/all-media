@@ -1,0 +1,16 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'ab260026-0000-4000-8000-000000000001'
+- 'feed'
+
+    at /Users/henrik.dikta/allmedia-wt-codex/bunny-anschluss/app/test/bunny-fix-b4.js:5:436
+    at async test (/Users/henrik.dikta/allmedia-wt-codex/bunny-anschluss/app/test/bunny-fix-b4.js:4:45)
+    at async /Users/henrik.dikta/allmedia-wt-codex/bunny-anschluss/app/test/bunny-fix-b4.js:5:2 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'ab260026-0000-4000-8000-000000000001',
+  expected: 'feed',
+  operator: 'strictEqual',
+  diff: 'simple'
+}

@@ -1,0 +1,3 @@
+OK 1 Schwächerer Signierweg weder am Modul noch an Adapterinstanzen exportiert
+OK 2 Zentraler Weg prüft jedes Mal Batch-Leserechte, hält Blockierung und Instants geschlossen
+2/2 Prüfungen bestanden

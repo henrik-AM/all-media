@@ -265,6 +265,25 @@ function farbe(wert) {
   return FARBE_STANDARD;
 }
 
+/*
+ * Ein Bild als CSS-Hintergrund: `url(...)` — oder `none` (Paket 8, Entwurf
+ * Sicherheitsprüfung 17.10.2026).
+ *
+ * Dieselbe Überlegung wie bei farbe(): Story- und Insight-Adressen schreibt
+ * der Absender selbst in die Datenbank, und im Stil-Attribut hilft esc()
+ * nicht gegen `x);"><meta http-equiv="refresh" …>` — so ließ sich jeder,
+ * der die Storyleiste sah, auf eine fremde Seite umleiten. Durchgelassen
+ * wird nur, was wirklich eine Bildadresse ist, und ohne ein einziges
+ * Zeichen, mit dem man url() oder das Attribut verlässt.
+ */
+function bildUrl(adresse) {
+  const a = String(adresse == null ? '' : adresse).trim();
+  const form = /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/|\/(?!\/)|blob:|data:image\/(jpeg|png|webp|gif);base64,)/;
+  if (!form.test(a)) return 'none';
+  if (/[\s"'()<>\\`]/.test(a)) return 'none';
+  return `url(${a})`;
+}
+
 function farbeFuerNadel(farbe) {
   const treffer = String(farbe || '').match(/#[0-9a-f]{3,8}\b|\brgba?\([^)]+\)/i);
   return treffer ? treffer[0] : '#0a66ff';
@@ -281,14 +300,20 @@ function avatarOf(chat, size = 54, messenger = istMessengerChat(chat)) {
 /*
  * Ein Personen-Avatar: Profilbild aus der Datenbank, sonst Initialen auf
  * Farbe (Kasten 12.5). Das Bild liegt unter den Initialen nicht darunter,
- * sondern statt ihrer — ein kaputtes Bild blendet sich per onerror aus und
+ * sondern statt ihrer — ein kaputtes Bild blendet sich bei einem Ladefehler aus und
  * gibt die Initialen frei. Gleiche Regel in app/components/Avatar.tsx.
  */
+document.addEventListener('error', (e) => {
+  if (e.target instanceof HTMLImageElement && e.target.hasAttribute('data-bei-bildfehler-entfernen')) {
+    e.target.remove();
+  }
+}, true);
+
 function personenAvatar(u, size, extra = '') {
   const klassen = `avatar avatar--${size}${extra ? ' ' + extra : ''}`;
   const bild = u?.avatar;
   return `<div class="${klassen}" style="background:${farbe(u?.color)}">${esc(u?.initials || '')}${
-    bild ? `<img src="${esc(bild)}" alt="" onerror="this.remove()" />` : ''
+    bild ? `<img src="${esc(bild)}" alt="" data-bei-bildfehler-entfernen />` : ''
   }</div>`;
 }
 
@@ -873,6 +898,8 @@ async function sendeKoerper(chatId, text, weiteres = {}) {
 
 async function bootstrap() {
   let data;
+  state.kontoAnalyse = null;
+  state.kontoAnalyseFehler = null;
 
   // Erst klaeren, ob jemand angemeldet ist. Sonst holt der Aufruf unten die
   // Beispieldaten, obwohl eine Sitzung vorliegt und echte Daten da waeren.
@@ -958,6 +985,7 @@ async function bootstrap() {
   if (window.KryptoWeb) await window.KryptoWeb.anmelden();
 
   Object.assign(state, data);
+  state.einzelBeitragZiel=null;
 
   // Kasten 27: Chatlisten ab jetzt im Takt nachsehen (listeNachsehen).
   listeNachsehenStarten();
@@ -1469,6 +1497,7 @@ function renderBottomNav() {
        * unterer Leiste.
        */
       profilReiterPruefen(ziel, STARTPUNKT[ziel]);
+      state.einzelBeitragZiel=null;
       state.area = ziel;
       state.sub[ziel] = STARTPUNKT[ziel];
       verlasseExplorer();
@@ -1507,6 +1536,7 @@ function renderTopBar() {
   bar.querySelectorAll('[data-sub]').forEach((b) =>
     b.addEventListener('click', () => {
       profilReiterPruefen(state.area, b.dataset.sub);
+      state.einzelBeitragZiel=null;
       state.sub[state.area] = b.dataset.sub;
       verlasseExplorer();
       render();
@@ -1602,6 +1632,8 @@ let renderLaufListe = 0;
 
 function render() {
   renderLauf++;
+  // E16-1.4 (nach Runde 3): jede Navigation macht ausstehende Einstellungsblätter ungültig.
+  state.blattAufruf = (state.blattAufruf || 0) + 1;
   renderLaufListe = renderLauf;
   // Die Kamera laeuft weiter, solange niemand sie abschaltet — auch dann,
   // wenn ihre Seite laengst weggezeichnet ist. Am Handy bliebe das Licht an.
@@ -1707,6 +1739,7 @@ function renderChats() {
   const list = filteredChats();
   main.innerHTML = `
     ${storyRail(state.stories, 'messenger')}
+    <button class="item" id="instantPostfach">Instants</button>
     <div class="pagehead">
       <div class="searchrow">
         <label class="searchbox">
@@ -1762,6 +1795,8 @@ function renderChats() {
             </div>`
       }
     </div>`;
+  document.getElementById('instantPostfach')?.addEventListener('click',openInstants);
+  void instantBadgeLaden();
 
   const input = $('#chatSearch');
   input.addEventListener('input', (e) => {
@@ -2735,20 +2770,30 @@ async function storyPosten(bild, wahl) {
 }
 
 /** Eine Video-Aufnahme roh hochladen (Kasten 15). Antwort wie /api/hochladen. */
-async function videoHochladen(aufnahme, ordner) {
+async function medienDateiHochladen(datei, ordner, typ) {
+  const konto=window.Anmeldung?.nutzer?.()?.id;
+  const client=window.Anmeldung?.client?.();
+  const token=client?(await client.auth.getSession()).data.session?.access_token:null;
+  const steuerung=new AbortController();
+  const rahmen=document.createElement('div');rahmen.className='medienupload';
+  rahmen.setAttribute('role','dialog');rahmen.setAttribute('aria-modal','true');rahmen.setAttribute('aria-label','Aufnahme hochladen');
+  rahmen.innerHTML='<div class="medienupload__karte"><h2>Aufnahme hochladen</h2><p aria-live="polite">Hochladen …</p><progress aria-label="Hochladefortschritt" max="100"></progress><button class="primary-btn" type="button">Hochladen abbrechen</button></div>';
+  const vorher=document.activeElement;document.body.appendChild(rahmen);
+  const knopf=rahmen.querySelector('button');knopf.onclick=()=>steuerung.abort();knopf.focus();
+  const taste=e=>{if(e.key==='Escape'){e.preventDefault();steuerung.abort();}if(e.key==='Tab'){e.preventDefault();knopf.focus();}};
+  rahmen.addEventListener('keydown',taste);
   try {
-    const res = await fetch(`/api/hochladen/video?ordner=${encodeURIComponent(ordner)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': aufnahme.typ || 'video/mp4' },
-      body: aufnahme.datei,
-    });
-    const daten = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: daten.error || `Server antwortet mit ${res.status}` };
+    const daten=await window.MedienUpload.senden({url:`/api/hochladen/datei?ordner=${encodeURIComponent(ordner)}`,
+      body:datei,headers:{'Content-Type':typ || datei.type || 'video/mp4',...(token?{Authorization:`Bearer ${token}`}:{})},signal:steuerung.signal,
+      fortschritt:s=>{rahmen.querySelector('p').textContent=window.MedienUpload.text(s);const p=rahmen.querySelector('progress');if(s.gesamt>0)p.value=100*s.geladen/s.gesamt;else p.removeAttribute('value');}});
+    if(steuerung.signal.aborted)throw new Error('Hochladen abgebrochen.');
+    if(window.Anmeldung?.nutzer?.()?.id!==konto || (client&&(await client.auth.getSession()).data.session?.access_token!==token))throw new Error('Das Konto wurde gewechselt. Bitte erneut versuchen.');
     return daten;
-  } catch (fehler) {
-    console.error('Video hochladen fehlgeschlagen:', fehler);
-    return { ok: false, error: 'Keine Verbindung' };
-  }
+  } catch(e){return {ok:false,error:e.message || 'Hochladen fehlgeschlagen.'};}
+  finally{rahmen.remove();if(vorher?.isConnected)vorher.focus();}
+}
+async function videoHochladen(aufnahme, ordner) {
+  return medienDateiHochladen(aufnahme.datei,ordner,aufnahme.typ || 'video/mp4');
 }
 
 /*
@@ -2824,8 +2869,8 @@ function aufnahmeMenue(bild, extra = null) {
     `<div class="sheet__body">
        <div class="aufnahme__vorschau" style="background-image:${
          filterSchicht(state.kameraFilter)
-           ? filterSchicht(state.kameraFilter) + ', url(' + bild + ')'
-           : 'url(' + bild + ')'
+           ? filterSchicht(state.kameraFilter) + ', ' + bildUrl(bild)
+           : bildUrl(bild)
        }"></div>
        ${punkte
          .map(
@@ -2971,9 +3016,9 @@ function storyItem(storys, wo = 'messenger') {
         messenger: wo === 'messenger',
       }).bild;
   const kern = standbild
-    ? `<div class="story__inner" style="background-image:url(${standbild});background-size:cover;background-position:center"></div>`
+    ? `<div class="story__inner" style="background-image:${bildUrl(standbild)};background-size:cover;background-position:center"></div>`
     : `<div class="story__inner" style="background:${farbe(u.color)}">${esc(u.initials)}${
-        profilbild ? `<img class="story__profilbild" src="${esc(profilbild)}" alt="" onerror="this.remove()" />` : ''
+        profilbild ? `<img class="story__profilbild" src="${esc(profilbild)}" alt="" data-bei-bildfehler-entfernen />` : ''
       }</div>`;
 
   // Der dritte Zustand: keine Story, kein Ring. Es gibt ihn nur bei der
@@ -3196,14 +3241,21 @@ async function openFollowerList(profile, art) {
  * denselben Kopf wieder braucht. Vorher stand die Form nur hier inline, und
  * ein neu gezeichnetes Blatt verlor seinen Schliessen-Knopf.
  */
-function sheetKopf(title, mitX) {
+function sheetKopf(title, mitX, oberthema = null) {
+  /*
+   * Einstellungen 16.11., Kasten 1.4 (Henrik, 24.11.2026): ein Blatt aus den
+   * Einstellungen zeigt klein sein Oberthema über dem Titel („Messenger“ über
+   * „Lesebestätigung“). Wie SheetRahmen in der App.
+   */
+  const thema = oberthema && oberthema !== title ? oberthema : '';
+  const ober = thema ? `<div class="sheet__ober" data-testid="blatt-oberthema">${esc(thema)}</div>` : '';
   return mitX
-    ? `<div class="sheet__kopf">
-         <button class="sheet__x" data-sheet-close aria-label="Zurück">${ICONS.chevron}</button>
-         <div class="sheet__titel-mitte">${esc(title)}</div>
+    ? `<div class="sheet__kopf ${thema ? 'sheet__kopf--thema' : ''}">
+         <button class="sheet__x" data-sheet-close aria-label="Zurück">${ICONS.back}</button>
+         <div class="sheet__titel-mitte">${ober}<span>${esc(title)}</span></div>
        </div>`
     : `<div class="sheet__handle"></div>
-       <div class="sheet__title">${esc(title)}</div>`;
+       ${ober}<div class="sheet__title">${esc(title)}</div>`;
 }
 
 /*
@@ -3299,7 +3351,12 @@ function openSheet(title, bodyHtml, onMount, opts = {}) {
   sheet.className = 'sheet-backdrop';
   sheet.innerHTML = `
     <div class="sheet ${opts.hoch ? 'sheet--tall' : ''}" role="dialog" aria-label="${esc(title)}">
-      ${sheetKopf(title, opts.schliessen)}
+      ${sheetKopf(
+        title,
+        opts.schliessen,
+        // Kasten E16-1.4: beim Öffnen festgelegt, nicht beim späteren Zeichnen.
+        opts.oberthema !== undefined ? opts.oberthema : state.area === 'settings' ? state.blattThema : null
+      )}
       ${bodyHtml}
     </div>`;
   document.querySelector('.app').appendChild(sheet);
@@ -3616,7 +3673,7 @@ function renderProfilSeite() {
     <div class="scroll profilseite" data-testid="profilseite">
       <div class="profilseite__kopf">
         <button class="iconbtn" id="psZurueck" aria-label="${esc(T.zurueck)}">${ICONS.back}</button>
-        <h2 class="profilseite__titel">${esc(T.seite)}</h2>
+        <div class="profilseite__mitte"><span class="sheet__ober" data-testid="profilseite-oberthema">Konto</span><h2 class="profilseite__titel">${esc(T.seite)}</h2></div>
         <span class="profilseite__platz"></span>
       </div>
 
@@ -3980,7 +4037,7 @@ function openNewGroup() {
       <div class="sheet__row">
         <div class="group-pic" id="groupPic" ${
           zustand.bild
-            ? `style="background-image:url(${zustand.bild});background-size:cover;background-position:center"`
+            ? `style="background-image:${bildUrl(zustand.bild)};background-size:cover;background-position:center"`
             : ''
         }>${zustand.bild ? '' : ICONS.camera}</div>
         <span class="sheet__label">${zustand.bild ? 'Gruppenbild ändern' : 'Gruppenbild hinzufügen'}</span>
@@ -4477,7 +4534,7 @@ function openCall(ziel, art, ort = {}) {
                   .map((id) => avatarForUser(id, 52, state.area === 'messenger'))
                   .join('')}</div>`
               : `<div class="anruf__avatar" style="background:${farbe(u.color)}">${u.initials ? esc(u.initials) : gruppe ? ICONS.people : ''}${
-                  anrufBild ? `<img class="anruf__bild" src="${esc(anrufBild)}" alt="" onerror="this.remove()" />` : ''
+                  anrufBild ? `<img class="anruf__bild" src="${esc(anrufBild)}" alt="" data-bei-bildfehler-entfernen />` : ''
                 }</div>`
           }
           <div class="anruf__name">${esc(u.name)}</div>
@@ -5570,6 +5627,7 @@ async function openProfile(userId, variante) {
         ${profilRaster(profile, tab, reiterListen)}
       </div>`;
 
+    overlay.querySelectorAll('[data-profilmedium]').forEach(b=>b.addEventListener('click',()=>{closeOverlay();void beitragOeffnen(b.dataset.profilart,b.dataset.profilmedium);}));
     // Kasten 28/7.9: aus der Gruppeninfo geöffnet → Zurück führt dorthin.
     $('#profBack').addEventListener('click', () => (profilZurueckVon ? profilZurueckVon() : closeOverlay()));
     $('#profMore').addEventListener('click', () => openProfilOptionen(profile, (neu) => { profile = neu; paint(); }));
@@ -5646,10 +5704,10 @@ function profilRaster(profile, tab, listen) {
     }
     return `<div class="prof__grid">${profile.grid
       .map(
-        (g) => `<div class="griditem">
-          ${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image, g.mediaUrl, g.thumbnail)}
+        (g) => `<button class="griditem" data-profilmedium="${esc(g.id)}" data-profilart="${esc(g.art || (g.kind==='video'?'reel':'post'))}">
+          ${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image, g.mediaUrl, g.thumbnail)}${medienZaehlerBadge(g)}
           ${g.kind === 'video' ? `<span class="griditem__badge">${ICONS.play}</span>` : ''}
-        </div>`
+        </button>`
       )
       .join('')}</div>`;
   }
@@ -6192,6 +6250,7 @@ function renderHomeFeed() {
       <div class="postlist">${karten.join('')}</div>
     </div>`;
 
+  karussellVerbinden(main);
   vorschlaegeEinhaengen('videos');
   bindStoryRail();
   /*
@@ -6256,7 +6315,8 @@ function renderHomeFeed() {
   );
 
   main.querySelectorAll('[data-doppelklick]').forEach((flaeche) =>
-    flaeche.addEventListener('dblclick', () => {
+    flaeche.addEventListener('dblclick', (e) => {
+      if(e.target.closest('button,video,input'))return;
       const pid = flaeche.dataset.doppelklick;
       const beitrag = state.posts.find((x) => x.id === pid);
 
@@ -6304,8 +6364,9 @@ function renderHomeFeed() {
 
       const res = await fetch(`/api/posts/${pid}/${paction}`, { method: 'POST' });
       const updated = await res.json();
+      if (!res.ok) return toast(updated.error || 'Reaktion konnte nicht gespeichert werden');
       const idx = state.posts.findIndex((p) => p.id === updated.id);
-      state.posts[idx] = updated;
+      state.posts[idx] = {...updated,nurEinzeln:state.posts[idx]?.nurEinzeln};
 
       // Punkt 42: Folgen gilt der Person, nicht dem einzelnen Beitrag - alle
       // ihre Beitraege im Feed ziehen mit, sonst widersprechen sie sich.
@@ -6421,7 +6482,7 @@ function postCard(p) {
         state.umfragen?.[p.id]
           ? umfrageKarte(state.umfragen[p.id])
           : `<div class="post__media" data-doppelklick="${p.id}">
-               ${medienFlaeche(p.id, ICONS.image, p.mediaUrl, p.thumbnail)}
+               ${p.medien?.length?karussellFlaeche(p):medienFlaeche(p.id, ICONS.image, p.mediaUrl, p.thumbnail)}
                <span class="post__herz" aria-hidden="true">${ICONS.heart}</span>
              </div>`
       }
@@ -6622,8 +6683,9 @@ function renderVideoFeed() {
 
       const res = await fetch(`/api/videos/${vid}/${vaction}`, { method: 'POST' });
       const updated = await res.json();
+      if (!res.ok) return toast(updated.error || 'Reaktion konnte nicht gespeichert werden');
       const idx = state.videos.findIndex((v) => v.id === updated.id);
-      state.videos[idx] = updated;
+      state.videos[idx] = {...updated,nurEinzeln:state.videos[idx]?.nurEinzeln};
 
       if (vaction === 'repost') toast(updated.reposted ? 'Repostet' : 'Repost zurückgenommen');
       if (vaction === 'save') toast(updated.saved ? 'Gespeichert' : 'Nicht mehr gespeichert');
@@ -6678,7 +6740,17 @@ function reelsBeobachten() {
   if (!spieler.length) return;
   const feed = document.getElementById('feed');
   const vonSelbst = !schalterAn('datensparen');
-  spieler.forEach((v) => { v.muted = tonAus; });
+  spieler.forEach((v) => {
+    v.muted = tonAus;
+    // AF5: Sprungleiste für lange Reels.
+    const id = v.closest('.slide')?.dataset.impression;
+    const feld = id && main.querySelector(`[data-reelposition="${id}"]`);
+    const zeit = id && main.querySelector(`[data-reelzeit="${id}"]`);
+    if (!feld) return;
+    const zeigen = () => { feld.value = String(1000 * (v.currentTime || 0) / (v.duration || 1)); zeit.textContent = Reel.zeit(v.currentTime) + ' / ' + Reel.zeit(v.duration); };
+    v.addEventListener('timeupdate', zeigen); v.addEventListener('loadedmetadata', zeigen);
+    feld.addEventListener('input', () => { if (Number.isFinite(v.duration)) v.currentTime = Reel.ziel(Number(feld.value) / 1000, v.duration); zeigen(); });
+  });
 
   // Ohne src kann ein unsichtbarer Spieler auch nicht weiter puffern.
   // preload="none" allein ist nur ein Hinweis an den Browser.
@@ -6771,7 +6843,10 @@ function videoSlide(v) {
         <span class="slide__tempo" hidden>2×</span>
       </div>
 
+      <div class="reel-position"><label>Videoposition <output data-reelzeit="${v.id}">0:00 / 0:00</output>
+        <input type="range" min="0" max="1000" value="0" data-reelposition="${v.id}" aria-label="Videoposition" /></label></div>
       <div class="slide__rail">
+        <button class="railbtn ${v.disliked ? 'is-on' : ''}" data-vaction="dislike" data-vid="${v.id}" aria-label="Gefällt mir nicht" aria-pressed="${!!v.disliked}"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M16 3H6a2 2 0 0 0-2 2l-1 7a2 2 0 0 0 2 2h5l-1 5c0 2 2 3 3 1l4-7V3ZM16 3h5v10h-5"/></svg></button>
         <button class="railbtn ${v.liked ? 'is-on' : ''}" data-vaction="like" data-vid="${v.id}" aria-label="Gefällt mir">
           ${ICONS.heart}
           <span>${compactNumber(v.likes)}</span>
@@ -6930,7 +7005,10 @@ function pttEinhaengen(communityId, kanalId = null, nachSenden = null) {
     }
     try {
       stuecke = [];
-      aufnahme = new MediaRecorder(spur);
+      const konfig=await fetch('/api/medien/konfiguration').then(r=>r.json()).catch(()=>({}));
+      const mp4=['audio/mp4;codecs=mp4a.40.2','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
+      if(konfig.anbieter==='bunny'&&!mp4){spur.getTracks().forEach(t=>t.stop());return toast('Dieser Browser nimmt kein M4A auf. Bitte Push-to-Talk in der App verwenden.');}
+      aufnahme = new MediaRecorder(spur,konfig.anbieter==='bunny'?{mimeType:mp4}:undefined);
       aufnahme.addEventListener('dataavailable', (e) => stuecke.push(e.data));
 
       aufnahme.addEventListener('stop', async () => {
@@ -6941,7 +7019,7 @@ function pttEinhaengen(communityId, kanalId = null, nachSenden = null) {
         const dauerMs = Date.now() - beginn;
         if (dauerMs < PTT_MINDESTDAUER) return toast('Zu kurz — halte den Knopf gedrückt');
 
-        const blob = new Blob(stuecke, { type: 'audio/webm' });
+        const blob = new Blob(stuecke, { type: (aufnahme.mimeType||'audio/webm').split(';')[0] });
         const adresse = await new Promise((fertig) => {
           const leser = new FileReader();
           leser.onload = () => fertig(leser.result);
@@ -7899,7 +7977,13 @@ function geteiltBinden(liste) {
     b.addEventListener('click', (e) => {
       // Ein Ziehen zum Antworten endet nicht als Klick auf die Karte.
       if (b.closest('[data-gezogen]')) return e.preventDefault();
-      beitragOeffnen(b.dataset.beitragkind, b.dataset.beitrag);
+      const imChatOverlay = overlay.contains(liste);
+      beitragOeffnen(b.dataset.beitragkind, b.dataset.beitrag, () => {
+        // Nach einem Bereichswechsel gehört eine verspätete Antwort nicht mehr hierher.
+        if (!liste.isConnected || (imChatOverlay && overlay.hidden)) return false;
+        if (imChatOverlay) closeChat();
+        return true;
+      });
     })
   );
 }
@@ -8743,6 +8827,8 @@ function bzWertText(ansicht) {
 }
 
 function openBildschirmzeit(ansicht) {
+  // Kasten E16-1.4: Oberthema beim Öffnen festhalten (der Kopf wird bei jedem Schritt neu gezeichnet).
+  const bzThema = state.area === 'settings' ? state.blattThema : null;
   if (!BZ) return toast('Die Bildschirmzeit ist gerade nicht verfügbar');
   const stapel = [ansicht];
   let kind = null;
@@ -8897,7 +8983,7 @@ function openBildschirmzeit(ansicht) {
     const eltern = !kind && bz.stand?.eltern && seite !== 'uebersicht' && seite !== 'kinder'
       ? `<p class="bz__eltern">${esc(BZ.TEXTE.elternGesetzt(bz.stand.eltern.name))}</p>` : '';
     const blatt = sheet.querySelector('.sheet');
-    blatt.innerHTML = `${sheetKopf(titel, true)}
+    blatt.innerHTML = `${sheetKopf(titel, true, bzThema)}
       <div class="sheet__body" data-bz-blatt="${esc(seite)}">${eltern}
         ${meldung ? `<p class="sheet__fehler" role="alert">${esc(meldung)}</p>` : ''}
         ${inhalt()}
@@ -9017,6 +9103,27 @@ function renderSettingsWert() {
     el.textContent = bzWertText(el.dataset.bzWert);
   });
 }
+
+/*
+ * Einstellungen 16.11., Kasten 1.6: jeder .switch ist für Bildschirmleser ein
+ * Schalter mit Zustand. Die Handler schalten nur die Klasse is-on um; dieser
+ * Beobachter hält role und aria-checked dazu passend, überall in der Seite.
+ */
+(function schalterZugaenglich() {
+  const setze = (el) => {
+    if (!el.classList?.contains('switch') || el.classList.contains('einst-anzeige')) return;
+    if (el.getAttribute('role') !== 'switch') el.setAttribute('role', 'switch');
+    const an = String(el.classList.contains('is-on'));
+    if (el.getAttribute('aria-checked') !== an) el.setAttribute('aria-checked', an);
+  };
+  const beobachter = new MutationObserver((liste) => {
+    for (const m of liste) {
+      if (m.type === 'attributes') setze(m.target);
+      else m.addedNodes.forEach((n) => n.nodeType === 1 && (setze(n), n.querySelectorAll?.('.switch').forEach(setze)));
+    }
+  });
+  beobachter.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+})();
 
 /* ---------------------------------------------------------- settings */
 /*
@@ -9258,58 +9365,15 @@ const SETTINGS = [
     ],
   },
   {
-    id: 'speicher',
-    title: 'Speicher',
-    items: [
-      { label: 'Automatischer Download', icon: 'image', wahlKey: 'autoDownload', wahl: ['Nie', 'Nur im WLAN', 'Immer'], standard: 'Nur im WLAN' },
-      { label: 'Speicher verwalten', icon: 'compass', liste: 'speicher' },
-      { label: 'Datensparmodus', icon: 'portrait', toggle: 'datensparen' },
-      { label: 'Medienqualität', icon: 'image', wahlKey: 'medienqualitaet', wahl: ['Standard', 'Hoch'], standard: 'Standard' },
-    ],
-  },
-  {
-    id: 'hilfe',
-    title: 'Hilfe',
-    items: [
-      {
-        label: 'Hilfebereich',
-        icon: 'info',
-        info: 'Fragen und Antworten zu All Media. Bei allem, was hier nicht steht: schreib uns über „Problem melden“ — wir antworten meist innerhalb eines Werktags.',
-      },
-      /*
-       * Kasten RS 3: „Problem melden" meldete „angekommen" und speicherte
-       * nichts. Jetzt inhalt_melden('problem', …) über das Melden-Blatt; die
-       * Antwort kommt als Mitteilung in die Glocke (Schema 102). Darunter
-       * der Stand eigener Meldungen, der Kontostatus (DSA Art. 16, 17, 20)
-       * und — nur für Moderatoren — die Moderation. Gleiche Einträge in der
-       * App (SettingsScreen, Hilfe); die Moderation gibt es nur hier.
-       */
-      { label: 'Problem melden', icon: 'shield', aktion: 'problem' },
-      { label: 'Meine Meldungen', icon: 'flag', aktion: 'meinemeldungen' },
-      { label: 'Kontostatus', icon: 'info', aktion: 'kontostatus' },
-      { label: 'Moderation', icon: 'shield', aktion: 'moderation', nurModerator: true },
-      /*
-       * Kasten RS 1 (24.10.2026): bis hierher je zwei Sätze, die zum Teil
-       * nicht stimmten („ab 13"). Jetzt die vollständigen Texte aus
-       * gemeinsam/rechtstexte.js — dieselben wie in der App
-       * (app/components/RechtstextSheet.tsx).
-       */
-      { label: 'Die Regeln kurz erklärt', icon: 'info', rechtstext: 'kurz_erklaert' },
-      { label: 'Nutzungsbedingungen', icon: 'document', rechtstext: 'nutzungsbedingungen' },
-      { label: 'Community-Richtlinien', icon: 'people', rechtstext: 'community_richtlinien' },
-      { label: 'Datenschutzerklärung', icon: 'lock', rechtstext: 'datenschutz' },
-      { label: 'Für Eltern', icon: 'heart', rechtstext: 'eltern_info' },
-      { label: 'Impressum', icon: 'info', rechtstext: 'impressum' },
-      { label: 'Freunde einladen', icon: 'people', aktion: 'einladen' },
-    ],
-  },
-  {
     id: 'videos',
     title: 'Videos',
     items: [
       { label: 'Privates Profil', icon: 'lock', toggle: 'videoPrivate' },
       { label: 'Spenden-PIN', icon: 'bookmark', aktion: 'spendencode' },
       { label: 'Insights', icon: 'compass', liste: 'insights' },
+      { label: 'Enge Freunde', icon: 'people', aktion: 'engefreunde' },
+      { label: 'Instants empfangen', icon: 'camera', toggle: 'instantsEmpfangen' },
+      { label: 'Konto-Analysen', icon: 'compass', liste: 'kontoanalysen' },
       { label: 'Wem ich folge', icon: 'person', liste: 'gefolgt' },
       { label: 'Mit Glocke markierte Profile', icon: 'bell', liste: 'glocke' },
       /*
@@ -9361,6 +9425,60 @@ const SETTINGS = [
       { label: 'Gestummte Profile', icon: 'block', liste: 'stummeProfile' },
     ],
   },
+
+  /*
+   * Einstellungen 16.11., Q04 (Kasten 1.3): „Speicher“ und „Hilfe“ als eigene
+   * Oberbegriffe unterhalb von Videos und Communitys. Gleiche Reihenfolge wie
+   * in der App (SECTIONS in SettingsScreen.tsx).
+   */
+  {
+    id: 'speicher',
+    title: 'Speicher',
+    items: [
+      { label: 'Automatischer Download', icon: 'image', wahlKey: 'autoDownload', wahl: ['Nie', 'Nur im WLAN', 'Immer'], standard: 'Nur im WLAN' },
+      { label: 'Speicher verwalten', icon: 'compass', liste: 'speicher' },
+      { label: 'Datensparmodus', icon: 'portrait', toggle: 'datensparen' },
+      { label: 'Medienqualität', icon: 'image', wahlKey: 'medienqualitaet', wahl: ['Standard', 'Hoch'], standard: 'Standard' },
+    ],
+  },
+  {
+    id: 'hilfe',
+    title: 'Hilfe',
+    items: [
+      {
+        label: 'Hilfebereich',
+        icon: 'info',
+        info: 'Fragen und Antworten zu All Media. Bei allem, was hier nicht steht: schreib uns über „Problem melden“ — wir antworten meist innerhalb eines Werktags.',
+      },
+      /*
+       * Kasten RS 3: „Problem melden" meldete „angekommen" und speicherte
+       * nichts. Jetzt inhalt_melden('problem', …) über das Melden-Blatt; die
+       * Antwort kommt als Mitteilung in die Glocke (Schema 102). Darunter
+       * der Stand eigener Meldungen, der Kontostatus (DSA Art. 16, 17, 20)
+       * und — nur für Moderatoren — die Moderation. Gleiche Einträge in der
+       * App (SettingsScreen, Hilfe); die Moderation gibt es nur hier.
+       */
+      { label: 'Problem melden', icon: 'shield', aktion: 'problem' },
+      { label: 'Meine Meldungen', icon: 'flag', aktion: 'meinemeldungen' },
+      { label: 'Kontostatus', icon: 'info', aktion: 'kontostatus' },
+      { label: 'Moderation', icon: 'shield', aktion: 'moderation', nurModerator: true },
+      /*
+       * Kasten RS 1 (24.10.2026): bis hierher je zwei Sätze, die zum Teil
+       * nicht stimmten („ab 13"). Jetzt die vollständigen Texte aus
+       * gemeinsam/rechtstexte.js — dieselben wie in der App
+       * (app/components/RechtstextSheet.tsx).
+       */
+      { label: 'Die Regeln kurz erklärt', icon: 'info', rechtstext: 'kurz_erklaert' },
+      { label: 'Nutzungsbedingungen', icon: 'document', rechtstext: 'nutzungsbedingungen' },
+      { label: 'Community-Richtlinien', icon: 'people', rechtstext: 'community_richtlinien' },
+      { label: 'Datenschutzerklärung', icon: 'lock', rechtstext: 'datenschutz' },
+      { label: 'Für Eltern', icon: 'heart', rechtstext: 'eltern_info' },
+      { label: 'Impressum', icon: 'info', rechtstext: 'impressum' },
+      { label: 'Freunde einladen', icon: 'people', aktion: 'einladen' },
+      // Einstellungen 16.11., Q78 (Kasten 1.3): „Über All Media“ gehört zur Hilfe. Wie in der App.
+      { label: 'Über All Media', icon: 'info', aktion: 'ueber' },
+    ],
+  },
 ];
 
 /*
@@ -9391,6 +9509,7 @@ const SCHALTER_STANDARD = {
   datensparen: false,
   // Livestream: Aufzeichnung ohne Rueckfrage veroeffentlichen (28.09.2026).
   liveAutoVeroeffentlichen: false,
+  instantsEmpfangen: true,
   // Adressbuch abgleichen (Schema 87). Leer heißt: noch nicht gefragt.
   kontakteAbgleich: false,
 };
@@ -9927,7 +10046,7 @@ function openSichtbarkeit(punkt) {
       });
 
     sheet.querySelector('.sheet').innerHTML =
-      sheetKopf(punkt.label, true) +
+      sheetKopf(punkt.label, true, punkt._thema ?? null) +
       `<div class="sheet__body">
          ${
            /*
@@ -9941,15 +10060,17 @@ function openSichtbarkeit(punkt) {
              ? `<div class="sheet__hint" data-testid="likes-ersteller-hinweis">${esc(window.Sichtbarkeit.LIKES_ERSTELLER_HINWEIS)}</div>`
              : ''
          }
-         ${window.Sichtbarkeit.stufenFuer(bereich).map(
-           (st) => `<button class="item sicht__stufe${st.key === jetzt.stufe ? ' is-active' : ''}" data-stufe="${st.key}">
-             <span class="item__label">
-               <b>${esc(st.label)}</b>
-               <small>${esc(st.hinweis)}</small>
+         <div class="listhead">Wer darf das?</div>
+         <div class="einst-wahl" role="radiogroup" aria-label="${esc(punkt.label)}">${window.Sichtbarkeit.stufenFuer(bereich).map(
+           // Kasten E16-1.5: dasselbe Auswahlmuster wie jede „eine aus mehreren“-Einstellung.
+           (st) => `<button class="einst-wahl__zeile sicht__stufe${st.key === jetzt.stufe ? ' is-active' : ''}" role="radio" aria-checked="${st.key === jetzt.stufe}" data-stufe="${st.key}">
+             <span class="einst-wahl__text">
+               <span class="einst-wahl__label">${esc(st.label)}</span>
+               <span class="einst-wahl__hinweis">${esc(st.hinweis)}</span>
              </span>
-             <span class="sicht__punkt">${st.key === jetzt.stufe ? ICONS.check : ''}</span>
+             <span class="einst-wahl__kreis" aria-hidden="true"></span>
            </button>`
-         ).join('')}
+         ).join('')}</div>
 
          ${
            /*
@@ -9960,7 +10081,7 @@ function openSichtbarkeit(punkt) {
             * Datenbank selbst (Schema 30), nicht hier.
             */
            bereich === 'story'
-             ? `<button class="item sicht__stufe${jetzt.stufe !== 'alle' ? ' is-aus' : ''}" data-invideos="1"${
+             ? `<button class="item sicht__stufe${jetzt.stufe !== 'alle' ? ' is-aus' : ''}" data-invideos="1" role="switch" aria-checked="${!!(jetzt.inVideos && jetzt.stufe === 'alle')}" aria-label="Story auch in Videos teilen"${
                  jetzt.stufe !== 'alle' ? ' disabled' : ''
                }>
                   <span class="item__label">
@@ -9971,9 +10092,7 @@ function openSichtbarkeit(punkt) {
                         : 'Nur bei „Alle" möglich.'
                     }</small>
                   </span>
-                  <span class="sicht__punkt">${
-                    jetzt.inVideos && jetzt.stufe === 'alle' ? ICONS.check : ''
-                  }</span>
+                  <span class="switch einst-anzeige ${jetzt.inVideos && jetzt.stufe === 'alle' ? 'is-on' : ''}" aria-hidden="true"><span class="switch__knob"></span></span>
                 </button>`
              : ''
          }
@@ -10292,17 +10411,35 @@ function einstellung(punkt) {
   return gespeichert && (!punkt.wahl || punkt.wahl.includes(gespeichert)) ? gespeichert : punkt.standard || '';
 }
 
-async function einstellungSetzen(punkt, wert) {
+// Kasten E16-1.6 (Gegenprüfung R2/R3): je Schlüssel zählt nur der jüngste Schreibvorgang;
+// Schreibvorgänge laufen nacheinander, beide Privatprofil-Schalter teilen sich die Reihe.
+const einstellungSchreibNr = {};
+const einstellungReihe = {};
+const einstellungBestaetigt = {};
+function einstellungSetzen(punkt, wert) {
   const schluessel = einstellungsSchluessel(punkt);
-  const vorher = state.einstellungen ? state.einstellungen[schluessel] : undefined;
-
-  // Sofort umlegen, damit es sich nicht zaeh anfuehlt.
+  const reihe = schluessel === 'videoPrivate' || schluessel === 'commPrivate' ? 'privat' : schluessel;
+  const nr = (einstellungSchreibNr[reihe] || 0) + 1;
+  einstellungSchreibNr[reihe] = nr;
+  if (!(schluessel in einstellungBestaetigt)) einstellungBestaetigt[schluessel] = state.einstellungen ? state.einstellungen[schluessel] : undefined;
+  // Sofort anzeigen; geschrieben wird der Reihe nach.
   state.einstellungen = { ...(state.einstellungen || {}), [schluessel]: wert };
+  const lauf = (einstellungReihe[reihe] || Promise.resolve()).then(() => einstellungSchreiben(punkt, wert, reihe, nr));
+  einstellungReihe[reihe] = lauf.catch(() => false);
+  return lauf;
+}
+async function einstellungSchreiben(punkt, wert, reihe, nr) {
+  const schluessel = einstellungsSchluessel(punkt);
+  // Eine neuere Wahl steht schon an: diese gar nicht erst schreiben.
+  if (einstellungSchreibNr[reihe] !== nr) return true;
 
   const antwort = await api(`/api/einstellungen/${encodeURIComponent(schluessel)}`, { wert });
+  if (antwort?.ok) einstellungBestaetigt[schluessel] = wert;
+  // Inzwischen wurde neu gewählt: diese Antwort darf nichts mehr zurückdrehen.
+  if (einstellungSchreibNr[reihe] !== nr) return !!antwort?.ok;
   if (!antwort?.ok) {
-    // Zurueckdrehen. Eine Einstellung, die anders aussieht, als sie
-    // gespeichert ist, ist schlimmer als eine, die sich nicht setzen laesst.
+    // Zurück auf den zuletzt BESTÄTIGTEN Wert, nicht auf einen Zwischenstand.
+    const vorher = einstellungBestaetigt[schluessel];
     if (vorher === undefined) delete state.einstellungen[schluessel];
     else state.einstellungen[schluessel] = vorher;
     toast(antwort?.error || 'Nicht gespeichert');
@@ -10334,6 +10471,11 @@ async function einstellungSetzen(punkt, wert) {
 
 /** Inhalt der Listen-Punkte. Alles kommt aus dem echten Zustand. */
 function einstellungsListe(art) {
+  if (art === 'kontoanalysen') {
+    if (state.kontoAnalyseFehler) return {leer:state.kontoAnalyseFehler,zeilen:[]};
+    try { return {leer:'',zeilen:Analyse.zeilen(state.kontoAnalyse)}; }
+    catch { return {leer:'Analysen noch nicht verfügbar.',zeilen:[]}; }
+  }
   // Kasten RS 1 (L11): kein erfundenes Gerät, kein Knopf ohne Wirkung. Wie in der App.
   if (art === 'geraete') {
     return {
@@ -10534,7 +10676,57 @@ function einstellungsListe(art) {
 
 /** `nachher` wird gerufen, wenn sich etwas geaendert hat - damit die
  *  aufrufende Seite ihren neuen Stand zeigen kann. */
+/* E16-1.6: Zeilen eines Listenblatts — beim Öffnen und beim Nachladen im offenen Blatt. */
+function listenZeilenHtml(zeilen, leer) {
+  return (
+
+           zeilen.length
+             ? zeilen
+                 .map((z) =>
+                   /*
+                    * Zwischenueberschrift statt Eintrag. Die Profilstatistik
+                    * hat zwoelf Zeilen; ohne Gliederung sieht "Profilaufrufe
+                    * (7 Tage)" so wichtig aus wie "Follower gesamt", obwohl
+                    * das eine eine Entwicklung ist und das andere ein Stand.
+                    */
+                   z.kopf
+                     ? `<div class="sheet__gruppe">${esc(z.text)}</div>`
+                     : z.ziel
+                     ? // Verlauf, Gelikte, Kommentare: zum Beitrag (Kasten 10.1).
+                       `<button class="item" data-ziel-kind="${esc(z.ziel.kind || '')}" data-ziel-id="${esc(z.ziel.id)}">
+                     <span class="item__label">${esc(z.text)}</span>
+                     <span class="item__value item__value--zeit">${esc(z.neben || '')}</span>
+                     <span class="item__chevron">${ICONS.chevron}</span>
+                   </button>`
+                     : `<div class="item">
+                     <span class="item__label">${esc(z.text)}</span>
+                     <span class="item__value">${esc(z.neben || '')}</span>
+                   </div>`
+                 )
+                 .join('')
+             : `<div class="sheet__hint">${esc(leer)}</div>`
+         
+  );
+}
+function listenZeilenBinden(sheet, close) {
+  sheet.querySelectorAll('[data-ziel-id]').forEach((b) =>
+    b.addEventListener('click', () => {
+      close();
+      beitragOeffnen(b.dataset.zielKind, b.dataset.zielId);
+    })
+  );
+}
+
 function openEinstellung(punkt, nachher) {
+  /*
+   * Kasten E16-1.4 (Gegenprüfung 24.11.): das Oberthema gehört zum Aufruf.
+   * Verspätete Antworten (Verlauf, Analysen, Version) zeigen sonst das Thema
+   * eines inzwischen angetippten anderen Punkts.
+   */
+  if (!('_thema' in punkt)) punkt = { ...punkt, _thema: state.area === 'settings' ? state.blattThema : null, _aufruf: state.blattAufruf };
+  // Späte Antwort (Verlauf, Analysen): inzwischen woanders oder ein anderer Punkt geöffnet → verwerfen.
+  if (punkt._frisch && (state.area !== 'settings' || punkt._aufruf !== state.blattAufruf)) return;
+  state.blattThema = punkt._thema;
   // Sichtbarkeit hat ein eigenes Blatt: vier Stufen plus Ausnahmeliste.
   if (punkt.sichtbar) return openSichtbarkeit(punkt);
   // Kasten 22: das Bildschirmzeit-Blatt.
@@ -10545,6 +10737,23 @@ function openEinstellung(punkt, nachher) {
    * gerade im Feed etwas gespeichert hat, soll es hier sehen, ohne die Seite
    * neu zu laden. Ein offenes Blatt baut sich nicht von selbst neu auf.
    */
+  if (punkt.liste === 'kontoanalysen' && !punkt._frisch) {
+    return (async () => {
+      state.kontoAnalyseFehler = null;
+      const konto=window.Anmeldung?.nutzer?.()?.id || null;
+      try {
+        const r=await fetch('/api/kontoanalysen');const d=await r.json();
+        if (!r.ok || !d?.zeitraeume) throw new Error('Analysen konnten nicht geladen werden.');
+        if((window.Anmeldung?.nutzer?.()?.id || null)!==konto)return;
+        Analyse.zeilen(d);state.kontoAnalyse=d;
+      } catch(e) {
+        if((window.Anmeldung?.nutzer?.()?.id || null)!==konto)return;
+        state.kontoAnalyseFehler=e.message;
+      }
+      if((window.Anmeldung?.nutzer?.()?.id || null)!==konto)return;
+      openEinstellung({...punkt,_frisch:true});
+    })();
+  }
   if (punkt.liste === 'verlauf' && !punkt._frisch) {
     return fetch('/api/verlauf')
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
@@ -10563,25 +10772,52 @@ function openEinstellung(punkt, nachher) {
     const jetzt = einstellung(punkt);
     return openSheet(
       punkt.label,
-      `<div class="sheet__body">${punkt.wahl
+      // Kasten E16-1.5: dasselbe Auswahlmuster wie Sichtbarkeit und App (AuswahlZeile).
+      `<div class="sheet__body"><div class="einst-wahl" role="radiogroup" aria-label="${esc(punkt.label)}">${punkt.wahl
         .map(
-          (w) => `<button class="item" data-wahl="${esc(w)}">
-            <span class="item__label">${esc(w)}</span>
-            ${w === jetzt ? `<span class="item__haken">${ICONS.check}</span>` : ''}
+          (w) => `<button class="einst-wahl__zeile" role="radio" aria-checked="${w === jetzt}" data-wahl="${esc(w)}">
+            <span class="einst-wahl__text"><span class="einst-wahl__label">${esc(w)}</span></span>
+            <span class="einst-wahl__kreis" aria-hidden="true"></span>
           </button>`
         )
-        .join('')}</div>`,
+        .join('')}</div></div>`,
       (sheet, close) => {
+        /*
+         * Kasten E16-1.6 (Gegenprüfung 24.11.): erst speichern, dann
+         * schließen. Vorher ging das Blatt sofort zu; lehnte der Server ab,
+         * stand in der Liste weiter der abgelehnte Wert. Jetzt bleibt das
+         * Blatt bei einem Fehler offen und sagt es.
+         */
+        let laeuft = false;
         sheet.querySelectorAll('[data-wahl]').forEach((b) =>
-          b.addEventListener('click', () => {
-            einstellungSetzen(punkt, b.dataset.wahl);
+          b.addEventListener('click', async () => {
+            if (laeuft) return;
+            laeuft = true;
+            const wahl = b.dataset.wahl;
+            sheet.querySelectorAll('[data-wahl]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+            sheet.querySelector('.einst-wahl')?.setAttribute('aria-busy', 'true');
+            const ok = await einstellungSetzen(punkt, wahl);
+            laeuft = false;
+            sheet.querySelector('.einst-wahl')?.removeAttribute('aria-busy');
+            if (!ok) {
+              sheet.querySelectorAll('[data-wahl]').forEach((x) => x.setAttribute('aria-checked', String(x.dataset.wahl === einstellung(punkt))));
+              let f = sheet.querySelector('.einst-fehler');
+              if (!f) {
+                f = document.createElement('p');
+                f.className = 'einst-fehler';
+                f.setAttribute('role', 'alert');
+                sheet.querySelector('.sheet__body')?.appendChild(f);
+              }
+              f.textContent = 'Das ließ sich gerade nicht speichern. Bitte versuch es noch einmal.';
+              return;
+            }
             close();
             // Nur dort neu zeichnen, wo die Liste auch steht. Aus der
             // Kontaktinfo heraus haette das sonst den Einstellungs-
             // Bildschirm unter das offene Fenster gebaut.
             if (state.area === 'settings') renderSettings();
             nachher?.();
-            toast(`${punkt.label}: ${b.dataset.wahl}`);
+            toast(`${punkt.label}: ${wahl}`);
           })
         );
       },
@@ -10676,7 +10912,8 @@ function openEinstellung(punkt, nachher) {
         toast(punkt.fertig || 'Gespeichert');
         return null;
       },
-      'Merken'
+      'Merken',
+      { wahlListe: true }
     );
   }
 
@@ -10685,49 +10922,26 @@ function openEinstellung(punkt, nachher) {
     const { zeilen, leer, knopf, knopfText } = punkt._zeilen
       ? { zeilen: punkt._zeilen, leer: '', knopf: null, knopfText: '' }
       : einstellungsListe(punkt.liste);
+    const nachladeName = Object.keys(NACHLADE_LISTE).find((k) => NACHLADE_LISTE[k] === punkt.liste);
+    const ladeFehler = nachladeName && !state[nachladeName] && einstellungNachgeladen[nachladeName] && einstellungNachgeladen[nachladeName] !== 'laeuft';
     return openSheet(
       punkt.label,
-      `<div class="sheet__body">
-         ${
-           zeilen.length
-             ? zeilen
-                 .map((z) =>
-                   /*
-                    * Zwischenueberschrift statt Eintrag. Die Profilstatistik
-                    * hat zwoelf Zeilen; ohne Gliederung sieht "Profilaufrufe
-                    * (7 Tage)" so wichtig aus wie "Follower gesamt", obwohl
-                    * das eine eine Entwicklung ist und das andere ein Stand.
-                    */
-                   z.kopf
-                     ? `<div class="sheet__gruppe">${esc(z.text)}</div>`
-                     : z.ziel
-                     ? // Verlauf, Gelikte, Kommentare: zum Beitrag (Kasten 10.1).
-                       `<button class="item" data-ziel-kind="${esc(z.ziel.kind || '')}" data-ziel-id="${esc(z.ziel.id)}">
-                     <span class="item__label">${esc(z.text)}</span>
-                     <span class="item__value item__value--zeit">${esc(z.neben || '')}</span>
-                     <span class="item__chevron">${ICONS.chevron}</span>
-                   </button>`
-                     : `<div class="item">
-                     <span class="item__label">${esc(z.text)}</span>
-                     <span class="item__value">${esc(z.neben || '')}</span>
-                   </div>`
-                 )
-                 .join('')
-             : `<div class="sheet__hint">${esc(leer)}</div>`
-         }
+      `<div class="sheet__body" data-liste="${esc(punkt.liste)}" data-thema="${esc(punkt._thema || '')}">
+         ${listenZeilenHtml(zeilen, leer)}
        </div>
-       ${knopf ? `<div class="sheet__footer"><button class="prof__btn is-primary" id="listenKnopf">${esc(knopf)}</button></div>` : ''}`,
+       ${knopf ? `<div class="sheet__footer"><button class="prof__btn is-primary" id="listenKnopf">${esc(knopf)}</button></div>` : ''}
+       ${ladeFehler ? `<div class="sheet__footer"><button class="prof__btn is-primary" id="listeNochmal">Erneut versuchen</button></div>` : ''}`,
       (sheet, close) => {
+        // Kasten E16-1.6: nach einem Ladefehler sofort neu fragen statt 30 s zu warten.
+        sheet.querySelector('#listeNochmal')?.addEventListener('click', () => listeNochmal(nachladeName, sheet));
         sheet.querySelector('#listenKnopf')?.addEventListener('click', () => {
           close();
           toast(knopfText);
         });
-        sheet.querySelectorAll('[data-ziel-id]').forEach((b) =>
-          b.addEventListener('click', () => {
-            close();
-            beitragOeffnen(b.dataset.zielKind, b.dataset.zielId);
-          })
-        );
+        listenZeilenBinden(sheet, close);
+        // Für das Nachladen im offenen Blatt (einstellungNachladen).
+        const body = sheet.querySelector('[data-liste]');
+        if (body) body._zu = close;
       },
       { schliessen: true, hoch: zeilen.length > 4 }
     );
@@ -10760,8 +10974,31 @@ function openEinstellung(punkt, nachher) {
   if (punkt.aktion === 'kontostatus') return openKontostatus('kontostatus');
   if (punkt.aktion === 'kontoLoeschen') return openKontoLoeschen();
   if (punkt.aktion === 'moderation') return state.istModerator ? openModeration() : toast(window.Meldung.grundText('nicht_erlaubt'));
+  if (punkt.aktion === 'engefreunde') return openEngeFreunde();
 
   if (punkt.aktion === 'datenauskunft') return datenauskunftLaden();
+  // Kasten E16-1.3: „Über All Media“ unter Hilfe — Fassung und ausgelieferter Stand.
+  if (punkt.aktion === 'ueber') {
+    const thema = punkt._thema;
+    return (async () => {
+      let stand;
+      try {
+        const v = await (await fetch('/api/version')).json();
+        stand = `Version ${v.version} · Stand ${v.commit}`;
+      } catch {
+        stand = 'Version 1.0.0 · Stand gerade nicht abrufbar';
+      }
+      // Inzwischen woanders hin gewechselt oder etwas anderes geöffnet: kein Blatt mehr aufmachen.
+      if (state.area !== 'settings' || punkt._aufruf !== state.blattAufruf) return;
+      openSheet(
+        'Über All Media',
+        `<div class="sheet__body"><p class="sheet__text" data-testid="ueber-stand">${esc(stand)}</p>
+          <p class="sheet__text">Ein Konto für Messenger, Videos und Communitys. Nutzungsbedingungen, Datenschutzerklärung und Impressum findest du im Abschnitt Hilfe; Fragen und Fehler schickst du über „Problem melden“.</p></div>`,
+        null,
+        { schliessen: true, oberthema: thema }
+      );
+    })();
+  }
 
   if (punkt.aktion === 'sicherung') {
     const anzahl = state.chats.length;
@@ -10847,8 +11084,41 @@ function einstellungNachladen(name, pfad, auswerten) {
     })
     .finally(() => {
       if (state.area === 'settings') renderSettings();
+      /*
+       * Gegenprüfung R2: ein schon offenes Blatt dieser Liste zeigte weiter
+       * „Wird geladen …“. Es wird mit dem neuen Stand (oder dem Fehler) neu
+       * geöffnet — mit demselben Oberthema.
+       */
+      const liste = NACHLADE_LISTE[name];
+      const offen = liste && document.querySelector(`.sheet [data-liste="${liste}"]`);
+      if (offen) {
+        // Nach Runde 3: im vorhandenen Blatt aktualisieren — Platz, Fokus und Schließen bleiben.
+        const { zeilen, leer } = einstellungsListe(liste);
+        const scroll = offen.scrollTop;
+        offen.innerHTML = listenZeilenHtml(zeilen, leer);
+        offen.scrollTop = scroll;
+        listenZeilenBinden(offen, offen._zu || (() => offen.closest('.sheet-backdrop')?.remove()));
+        const sheet = offen.closest('.sheet');
+        const fehler = !state[name] && einstellungNachgeladen[name] && einstellungNachgeladen[name] !== 'laeuft';
+        const fuss = sheet?.querySelector('#listeNochmal')?.closest('.sheet__footer');
+        if (!fehler) fuss?.remove();
+        else if (!fuss && sheet) {
+          sheet.insertAdjacentHTML('beforeend', '<div class="sheet__footer"><button class="prof__btn is-primary" id="listeNochmal">Erneut versuchen</button></div>');
+          sheet.querySelector('#listeNochmal').addEventListener('click', () => listeNochmal(name, sheet));
+        }
+      }
     });
 }
+function listeNochmal(name, sheet) {
+  einstellungNachgeladen[name] = undefined;
+  const body = sheet.querySelector('[data-liste]');
+  if (body) body.innerHTML = '<div class="sheet__hint">Wird geladen …</div>';
+  sheet.querySelector('#listeNochmal')?.closest('.sheet__footer')?.remove();
+  const pfade = { statistik: ['/api/statistik', (d) => d?.statistik || null], gelikt: ['/api/gelikt', (d) => (Array.isArray(d) ? d : null)], kommentiert: ['/api/kommentiert', (d) => (Array.isArray(d) ? d : null)] };
+  einstellungNachladen(name, ...pfade[name]);
+}
+// Welche Liste in den Einstellungen an welchem Nachladen hängt.
+const NACHLADE_LISTE = { statistik: 'insights', gelikt: 'gelikt', kommentiert: 'kommentiert' };
 /** Leertext einer nachgeladenen Liste: noch unterwegs oder gescheitert. */
 function nachladenLeer(name) {
   return einstellungNachgeladen[name] && einstellungNachgeladen[name] !== 'laeuft'
@@ -10913,10 +11183,10 @@ function renderSettings() {
   const itemHtml = (it, sektionId) => {
     if (it.toggle) {
       const on = it.toggle === 'theme' ? state.theme === 'dark' : schalterAn(it.toggle);
-      return `<div class="item">
+      return `<div class="item einst-zeile">
         <span class="item__icon">${ICONS[it.icon]}</span>
         <span class="item__label">${esc(it.label)}</span>
-        <button class="switch ${on ? 'is-on' : ''}" data-toggle="${it.toggle}" aria-label="${esc(it.label)}"><span class="switch__knob"></span></button>
+        <button class="switch ${on ? 'is-on' : ''}" data-toggle="${it.toggle}" aria-label="${esc(it.label)}" role="switch" aria-checked="${on}"><span class="switch__knob"></span></button>
       </div>`;
     }
     // Bei einer Auswahl steht rechts, was gerade gilt - sonst muesste man
@@ -10930,7 +11200,7 @@ function renderSettings() {
       : it.aktion === 'entsperrcode' && bz.stand
       ? (bz.stand.eigene_art === 'eigen' ? 'Eigener Code' : 'Spenden-PIN')
       : '';
-    return `<button class="item ${it.gefahr ? 'item--danger' : ''}" data-setting="${esc(it.label)}" data-abschnitt="${esc(sektionId)}">
+    return `<button class="item einst-zeile ${it.gefahr ? 'item--danger' : ''}" data-setting="${esc(it.label)}" data-abschnitt="${esc(sektionId)}">
       <span class="item__icon">${ICONS[it.icon]}</span>
       <span class="item__label">${esc(it.label)}</span>
       ${wert ? `<span class="item__value">${esc(wert)}</span>` : ''}
@@ -10940,22 +11210,28 @@ function renderSettings() {
   };
 
   main.innerHTML = `
-    <div class="pagehead">
+    <div class="pagehead einst-kopf">
       ${
         nur
           ? `<div class="pagehead__row">
               <button class="iconbtn" id="settingsNurBack" aria-label="Zurück zu allen Einstellungen">${ICONS.back}</button>
-              <h2 class="pagehead__title">${esc(nur.title)}</h2>
+              <div class="einst-titel"><span class="einst-titel__ober">Einstellungen</span><h2 class="pagehead__title" id="einstThema">${esc(nur.title)}</h2></div>
             </div>`
           : ''
       }
       ${
         // Nur wenn man aus einem Profil kam - wer die Einstellungen ueber die
         // untere Leiste oeffnet, hat kein "zurueck".
-        !nur && state.settingsAus
+        /*
+         * Einstellungen 16.11., Kasten 1.4 (Henrik, 24.11.2026): oben steht
+         * immer, wo man ist. Über dem ersten Abschnitt „Einstellungen“, beim
+         * Blättern der aktuelle Abschnitt (Scroll-Verfolgung weiter unten).
+         * Gleicher Kopf in der App (SettingsScreen.tsx).
+         */
+        !nur
           ? `<div class="pagehead__row">
-              <button class="iconbtn" id="settingsBack" aria-label="Zurück zum Profil">${ICONS.back}</button>
-              <h2 class="pagehead__title">Einstellungen</h2>
+              ${state.settingsAus ? `<button class="iconbtn" id="settingsBack" aria-label="Zurück zum Profil">${ICONS.back}</button>` : ''}
+              <div class="einst-titel"><span class="einst-titel__ober" id="einstOber" hidden>Einstellungen</span><h2 class="pagehead__title" id="einstThema">Einstellungen</h2></div>
             </div>`
           : ''
       }
@@ -10972,6 +11248,7 @@ function renderSettings() {
           color: ich.color || '',
         };
         return `
+        <div class="einst-konto">
         <div class="konto__kopf" id="kontoKopf">
           <span class="avatar avatar--52" style="background:${farbe(aktiv.color)}">${esc(aktiv.initials)}</span>
           <div class="konto__body">
@@ -10982,7 +11259,8 @@ function renderSettings() {
         </div>
         <button class="konto__wechsel" id="kontoWechselBtn">
           ${ICONS.people}<span>Konto wechseln oder hinzufügen</span>
-        </button>`;
+        </button>
+        </div>`;
       })()}
       ${
         nur
@@ -10992,31 +11270,34 @@ function renderSettings() {
       </div>`
       }
     </div>
-    <div class="scroll" id="settingsScroll">
+    <div class="scroll einst" id="settingsScroll">
       ${(nur ? [nur] : SETTINGS).map(
         (sec) => `${
           nur
             ? ''
-            : `<button class="listhead listhead--knopf" id="sec-${sec.id}" data-settingsnur="${sec.id}" aria-label="${esc(sec.title)}, alle anzeigen">${esc(sec.title)} →</button>`
+            : `<button class="listhead listhead--knopf" id="sec-${sec.id}" data-settingsnur="${sec.id}" aria-label="${esc(sec.title)}, alle anzeigen">${esc(sec.title)} <span class="einst-pfeil" aria-hidden="true">${ICONS.chevron}</span></button>`
         }
-          <div class="group">${sec.items
+          <div class="group einst-karte">${sec.items
             .filter((it) => !it.nurEltern || bzKinderZahl() > 0)
             // Kasten RS 3: die Moderation nur, wenn ist_moderator() ja sagt (Bootstrap).
             .filter((it) => !it.nurModerator || state.istModerator === true)
             .map((it) => itemHtml(it, sec.id))
             .join('')}</div>`
       ).join('')}
-      ${nur ? '' : `<div class="group">
-        <button class="item" data-setting="Über All Media">
-          <span class="item__icon">${ICONS.info}</span>
-          <span class="item__label">Über All Media</span>
-          <span class="item__value">1.0.0</span>
-        </button>
-        <button class="item item--danger" data-setting="Abmelden">
+      ${
+        /*
+         * Einstellungen 16.11., Q79 (Kasten 1.3): „Abmelden“ stand direkt unter
+         * Communitys und las sich wie ein Teil davon. Eigener Block mit Satz;
+         * „Über All Media“ steht seitdem unter Hilfe. Wie in der App.
+         */
+        nur ? '' : `<div class="listhead einst-frei">Konto auf diesem Gerät</div>
+      <div class="group einst-karte">
+        <button class="item einst-zeile item--danger" data-setting="Abmelden">
           <span class="item__icon">${ICONS.logout}</span>
           <span class="item__label">Abmelden</span>
         </button>
-      </div>`}
+      </div>
+      <p class="einst-fuss">Meldet nur dieses Konto ab. Weitere Konten in diesem Browser bleiben angemeldet.</p>`}
     </div>`;
 
   main.querySelectorAll('[data-settingsnur]').forEach((b) =>
@@ -11033,14 +11314,46 @@ function renderSettings() {
     document.getElementById('sec-' + abschnitt)?.scrollIntoView({ block: 'start' });
   });
 
-  $('#kontoKopf')?.addEventListener('click', openKontoWechsel);
-  $('#kontoWechselBtn')?.addEventListener('click', openKontoWechsel);
+  const kontoWechsel = () => {
+    state.blattThema = null;
+    openKontoWechsel();
+  };
+  $('#kontoKopf')?.addEventListener('click', kontoWechsel);
+  $('#kontoWechselBtn')?.addEventListener('click', kontoWechsel);
 
   main.querySelectorAll('[data-jump]').forEach((b) =>
     b.addEventListener('click', () => {
       document.getElementById('sec-' + b.dataset.jump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     })
   );
+
+  // Kasten E16-1.4: Kopf und Pille folgen dem Abschnitt, der gerade oben steht.
+  const einstScroll = $('#settingsScroll');
+  if (!nur && einstScroll) {
+    let zuletzt;
+    const verfolgen = () => {
+      const oben = einstScroll.getBoundingClientRect().top;
+      let id = null;
+      for (const sec of SETTINGS) {
+        const el = document.getElementById('sec-' + sec.id);
+        if (el && el.getBoundingClientRect().top - oben <= 12) id = sec.id;
+      }
+      if (id === zuletzt) return;
+      zuletzt = id;
+      const thema = $('#einstThema');
+      if (thema) thema.textContent = id ? SETTINGS.find((x) => x.id === id).title : 'Einstellungen';
+      const ober = $('#einstOber');
+      if (ober) ober.hidden = !id;
+      main.querySelectorAll('[data-jump]').forEach((p) => {
+        const an = p.dataset.jump === id;
+        p.classList.toggle('is-active', an);
+        p.setAttribute('aria-current', an ? 'true' : 'false');
+        if (an) p.parentElement?.scrollTo?.({ left: Math.max(0, p.offsetLeft - 16), behavior: 'smooth' });
+      });
+    };
+    einstScroll.addEventListener('scroll', verfolgen, { passive: true });
+    verfolgen();
+  }
 
   // Aus dem Menü im eigenen Profil kommend: gleich beim richtigen Abschnitt
   // anfangen (Prototyp "VP + Einstellung" / "CP + Einstellung").
@@ -11059,7 +11372,10 @@ function renderSettings() {
       const abschnitt = SETTINGS.find((sec) => sec.id === abschnittId);
       const punkt = abschnitt?.items.find((it) => it.label === state.settingsPunkt);
       state.settingsPunkt = null;
-      if (punkt) setTimeout(() => openEinstellung(punkt), 60);
+      state.blattThema = abschnitt?.title || null;
+      state.blattAufruf = (state.blattAufruf || 0) + 1;
+      const aufruf = state.blattAufruf;
+      if (punkt) setTimeout(() => state.area === 'settings' && state.blattAufruf === aufruf && openEinstellung(punkt), 60);
     }
   }
 
@@ -11122,6 +11438,10 @@ function renderSettings() {
     b.addEventListener('click', () => {
       const abschnitt = SETTINGS.find((sec) => sec.id === b.dataset.abschnitt);
       const punkt = abschnitt?.items.find((it) => it.label === b.dataset.setting);
+      // Kasten E16-1.4: das Blatt zeigt über seinem Titel, wozu es gehört.
+      state.blattThema = abschnitt?.title || null;
+      // Gegenprüfung R2: jeder Aufruf bekommt eine Nummer; späte Antworten älterer Aufrufe öffnen nichts mehr.
+      state.blattAufruf = (state.blattAufruf || 0) + 1;
       if (punkt) return openEinstellung(punkt);
 
       // Die zwei Punkte ganz unten stehen ausserhalb der Abschnitte.
@@ -11277,7 +11597,7 @@ function renderFriendMap() {
             <div class="standort__sub">${esc(standortText())}</div>
           </div>
           <label class="schalter">
-            <input type="checkbox" id="standortAn" ${standortAn() ? 'checked' : ''} />
+            <input type="checkbox" id="standortAn" aria-label="Deinen Standort teilen" ${standortAn() ? 'checked' : ''} />
             <span></span>
           </label>
         </div>
@@ -11617,7 +11937,7 @@ function openInsightSenden(bild) {
   openSheet(
     'Insight senden',
     `<div class="sheet__body insight-senden">
-       <div class="insight__vorschau" style="background-image:${schicht ? schicht + ', url(' + bild + ')' : 'url(' + bild + ')'}"></div>
+       <div class="insight__vorschau" style="background-image:${schicht ? schicht + ', ' + bildUrl(bild) : bildUrl(bild)}"></div>
 
        <p class="insight__titel">Wie lange sichtbar</p>
        <div class="pillen" id="insDauer">
@@ -11812,7 +12132,7 @@ function openInsightAnsehen(userId) {
         <button id="insZu" aria-label="Schließen">${ICONS.close}</button>
       </div>
       <div class="insight-viewer__bild" style="background-image:${
-        schicht ? schicht + ', url(' + i.mediaUrl + ')' : 'url(' + i.mediaUrl + ')'
+        schicht ? schicht + ', ' + bildUrl(i.mediaUrl) : bildUrl(i.mediaUrl)
       }"></div>
       <div class="insight-viewer__fuss">
         <span class="insight-viewer__marke">
@@ -12054,6 +12374,8 @@ function kameraLaufwerk(wurzel, fertig) {
     if (typeof MediaRecorder === 'undefined') {
       return toast('Dieser Browser kann keine Videos aufnehmen');
     }
+    const medienKonfig=await fetch('/api/medien/konfiguration').then(r=>r.json()).catch(()=>({}));
+    if(medienKonfig?.anbieter==='bunny' && !['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4'].some(t=>MediaRecorder.isTypeSupported(t)))return toast('Dieser Browser nimmt kein MP4 auf. Bitte eine MP4-Datei aus der Galerie wählen.');
     stuecke = [];
     try {
       aufnehmer = new MediaRecorder(kameraStrom, aufnahmeOptionen());
@@ -13003,7 +13325,7 @@ function renderLandscapeVideos() {
   const q = state.clipQuery.trim().toLowerCase();
   const filter = CLIP_FILTER[state.clipFilter] ? state.clipFilter : 'alle';
   const passt = CLIP_FILTER[filter].passt;
-  const list = state.clips.filter(
+  const list = state.clips.filter(c=>!c.nurEinzeln).filter(
     (c) =>
       passt(c) &&
       (!q || c.title.toLowerCase().includes(q) || user(c.userId).name.toLowerCase().includes(q))
@@ -13178,9 +13500,10 @@ function renderPostsExplorer() {
 }
 
 function renderHashtagExplorer(tag) {
-  const items = state.videos.filter(v => v.tags?.includes(tag))
-    .concat(state.clips.filter(c => c.tags?.includes(tag)))
-    .concat(state.posts.filter(p => p.tags?.includes(tag)));
+  // Gezielt geöffnete Fremdbeiträge (nurEinzeln) gehören nicht in den Explorer.
+  const items = state.videos.filter(v => !v.nurEinzeln && v.tags?.includes(tag))
+    .concat(state.clips.filter(c => !c.nurEinzeln && c.tags?.includes(tag)))
+    .concat(state.posts.filter(p => !p.nurEinzeln && p.tags?.includes(tag)));
   main.innerHTML = `
     ${explorerKopf(esc(tag))}
     <div class="scroll">
@@ -13279,9 +13602,9 @@ function renderSoundsExplorer() {
 
 function renderPlaceExplorer(placeId) {
   const place = state.places.find(p => p.id === placeId);
-  const items = state.videos.filter(v => v.location === place?.name)
-    .concat(state.clips.filter(c => c.location === place?.name))
-    .concat(state.posts.filter(p => p.location === place?.name));
+  const items = state.videos.filter(v => !v.nurEinzeln && v.location === place?.name)
+    .concat(state.clips.filter(c => !c.nurEinzeln && c.location === place?.name))
+    .concat(state.posts.filter(p => !p.nurEinzeln && p.location === place?.name));
   main.innerHTML = `
     ${explorerKopf(esc(place?.name || 'Standort'))}
     <div class="scroll">
@@ -13358,12 +13681,13 @@ const vonGefolgten = (e) => !!(state.gefolgt && state.gefolgt[e.userId]);
  * versprochen hat.
  */
 function suchTreffer() {
+  // Gezielt geöffnete Fremdbeiträge (nurEinzeln) gehören nicht in die Suche.
   const q = (state.videoSearchQuery || '').trim().toLowerCase();
   const hit = (t) => !q || String(t).toLowerCase().includes(q);
   return {
-    reels: nachInteresse(state.videos.filter((v) => hit(v.description) || hit(v.music || '') || hit(user(v.userId).name)), (v) => v.likes, vonGefolgten),
-    clips: nachInteresse(state.clips.filter((c) => hit(c.title) || hit(user(c.userId).name)), (c) => c.views, vonGefolgten),
-    posts: nachInteresse(state.posts.filter((p) => hit(p.description) || hit(p.music || '') || hit(user(p.userId).name)), (p) => p.likes, vonGefolgten),
+    reels: nachInteresse(state.videos.filter((v) => !v.nurEinzeln && (hit(v.description) || hit(v.music || '') || hit(user(v.userId).name))), (v) => v.likes, vonGefolgten),
+    clips: nachInteresse(state.clips.filter((c) => !c.nurEinzeln && (hit(c.title) || hit(user(c.userId).name))), (c) => c.views, vonGefolgten),
+    posts: nachInteresse(state.posts.filter((p) => !p.nurEinzeln && (hit(p.description) || hit(p.music || '') || hit(user(p.userId).name))), (p) => p.likes, vonGefolgten),
     people: nachInteresse(
       Object.values(state.users).filter((u) => u.id !== 'me' && (hit(u.name) || hit(u.handle))),
       () => 0,
@@ -13583,12 +13907,14 @@ function renderVideoSearch() {
 
 /** Eine Mitteilung anklickbar machen: dorthin springen, wo sie herkommt. */
 function mitteilungOeffnen(ziel, text = '') {
+  if (ziel.art === 'instant') return openInstants();
   /*
    * Kasten RS 3: Rechtsmitteilung (Schema 102). Wer betroffen ist, bekommt
    * den Hinweis auf den Kontostatus, wer gemeldet hat, auf „Meine Meldungen" —
    * so steht es im Satz der Datenbank (meldung_entscheiden).
    */
-  if (ziel.art === 'meldung') return openKontostatus(/Kontostatus/.test(text) ? 'kontostatus' : 'meine');
+  // E16-1.4: auch der Direktweg aus der Mitteilung zeigt „Hilfe“ als Oberthema.
+  if (ziel.art === 'meldung') return openKontostatus(/Kontostatus/.test(text) ? 'kontostatus' : 'meine', 'Hilfe');
   if (ziel.art === 'profile') return openProfile(ziel.id);
   if (ziel.art === 'community') return openChat(ziel.id);
   // Kasten 8.3: „Push to Talk beitreten?" führt ins Unterthema — dort sitzt
@@ -13651,8 +13977,17 @@ function mitteilungOeffnen(ziel, text = '') {
  * `kind` ist posts.kind (post, reel, clip). Die Profil-Routen liefern
  * stattdessen `art` (post, clip, video) — `video` heisst dort Reel.
  */
-function beitragOeffnen(kind, id) {
+async function beitragOeffnen(kind, id, vorOeffnen) {
   if (!id) return;
+  if(![...(state.posts||[]),...(state.videos||[]),...(state.clips||[])].some(p=>p.id===id)){
+    const konto=window.Anmeldung?.nutzer?.()?.id;
+    const r=await fetch(`/api/beitraege/${encodeURIComponent(id)}`).then(r=>r.json()).catch(()=>null);
+    if(window.Anmeldung?.nutzer?.()?.id!==konto)return;
+    if(!r?.beitrag)return toast('Dieser Beitrag ist nicht verfügbar.');
+    const b=r.beitrag;const liste=b.kind==='clip'?'clips':b.kind==='reel'?'videos':'posts';state[liste]=[...(state[liste]||[]),{...b,nurEinzeln:true}];
+  }
+  if (vorOeffnen && !vorOeffnen()) return;
+  state.einzelBeitragZiel = id;
   if (kind === 'clip') return openClip(id);
   if (kind === 'reel' || kind === 'video') return mitteilungOeffnen({ art: 'video', id });
   return mitteilungOeffnen({ art: 'post', id });
@@ -14101,7 +14436,7 @@ function openKontoLoeschen() {
  * Daten; leer → Leertext; ohne Schema 102 → ehrlicher Hinweis statt einer
  * leeren Liste. Gegenstück in der App: components/KontostatusSheet.tsx.
  */
-async function openKontostatus(ansicht) {
+async function openKontostatus(ansicht, oberthema) {
   const M = window.Meldung;
   const titel = ansicht === 'meine' ? 'Meine Meldungen' : 'Kontostatus';
   const pfad = ansicht === 'meine' ? '/api/meldungen/meine' : '/api/meldungen/kontostatus';
@@ -14204,7 +14539,7 @@ async function openKontostatus(ansicht) {
       };
       laden();
     },
-    { schliessen: true, hoch: true }
+    { schliessen: true, hoch: true, ...(oberthema ? { oberthema } : {}) }
   );
 }
 
@@ -14777,7 +15112,7 @@ function kanalNachrichtMenue(id) {
  * auf dem Profil und in der Suche steht er weiter. Gleiche Regel in
  * VideoFeedScreen.tsx und HomeFeedScreen.tsx (sichtbareVideos/-Posts).
  */
-const imFeed = (b) => !(state.keinInteresse || []).includes(b.id);
+const imFeed = (b) => Einzelbeitrag.imFeed(b,state.einzelBeitragZiel,state.keinInteresse || []);
 
 /* Die Adresse eines Beitrags. bootstrap() oeffnet sie wieder (?beitrag=). */
 const beitragLink = (id) => `${location.origin}/?beitrag=${encodeURIComponent(id)}`;
@@ -16346,6 +16681,7 @@ function spendenweg(anfrage, bereich) {
  * (/api/spendenstand → spendenstand(), SUPABASE_SCHEMA_71_spendenziel.sql).
  * Rechnung und Texte: gemeinsam/spende.js, wie in app/components/SpendeKarte.tsx.
  * Zahlungsmethode und Spenden-Code: Kasten 13.
+ * Ohne Zahlungsdienst heißt alles „vorgemerkt, nicht bezahlt" (Offene Punkte 0c).
  */
 function spendeKarte(spende, userId, name) {
   const stand = Spende.stand(spende, null);
@@ -16388,7 +16724,7 @@ async function openSpendenziel(spende, userId, name) {
        <div class="spendeziel__titel">${esc(stand.titel)}</div>
        ${stand.text ? `<div class="spendeziel__text">${esc(stand.text)}</div>` : ''}
        <div class="spendeziel__zeilen">
-         ${zeile('Erreicht', Spende.euro(stand.erreicht))}
+         ${zeile('Vorgemerkt', Spende.euro(stand.erreicht))}
          ${zeile('Ziel', stand.ziel > 0 ? Spende.euro(stand.ziel) : 'ohne festes Ziel')}
          ${stand.prozent !== null ? zeile('Fortschritt', `${stand.prozent} %`) : ''}
          ${zeile('Spender', stand.spender === null ? (eigen ? '–' : 'nur für dich sichtbar') : String(stand.spender))}
@@ -16396,6 +16732,7 @@ async function openSpendenziel(spende, userId, name) {
        </div>
        ${stand.prozent !== null ? `<div class="spende__balken"><div class="spende__fuellung" style="width:${stand.prozent}%"></div></div>` : ''}
        <div class="spende__zahlen">${esc(stand.spender === null ? stand.zahlenText : `${stand.zahlenText} · ${stand.spenderText}`)}</div>
+       <div class="spendeziel__hinweis" data-nicht-bezahlt>${esc(Spende.HINWEIS)}</div>
      </div>
      <div class="sheet__footer">
        <button class="btn btn--primary" id="spendeKnopf" ${gesperrt ? 'disabled' : ''}>Spenden</button>
@@ -16430,7 +16767,7 @@ function openSpende(empfaengerId, postId) {
   // Kasten 13: jede Spende läuft durch den Spendenweg (Methode, Code).
   const buchen = async (cent) => {
     const ok = await spendenweg({ empfaengerId, name, cent, postId });
-    if (ok) toast(`${(cent / 100).toFixed(2).replace('.', ',')} € an ${name} gespendet`);
+    if (ok) toast(Spende.bestaetigung(cent, name));
   };
   openSheet(
     `An ${name} spenden`,
@@ -16633,6 +16970,7 @@ function openClip(clipId) {
               gar nicht mehr.
             */ ''}
           <div class="post__actions post__actions--fuenf ${istLive() ? 'post__actions--vier' : ''}">
+            <button class="postbtn ${clip.disliked ? 'is-liked' : ''}" data-clipact="dislike" aria-label="Gefällt mir nicht" aria-pressed="${!!clip.disliked}"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M16 3H6a2 2 0 0 0-2 2l-1 7a2 2 0 0 0 2 2h5l-1 5c0 2 2 3 3 1l4-7V3ZM16 3h5v10h-5"/></svg></button>
             <button class="postbtn ${clip.liked ? 'is-liked' : ''}" data-clipact="like" aria-label="Gefällt mir">
               ${ICONS.heart}<span class="postbtn__zahl">${clip.likes ? compactNumber(clip.likes) : 'Like'}</span>
             </button>
@@ -17125,7 +17463,9 @@ function openClip(clipId) {
         if (was === 'share') return openTeilen('clip', clip.id);
 
         const res = await fetch(`/api/clips/${clip.id}/${was}`, { method: 'POST' });
-        clip = await res.json();
+        const antwort = await res.json();
+        if (!res.ok) return toast(antwort.error || 'Reaktion konnte nicht gespeichert werden');
+        clip = {...antwort,nurEinzeln:clip.nurEinzeln};
         const stelle = state.clips.findIndex((c) => c.id === clip.id);
         if (stelle !== -1) state.clips[stelle] = clip;
         paint();
@@ -18272,7 +18612,7 @@ function medienFlaeche(id, symbol, adresse, standbild) {
    * (thumbnail_url). Fehlt auch das, bleibt die Farbflaeche.
    */
   const bild = eigeneMedien()[id] || (istVideoAdresse(adresse) ? standbild : adresse) || standbild;
-  if (bild && !istVideoAdresse(bild)) return `<img class="eigenbild" src="${esc(bild)}" alt="">`;
+  if (bild && !istVideoAdresse(bild)) return `<img class="eigenbild" src="${esc(bild)}" alt="" loading="lazy">`;
   return `<span class="motiv motiv--${motivVon(id)}">${symbol}</span>`;
 }
 
@@ -18330,7 +18670,7 @@ function bestaetigen(titel, text, knopf = 'Weiter') {
   });
 }
 
-function openFormular(titel, felder, senden, knopf = 'Fertig') {
+function openFormular(titel, felder, senden, knopf = 'Fertig', optionen = {}) {
   const feldHtml = (f) => {
     const gemeinsam = `id="f_${f.key}" placeholder="${esc(f.platzhalter || '')}"`;
     const eingabe =
@@ -18338,7 +18678,22 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
         ? `<textarea ${gemeinsam} rows="3">${esc(f.wert || '')}</textarea>`
         : // Punkt 38: eine Auswahl statt eines Textfelds - Musik tippt man
           // nicht ab, man sucht sie aus dem aus, was es gibt.
-          f.typ === 'auswahl'
+          /*
+           * Kasten E16-1.5: in den Einstellungen dasselbe Auswahlmuster wie
+           * überall dort (Kreiszeilen). Der Wert steht in einem versteckten
+           * Feld mit derselben Kennung, damit das Absenden gleich bleibt.
+           */
+          f.typ === 'auswahl' && optionen.wahlListe
+          ? `<input type="hidden" id="f_${f.key}" value="${esc(f.wert || f.auswahl?.[0] || '')}">
+             <div class="einst-wahl" role="radiogroup" aria-label="${esc(f.label)}">${(f.auswahl || [])
+               .map(
+                 (w) => `<button type="button" class="einst-wahl__zeile" role="radio" aria-checked="${w === (f.wert || f.auswahl[0])}" data-feldwahl="${esc(f.key)}" data-wert="${esc(w)}">
+                   <span class="einst-wahl__text"><span class="einst-wahl__label">${esc(w)}</span></span>
+                   <span class="einst-wahl__kreis" aria-hidden="true"></span>
+                 </button>`
+               )
+               .join('')}</div>`
+          : f.typ === 'auswahl'
           ? `<select id="f_${f.key}">${(f.auswahl || [])
               .map((w) => `<option value="${esc(w)}" ${w === f.wert ? 'selected' : ''}>${esc(w)}</option>`)
               .join('')}</select>`
@@ -18361,6 +18716,15 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
       // Eine Auswahl bekommt keinen Fokus - sonst klappt sie beim Oeffnen auf.
       const ersteseingabe = sheet.querySelector('input, textarea');
       setTimeout(() => ersteseingabe?.focus(), 80);
+      sheet.querySelectorAll('[data-feldwahl]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const feld = sheet.querySelector('#f_' + b.dataset.feldwahl);
+          if (feld) feld.value = b.dataset.wert;
+          sheet
+            .querySelectorAll(`[data-feldwahl="${b.dataset.feldwahl}"]`)
+            .forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+        })
+      );
       // Kasten 25.1: Felder mit `markierbar` (Beschreibung) schlagen bei @ Personen vor.
       for (const f of felder) if (f.markierbar) markierungsEingabe(sheet.querySelector('#f_' + f.key), { unten: true });
 
@@ -18412,7 +18776,7 @@ function openFormular(titel, felder, senden, knopf = 'Fertig') {
         el.addEventListener('input', () => (sheet.querySelector('#formFehler').hidden = true))
       );
     },
-    { schliessen: true }
+    { ...optionen, schliessen: true }
   );
 }
 
@@ -18550,19 +18914,37 @@ async function erstelle(was) {
     );
   }
 
-  // Beitrag, Reels und Querformat: erst aufnehmen, dann beschreiben.
+  // Gemischte Auswahl ohne Stückgrenze; erst ordnen, dann hochladen.
   const istBild = was === 'post';
-  const datei = await dateiWaehlen(istBild ? 'photo' : 'video');
-  if (!datei) return;
-
-  let bild = null;
-  try {
-    bild = istBild ? await bildVerkleinern(datei) : await videoStandbild(datei);
-  } catch {
-    return toast('Aufnahme konnte nicht gelesen werden');
+  const dateien = istBild ? await karussellWaehlen() : [await dateiWaehlen('video')].filter(Boolean);
+  if (!dateien?.length) return;
+  const datei=dateien[0];
+  let sekunden;
+  for(const d of dateien){if(!d.type.startsWith('video/'))continue;
+    const lokal=URL.createObjectURL(d);let laenge;
+    try{laenge=await videoLaenge(lokal);}finally{URL.revokeObjectURL(lokal);}
+    const fehler=Reel.pruefen(laenge)||StoryRegeln.videoPruefen({bytes:d.size,mime:d.type});
+    if(fehler)return toast(fehler);if(d===datei)sekunden=laenge;
   }
+  let bild=null;
+  try{bild=datei.type.startsWith('video/')?await videoStandbild(datei):await bildVerkleinern(datei);}
+  catch{return toast('Aufnahme konnte nicht gelesen werden');}
 
   const quer = was === 'landscape';
+  // Ein Formular besitzt seine Uploads bis Erfolg oder endgültigem Schließen.
+  const hochgeladen = new Map();
+  let aktiv = true, veroeffentlicht = false, lauf = Promise.resolve();
+  const aufraeumen = async () => {
+    let fehlgeschlagen = false;
+    for (const [datei, hoch] of hochgeladen) {
+      try {
+        const weg = await api('/api/medien/loeschen', { pfad: hoch.pfad });
+        if (!weg?.ok) { fehlgeschlagen = true; continue; }
+        hochgeladen.delete(datei);
+      } catch { fehlgeschlagen = true; }
+    }
+    if (fehlgeschlagen) toast('Nicht alle unveröffentlichten Aufnahmen konnten entfernt werden.');
+  };
   openFormular(
     { post: 'Neuer Beitrag', reels: 'Neues Reel', landscape: 'Neues Querformat-Video' }[was],
     [
@@ -18604,24 +18986,43 @@ async function erstelle(was) {
         wert: 'Sofort',
       },
     ],
-    async (werte) => {
+    (werte) => {
+      const ausfuehren = async () => {
+      if (veroeffentlicht) return;
+      if (!aktiv) return 'Das Formular wurde geschlossen.';
+      if (!String(werte.beschreibung || '').trim()) return 'Bitte eine Beschreibung eingeben';
+      if (!['Sofort', 'In einer Stunde', 'Heute Abend', 'Morgen früh'].includes(werte.zeitpunkt || 'Sofort')) return 'Bitte einen gültigen Veröffentlichungszeitpunkt wählen.';
       const spaeter = geplantAb(werte.zeitpunkt);
+      if (spaeter && (!Number.isFinite(Date.parse(spaeter)) || Date.parse(spaeter) <= Date.now())) return 'Der Veröffentlichungszeitpunkt muss in der Zukunft liegen.';
       const ziel = istBild ? '/api/eigene/beitrag' : '/api/eigene/video';
-      const hoch = istBild
-        ? await api('/api/hochladen', { ordner: 'posts', aufnahme: bild })
-        : await videoHochladen({ datei, typ: datei.type || 'video/mp4' }, 'posts');
-      if (!hoch.ok) return hoch.error || 'Die Aufnahme ließ sich nicht speichern';
+      const medien = [];
+      for (const d of dateien) {
+        const video = d.type.startsWith('video/');
+        let hoch = hochgeladen.get(d);
+        if (!hoch) {
+          if (video) hoch = await videoHochladen({ art: 'video', datei: d, typ: d.type }, 'posts');
+          else {
+            const klein = await bildVerkleinern(d);
+            const typ = /^data:([^;]+)/.exec(klein)?.[1] || 'image/jpeg';
+            const blob = new Blob([Uint8Array.from(atob(klein.split(',')[1]), c => c.charCodeAt(0))], { type: typ });
+            hoch = await medienDateiHochladen(blob, 'posts', blob.type);
+          }
+          if (!hoch.ok) return hoch.error;
+          if (!hoch.pfad || !hoch.url) return 'Die Aufnahme konnte nicht bestätigt werden.';
+          hochgeladen.set(d, hoch);
+        }
+        if (!aktiv) return 'Das Formular wurde geschlossen.';
+        medien.push({ url: hoch.url, typ: video ? 'video' : 'image' });
+      }
+      const mediaUrl = medien[0]?.url;
       const res = await fetch(ziel, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...werte, mediaUrl: hoch.url, geplantAb: spaeter, format: quer ? 'quer' : 'hoch' }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...werte, sekunden, mediaUrl, ...(istBild ? { medien } : {}), geplantAb: spaeter, format: quer ? 'quer' : 'hoch' }),
       });
       const daten = await res.json();
-      if (!daten.ok) {
-        const pfad = hoch.url?.split('/storage/v1/object/public/media/')[1];
-        if (pfad) await api('/api/medien/loeschen', { pfad });
-        return daten.error;
-      }
+      if (!daten.ok) return daten.error || 'Veröffentlichen fehlgeschlagen.';
+      // Vor Nachladen/Anzeige bestätigen: deren Ausfall darf nicht erneut posten.
+      veroeffentlicht = true;
 
       /*
        * Geplante Beiträge kommen nicht in den Feed. Sie dort schon zu zeigen
@@ -18638,8 +19039,15 @@ async function erstelle(was) {
       state.sub.videos = istBild ? 'home' : quer ? 'landscape' : 'portrait';
       await bootstrap();
       toast(istBild ? 'Beitrag veröffentlicht' : 'Video veröffentlicht');
+      };
+      lauf = ausfuehren();
+      return lauf;
     },
-    'Veröffentlichen'
+    'Veröffentlichen',
+    { beimSchliessen: () => {
+      aktiv = false;
+      void lauf.catch(() => {}).then(() => veroeffentlicht ? undefined : aufraeumen());
+    } }
   );
 }
 
@@ -18683,11 +19091,11 @@ function openErstellenSeite(art, community) {
         <button class="erstellseite__zu" id="esZu" aria-label="${esc(T.schliessen)}">${ICONS.close}</button>
       </div>
       <div class="erstellseite__inhalt scroll">
-        <p class="erstellseite__pflicht"><span class="erstellseite__stern">✳</span> ${esc(T.pflichtfeld)}</p>
+        <p class="erstellseite__pflicht"><span class="erstellseite__stern">✳&#xFE0E;</span> ${esc(T.pflichtfeld)}</p>
         <label class="erstellseite__name">
           <input id="esName" maxlength="${Erstellen.NAME_MAX}" placeholder="${esc(istCommunity ? T.communityName : T.unterthemaName)}"
                  aria-label="${esc(istCommunity ? T.communityName : T.unterthemaName)}" autocomplete="off">
-          <span class="erstellseite__stern erstellseite__stern--ecke">✳</span>
+          <span class="erstellseite__stern erstellseite__stern--ecke">✳&#xFE0E;</span>
         </label>
         ${istCommunity ? `
         <label class="erstellseite__bild" id="esBild" aria-label="${esc(T.bild)}">
@@ -18695,7 +19103,7 @@ function openErstellenSeite(art, community) {
           <span class="erstellseite__bildLeer" id="esBildLeer">${ICONS.image}<span>${esc(T.bild)}</span></span>
           <img id="esBildVorschau" alt="" hidden>
           <span class="erstellseite__bildMarke" id="esBildMarke" hidden>${esc(T.bildAendern)}</span>
-          <span class="erstellseite__stern erstellseite__stern--ecke">✳</span>
+          <span class="erstellseite__stern erstellseite__stern--ecke">✳&#xFE0E;</span>
         </label>` : ''}
         <textarea id="esBio" class="erstellseite__feld erstellseite__feld--abstand" rows="1" maxlength="${Erstellen.BIO_MAX}"
                   placeholder="${esc(T.bio)}" aria-label="${esc(T.bio)}"></textarea>
@@ -18737,6 +19145,7 @@ function openErstellenSeite(art, community) {
     overlay.innerHTML = '';
   };
   $('#esZu').addEventListener('click', schliessen);
+  $('#esName').addEventListener('input', () => meldung(''));
 
   /*
    * Den QR-Code per fetch holen, nicht über <img src>: der Server verlangt die
@@ -18975,6 +19384,13 @@ function openLivestream() {
           if (!res.ok) return;
           fehlschlaege = 0;
           const daten = await res.json();
+          // Spendensumme wie in der App (LivestreamScreen): erst ab 1 Cent,
+          // Text aus gemeinsam/spende.js. null = nicht lesbar → letzter Stand bleibt.
+          const spendenFeld = overlay.querySelector('#liveSpenden');
+          if (spendenFeld && typeof daten.spendenCent === 'number') {
+            spendenFeld.hidden = !(daten.spendenCent > 0);
+            spendenFeld.textContent = daten.spendenCent > 0 ? Spende.liveText(daten.spendenCent) : '';
+          }
           const zeilen = daten.kommentare || [];
           spaltenListe = zeilen;
           // Nicht mitten in einem Ziehen neu zeichnen.
@@ -19901,7 +20317,7 @@ async function renderVideoProfile() {
               .map(
                 (g) => `<button class="griditem" data-eigen="${esc(g.id)}" data-eigenkind="${esc(g.art || '')}" data-eigenart="${
                   g.kind === 'video' ? 'video' : 'post'
-                }">${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image, g.mediaUrl, g.thumbnail)}</button>`
+                }">${medienFlaeche(g.id, g.kind === 'video' ? ICONS.play : ICONS.image, g.mediaUrl, g.thumbnail)}${medienZaehlerBadge(g)}</button>`
               )
               .join('')}</div>`
           : tab === 'repost' && meineReposts.length
@@ -21740,7 +22156,7 @@ function messageBubble(m, chat, i, absender) {
   for (const r of m.reaktionen || []) zaehler[r.emoji] = (zaehler[r.emoji] || 0) + 1;
   const reaktionen = Object.keys(zaehler).length
     ? `<div class="msg__reaktionen">${Object.entries(zaehler)
-        .map(([e, n]) => `<span class="msg__reaktion">${e}${n > 1 ? `<b>${n}</b>` : ''}</span>`)
+        .map(([e, n]) => `<span class="msg__reaktion">${esc(e)}${n > 1 ? `<b>${n}</b>` : ''}</span>`)
         .join('')}</div>`
     : '';
 
@@ -23308,6 +23724,7 @@ const ptr = new PullToRefresh({
       if (!res.ok) throw new Error('Network error');
       const data = await res.json();
       Object.assign(state, data);
+  state.einzelBeitragZiel=null;
       render();
       toast('Inhalte aktualisiert');
     } catch (error) {
@@ -23359,3 +23776,252 @@ window.fetch = function(...args) {
     return Promise.reject(error);
   });
 };
+
+/* AF6 — private Kamera-Instants. Keine Fotos aus der Galerie. */
+async function instantApi(pfad, body) {
+    const konto = window.Anmeldung?.nutzer?.()?.id || null;
+    const r = await fetch(pfad, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if ((window.Anmeldung?.nutzer?.()?.id || null) !== konto) throw new Error('Konto wurde gewechselt. Bitte erneut öffnen.');
+    if (!r.ok || d?.ok === false)
+        throw new Error(d.error || 'Das hat nicht geklappt.');
+    return d;
+}
+async function instantBadgeLaden() {
+    const knopf = document.getElementById('instantPostfach');
+    if (!knopf)
+        return;
+    try {
+        const d = await instantApi('/api/instants/stand');
+        if (!Number.isInteger(d.ungeoeffnet) || d.ungeoeffnet < 0)
+            throw new Error();
+        knopf.textContent = `Instants · ${d.ungeoeffnet} ungeöffnet`;
+    }
+    catch {
+        knopf.textContent = 'Instants · derzeit nicht verfügbar';
+    }
+}
+setInterval(() => { if (!document.hidden && state.area === 'messenger' && sub() === 'chats')
+    void instantBadgeLaden(); }, 30000);
+function openEngeFreunde(nachher) {
+    let lauf = 0, uhr;
+    const stateF = { freunde: [], vorschlaege: [] };
+    return openSheet('Enge Freunde', `<div class="sheet__body" style="padding:16px"><p>Deine Liste ist privat · <span id="efZahl">Wird geladen …</span></p><p>${esc(Instants.FREUNDE_HINWEIS)}</p><input class="instant-feld" id="efSuche" type="search" placeholder="Nach Namen suchen (mindestens 2 Zeichen)" aria-label="Enge Freunde suchen"><p role="alert" id="efFehler"></p><div id="efListe">Wird geladen …</div></div>`, (sheet) => {
+        const suche = sheet.querySelector('#efSuche');
+        const laden = async () => {
+            const nr = ++lauf;
+            sheet.querySelector('#efZahl').textContent = 'Wird geladen …';
+            sheet.querySelector('#efFehler').textContent = '';
+            try {
+                const d = await instantApi('/api/enge-freunde?suche=' + encodeURIComponent(suche.value));
+                if (nr !== lauf || !sheet.isConnected)
+                    return;
+                if (!Array.isArray(d.freunde) || !Array.isArray(d.vorschlaege))
+                    throw new Error('Enge Freunde konnten nicht geladen werden.');
+                Object.assign(stateF, d);
+                sheet.querySelector('#efZahl').textContent = `${d.freunde.length} Personen`;
+                const ids = new Set(d.freunde.map(p => p.id));
+                sheet.querySelector('#efListe').innerHTML = [...d.freunde.map(p => ({ ...p, an: true })), ...d.vorschlaege.filter(p => !ids.has(p.id)).map(p => ({ ...p, an: false }))].map(p => `<button class="item" data-ef="${esc(p.id)}" data-an="${!p.an}"><span class="item__label">${esc(p.name)}</span><span>${p.an ? 'Entfernen' : 'Hinzufügen'}</span></button>`).join('') || '<p>Noch keine Einträge. Suche nach einem Namen.</p>';
+                sheet.querySelectorAll('[data-ef]').forEach(b => b.addEventListener('click', async () => { b.disabled = true; try {
+                    await instantApi('/api/enge-freunde', { id: b.dataset.ef, an: b.dataset.an === 'true' });
+                    await laden();
+                }
+                catch (e) {
+                    sheet.querySelector('#efFehler').textContent = e.message;
+                    b.disabled = false;
+                } }));
+            }
+            catch (e) {
+                if (nr === lauf && sheet.isConnected) {
+                    sheet.querySelector('#efZahl').textContent = 'derzeit nicht verfügbar';
+                    sheet.querySelector('#efListe').innerHTML = '<p>Enge Freunde derzeit nicht verfügbar.</p>';
+                    sheet.querySelector('#efFehler').textContent = e.message;
+                }
+            }
+        };
+        suche.addEventListener('input', () => { clearTimeout(uhr); uhr = setTimeout(laden, 250); });
+        void laden();
+    }, { schliessen: true, hoch: true, beimSchliessen: () => { lauf++; clearTimeout(uhr); nachher?.(); } });
+}
+function openInstants() {
+    let stream = null, foto = null, freundeZahl = 0, aktiv = true, postfach = [], eigene = [];
+    const stop = () => { stream?.getTracks().forEach(t => t.stop()); stream = null; };
+    openSheet('Instants', `<div class="sheet__body" style="padding:16px"><p>${esc(Instants.HINWEIS)}</p><p role="alert" id="instantFehler"></p><div id="instantInhalt">Wird geladen …</div></div>`, (sheet, close) => {
+        const feld = sheet.querySelector('#instantInhalt'), fehler = sheet.querySelector('#instantFehler');
+        const laden = async (weiter = false) => {
+            try {
+                const [d, f] = await Promise.all([instantApi('/api/instants' + (weiter ? `?postfachAb=${postfach.length}&eigeneAb=${eigene.length}` : '')), instantApi('/api/enge-freunde')]);
+                if (!aktiv)
+                    return;
+                if (!Array.isArray(d.postfach) || !Array.isArray(d.eigene) || !Array.isArray(f.freunde))
+                    throw new Error('Instants konnten nicht geladen werden.');
+                postfach = weiter ? [...postfach, ...d.postfach.filter(i => !postfach.some(a => a.id === i.id))] : d.postfach;
+                eigene = weiter ? [...eigene, ...d.eigene.filter(i => !eigene.some(a => a.id === i.id))] : d.eigene;
+                freundeZahl = Number(f.empfaengerzahl);
+                if (!Number.isInteger(freundeZahl) || freundeZahl < 0)
+                    throw new Error("Empfängerzahl nicht verfügbar.");
+                feld.innerHTML = `<button class="item" id="instantFreunde">Enge Freunde bearbeiten · ${freundeZahl}</button><p>An deine Liste · ${freundeZahl} ${freundeZahl === 1 ? 'Person' : 'Personen'}</p><button class="prof__btn is-primary" id="instantKamera" ${freundeZahl ? '' : 'disabled'}>Instant aufnehmen</button><div id="instantAufnahme"></div><div id="instantStapel">${postfach.map(i => `<button class="item" data-instant="${esc(i.id)}">${esc(i.name)} · Einmal ansehen</button>`).join('') || '<p>Keine ungeöffneten Instants.</p>'}</div><div>${eigene.map(i => `<button class="item" data-instantzurueck="${esc(i.id)}">Gesendet: ${esc(i.text || 'Foto')} · Zurückziehen</button>`).join('')}</div>${d.postfach.length === 50 || d.eigene.length === 50 ? '<button class="item" id="instantMehr">Weitere Instants laden</button>' : ''}`;
+                feld.querySelector('#instantFreunde').addEventListener('click', () => openEngeFreunde(laden));
+                feld.querySelector('#instantKamera').addEventListener('click', kamera);
+                feld.querySelector('#instantMehr')?.addEventListener('click', async e => { e.currentTarget.disabled = true; await laden(true); });
+                feld.querySelectorAll('[data-instant]').forEach(b => b.addEventListener('click', () => ansehen(b.dataset.instant)));
+                feld.querySelectorAll('[data-instantzurueck]').forEach(b => b.addEventListener('click', async () => { try {
+                    await instantApi(`/api/instants/${b.dataset.instantzurueck}/zurueckziehen`, {});
+                    await laden();
+                }
+                catch (e) {
+                    fehler.textContent = e.message;
+                } }));
+            }
+            catch (e) {
+                fehler.textContent = e.message;
+            }
+        };
+        const kamera = async () => {
+            try {
+                stop();
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1080 } }, audio: false });
+                if (!aktiv) {
+                    stop();
+                    return;
+                }
+                const bereich = feld.querySelector('#instantAufnahme');
+                bereich.innerHTML = '<video id="instantLive" playsinline muted autoplay style="width:100%;max-height:360px"></video><button class="prof__btn" id="instantAusloeser">Foto aufnehmen</button>';
+                const v = bereich.querySelector('video');
+                v.srcObject = stream;
+                await v.play();
+                bereich.querySelector('#instantAusloeser').addEventListener('click', () => {
+                    if (!v.videoWidth)
+                        return;
+                    const m = Instants.masse(v.videoWidth, v.videoHeight), c = document.createElement('canvas');
+                    c.width = m.breite;
+                    c.height = m.hoehe;
+                    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+                    for (const q of [.8, .65, .5, .35]) {
+                        foto = c.toDataURL('image/jpeg', q);
+                        if (atob(foto.split(',')[1]).length <= Instants.BILD_MAX)
+                            break;
+                    }
+                    stop();
+                    const grund = Instants.pruefen('', freundeZahl, atob(foto.split(',')[1]).length);
+                    if (grund) {
+                        fehler.textContent = grund;
+                        return;
+                    }
+                    bereich.innerHTML = `<img alt="Vorschau des Instants" src="${foto}" style="width:100%;max-height:240px;object-fit:contain"><input id="instantText" class="instant-feld" maxlength="100" placeholder="Bildunterschrift (freiwillig)"><button class="prof__btn is-primary" id="instantSenden">Instant senden</button><button class="prof__btn" id="instantNeu">Neu aufnehmen</button>`;
+                    bereich.querySelector('#instantNeu').addEventListener('click', kamera);
+                    bereich.querySelector('#instantSenden').addEventListener('click', async (e) => {
+                        e.currentTarget.disabled = true;
+                        try {
+                            const hoch = await instantApi('/api/hochladen', { ordner: 'instants', aufnahme: foto });
+                            if (!hoch.pfad)
+                                throw new Error('Das Foto konnte nicht gespeichert werden.');
+                            await instantApi('/api/instants', { pfad: hoch.pfad, text: bereich.querySelector('#instantText').value });
+                            foto = null;
+                            await laden();
+                            void instantBadgeLaden();
+                        }
+                        catch (err) {
+                            fehler.textContent = err.message;
+                            bereich.querySelector('#instantSenden').disabled = false;
+                        }
+                    });
+                });
+            }
+            catch (e) {
+                fehler.textContent = 'Kamera nicht verfügbar. Erlaube den Kamerazugriff im Browser.';
+                stop();
+            }
+        };
+        const ansehen = async (id) => {
+            try {
+                const d = await instantApi(`/api/instants/${id}/bild`);
+                if (!aktiv)
+                    return;
+                feld.innerHTML = `<img id="instantBild" alt="Instant" src="${esc(d.bild)}" style="width:100%;max-height:60vh;object-fit:contain"><p>${esc(d.text || '')}</p><button class="prof__btn" id="instantZu">Bild schließen</button>`;
+                const bild = feld.querySelector('#instantBild');
+                let bestaetigt = false;
+                const gesehen = async () => { if (bestaetigt)
+                    return; bestaetigt = true; try {
+                    await instantApi(`/api/instants/${id}/gesehen`, {});
+                    void instantBadgeLaden();
+                }
+                catch (e) {
+                    bild.remove();
+                    fehler.textContent = 'Öffnen konnte nicht bestätigt werden.';
+                } };
+                bild.addEventListener('load', gesehen);
+                bild.addEventListener('error', () => { fehler.textContent = 'Das Foto konnte nicht geladen werden.'; });
+                if (bild.complete && bild.naturalWidth)
+                    void gesehen();
+                feld.querySelector('#instantZu').addEventListener('click', () => laden());
+            }
+            catch (e) {
+                fehler.textContent = 'Instant nicht mehr verfügbar.';
+            }
+        };
+        void laden();
+    }, { schliessen: true, hoch: true, beimSchliessen: () => { aktiv = false; foto = null; stop(); void instantBadgeLaden(); } });
+}
+
+/** Auswahl bleibt lokal; Abbrechen lädt keine Datei hoch. */
+function karussellWaehlen(){return new Promise(fertig=>{
+ const rahmen=document.createElement('div');rahmen.className='karusselleditor';
+ rahmen.setAttribute('role','dialog');rahmen.setAttribute('aria-modal','true');rahmen.setAttribute('aria-label','Medien auswählen');
+ rahmen.innerHTML='<section><h2>Medien auswählen</h2><p>Bilder und Videos gemischt auswählen, ordnen und entfernen.</p><ol></ol><p role="alert"></p><button data-add>Bilder und Videos hinzufügen</button><button data-fertig disabled>Weiter zur Beschreibung</button><button data-abbrechen>Abbrechen</button></section>';
+ const vorher=document.activeElement;document.body.appendChild(rahmen);let dateien=[],urls=[];let beendet=false;
+ const ende=wert=>{if(beendet)return;beendet=true;urls.forEach(URL.revokeObjectURL);rahmen.remove();vorher?.isConnected&&vorher.focus();fertig(wert);};
+ const zeichnen=()=>{
+  urls.forEach(URL.revokeObjectURL);urls=[];
+  rahmen.querySelector('ol').innerHTML=dateien.map((d,i)=>{const bild=d.type.startsWith('image/');const url=bild?URL.createObjectURL(d):null;if(url)urls.push(url);
+   return `<li>${bild?`<img src="${esc(url)}" alt="">`:'<span>Video</span>'}<span>${i+1}. ${esc(d.name)}</span><button data-vor="${i}" ${i===0?'disabled':''} aria-label="Medium ${i+1} nach vorn">↑</button><button data-nach="${i}" ${i===dateien.length-1?'disabled':''} aria-label="Medium ${i+1} nach hinten">↓</button><button data-weg="${i}" aria-label="Medium ${i+1} entfernen">×</button></li>`;}).join('');
+  rahmen.querySelector('[data-fertig]').disabled=!dateien.length;
+ };
+ rahmen.querySelector('[data-add]').onclick=()=>{const input=document.createElement('input');input.type='file';input.multiple=true;input.accept='image/*,video/*';input.onchange=()=>{dateien.push(...input.files);zeichnen();};input.click();};
+ rahmen.querySelector('[data-fertig]').onclick=()=>ende(dateien);
+ rahmen.querySelector('[data-abbrechen]').onclick=()=>ende(null);
+ rahmen.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.vor!==undefined)dateien=window.Karussell.verschieben(dateien,Number(b.dataset.vor),Number(b.dataset.vor)-1);
+  else if(b.dataset.nach!==undefined)dateien=window.Karussell.verschieben(dateien,Number(b.dataset.nach),Number(b.dataset.nach)+1);
+  else if(b.dataset.weg!==undefined)dateien=window.Karussell.entfernen(dateien,Number(b.dataset.weg));else return;zeichnen();});
+ rahmen.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();ende(null);}if(e.key==='Tab'){const knoepfe=[...rahmen.querySelectorAll('button:not(:disabled)')];if(e.shiftKey&&document.activeElement===knoepfe[0]){e.preventDefault();knoepfe.at(-1).focus();}else if(!e.shiftKey&&document.activeElement===knoepfe.at(-1)){e.preventDefault();knoepfe[0].focus();}}});
+ rahmen.querySelector('[data-add]').focus();
+});}
+function karussellFlaeche(p,voll=false,start=0){
+ const medien=window.Karussell.liste(p);return `<div class="karussell ${voll?'karussell--voll':''}" data-karussell data-start="${start}" data-kid="${esc(p.id)}">
+ <div class="karussell__streifen" tabindex="0" aria-label="Beitragsmedien">${medien.map((m,i)=>`<div class="karussell__seite" role="group" aria-label="Medium ${i+1} von ${medien.length}">${m.typ==='video'?`<video data-k-src="${esc(m.url)}" preload="none" playsinline controls></video>`:`<img data-k-src="${esc(m.url)}" alt="Medium ${i+1}" loading="lazy">`}</div>`).join('')}</div>
+ <div class="karussell__leiste"><button data-k-vor aria-label="Vorheriges Medium">‹</button><span data-k-zaehler aria-live="polite">${start+1}/${medien.length}</span><button data-k-nach aria-label="Nächstes Medium">›</button></div>
+ ${voll?'':`<button class="karussell__voll" data-k-voll aria-label="Medien im Vollbild öffnen">Vollbild</button>`}</div>`;
+}
+const karussellBeobachter=new Map();
+function karussellVerbinden(wurzel){
+ for(const [el,stop] of karussellBeobachter)if(!el.isConnected){stop();karussellBeobachter.delete(el);}
+ wurzel.querySelectorAll('[data-karussell]').forEach(el=>{
+  if(karussellBeobachter.has(el))return;
+  const streifen=el.querySelector('.karussell__streifen'),seiten=[...el.querySelectorAll('.karussell__seite')];let nah=false,bei=Number(el.dataset.start)||0;
+  const laden=()=>seiten.forEach((seite,i)=>seite.querySelectorAll('[data-k-src]').forEach(m=>{
+   const erlaubt=nah&&(m.tagName==='VIDEO'?i===bei:Math.abs(i-bei)<=1);
+   if(erlaubt&&!m.getAttribute('src'))m.src=m.dataset.kSrc;
+   if(!erlaubt&&m.getAttribute('src')){if(m.tagName==='VIDEO')m.pause();m.removeAttribute('src');if(m.tagName==='VIDEO')m.load();}
+  }));
+  const stand=()=>{bei=Math.max(0,Math.min(seiten.length-1,Math.round(streifen.scrollLeft/Math.max(1,streifen.clientWidth))));el.querySelector('[data-k-zaehler]').textContent=`${bei+1}/${seiten.length}`;el.querySelector('[data-k-vor]').disabled=bei===0;el.querySelector('[data-k-nach]').disabled=bei===seiten.length-1;laden();};
+  const springen=i=>streifen.scrollTo({left:Math.max(0,Math.min(seiten.length-1,i))*streifen.clientWidth,behavior:'instant'});
+  streifen.addEventListener('scroll',stand,{passive:true});streifen.addEventListener('keydown',e=>{if(e.target!==streifen)return;if(e.key==='ArrowRight'){e.preventDefault();springen(bei+1);}if(e.key==='ArrowLeft'){e.preventDefault();springen(bei-1);}});
+  el.querySelector('[data-k-vor]').onclick=()=>springen(bei-1);el.querySelector('[data-k-nach]').onclick=()=>springen(bei+1);
+  const observer=new IntersectionObserver(entries=>{nah=entries[0].isIntersecting;laden();},{rootMargin:'200px'});observer.observe(el);
+  el.querySelector('[data-k-voll]')?.addEventListener('click',()=>{
+   const p=[...(state.posts||[])].find(p=>p.id===el.dataset.kid);if(!p)return;
+   const warNah=nah;nah=false;laden();
+   const dialog=document.createElement('dialog');dialog.className='karussellvoll';dialog.innerHTML='<button data-schliessen>Vollbild schließen</button>'+karussellFlaeche(p,true,bei);document.body.appendChild(dialog);dialog.showModal();
+   const freigeben=()=>{dialog.remove();nah=warNah;laden();for(const [k,stop] of karussellBeobachter)if(!k.isConnected){stop();karussellBeobachter.delete(k);}};
+   dialog.querySelector('[data-schliessen]').onclick=()=>dialog.close();dialog.addEventListener('close',freigeben,{once:true});karussellVerbinden(dialog);
+  });
+  karussellBeobachter.set(el,()=>{observer.disconnect();nah=false;laden();});
+  if(bei)streifen.scrollLeft=bei*streifen.clientWidth;stand();
+ });
+}
+
+// Navigation entfernt DOM-Knoten; auch deren Spieler/Beobachter sofort freigeben.
+new MutationObserver(()=>{for(const [el,stop] of karussellBeobachter)if(!el.isConnected){karussellBeobachter.delete(el);stop();}}).observe(document.body,{childList:true,subtree:true});
+
+function medienZaehlerBadge(e){return e.medien?.length>1?`<span class="griditem__zaehler">1/${e.medien.length}</span>`:'';}

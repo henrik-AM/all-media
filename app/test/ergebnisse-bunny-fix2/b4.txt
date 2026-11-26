@@ -1,0 +1,7 @@
+OK 1 Website hängt Einzelbeitrag markiert hinten an und hält ihn aus normalem Feed
+OK 2 App posts: einzelnes Nachladen bleibt markiert, zeitliche Feedreihenfolge erhalten
+OK 3 App videos: einzelnes Nachladen bleibt markiert, zeitliche Feedreihenfolge erhalten
+OK 4 App clips: einzelnes Nachladen bleibt markiert, zeitliche Feedreihenfolge erhalten
+OK 5 App posts: nur explizites Ziel sichtbar, nach Home-Rückkehr wieder weg
+OK 6 App videos: nur explizites Ziel sichtbar, nach Home-Rückkehr wieder weg
+6/6 Prüfungen bestanden

@@ -1,0 +1,12 @@
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+✔ Abbruch während der Supabase-Signatur löscht über den Dienst (1.127584ms)
+✔ Beitrag gelöscht und Karussell weiter bereinigt trotz Fehler bei Dateilöschung (0.413ms)
+✔ Beitrag gelöscht und Karussell weiter bereinigt trotz Fehler bei Freigabe-RPC (0.110959ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 51.582667

@@ -340,7 +340,7 @@ function erstelleBunny(konfig, { abruf = fetch, jetzt = () => Date.now() } = {})
   }
 
   /** Unterschriebene Adresse für einen Pfad, höchstens eine Stunde gültig. */
-  function signierteAdresse(pfad, sekunden = STANDARD_SEKUNDEN) {
+  function signierteAdresse(pfad, sekunden = STANDARD_SEKUNDEN, { genauerAblauf = false } = {}) {
     if (!bereit) return null;
     const geprueft = pfadPruefen(pfad, ORDNER_LESEN);
     if (!geprueft) return null;
@@ -349,7 +349,7 @@ function erstelleBunny(konfig, { abruf = fetch, jetzt = () => Date.now() } = {})
       basis: konfig.auslieferung,
       schluessel: konfig.tokenSchluessel,
       pfad: `/${geprueft}`,
-      ablauf: dauer <= 60 ? Math.floor(jetzt() / 1000) + dauer : ablaufFuer(dauer, jetzt()),
+      ablauf: genauerAblauf || dauer <= 60 ? Math.floor(jetzt() / 1000) + dauer : ablaufFuer(dauer, jetzt()),
     });
   }
 
@@ -496,7 +496,7 @@ module.exports = {
   hochladen: (pfad, inhalt, typ) => adapter().hochladen(pfad, inhalt, typ),
   ablegen: (nutzerId, ordner, typ, inhalt, optionen) => adapter().ablegen(nutzerId, ordner, typ, inhalt, optionen),
   loeschen: (pfad) => adapter().loeschen(pfad),
-  signierteAdresse: (pfad, sekunden) => adapter().signierteAdresse(pfad, sekunden),
+  signierteAdresse: (pfad, sekunden, optionen) => adapter().signierteAdresse(pfad, sekunden, optionen),
   // Für Tests und das Umzugsskript
   erstelleBunny,
   konfigurationAus,

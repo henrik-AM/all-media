@@ -57,8 +57,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     }
   });
   await zuruecksetzen(page);
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(500);
+  await page.waitForSelector('[data-area="messenger"]');
 
   const ergebnisse = [];
   const pruefe = async (name, fn) => {
@@ -254,9 +253,9 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   console.log('\nGruppenanruf');
 
   await pruefe('Eine Gruppe lässt sich anrufen, alle Mitglieder stehen da', async () => {
+    // Der Rücksetzer lädt die Oberfläche bereits neu.
     await zuruecksetzen(page);
-    await page.reload({ waitUntil: 'load' });
-    await page.waitForTimeout(500);
+    await page.waitForSelector('[data-area="messenger"]');
     await imChat('Projekt Team');
     await page.click('[data-call="audio"]');
     await page.waitForSelector('.anruf__teilnehmer', { timeout: 3000 });

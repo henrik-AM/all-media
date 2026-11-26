@@ -58,6 +58,12 @@ function eigeneBasis(): string | undefined {
 export function eigeneMedienadresse(url: unknown, ordner?: string | string[]): boolean {
   return MedienAdresse.gespeichert(url, ordner ?? null, eigeneBasis());
 }
+export type UploadStand = import('../../gemeinsam/upload').Stand & {abbrechen:()=>void};
+let uploadStand:UploadStand|null=null;
+const uploadZuhoerer=new Set<(s:UploadStand|null)=>void>();
+export function uploadBeobachten(fn:(s:UploadStand|null)=>void){uploadZuhoerer.add(fn);fn(uploadStand);return ()=>{uploadZuhoerer.delete(fn);};}
+export function uploadIstAktiv(){return uploadStand!==null;}
+export function uploadStandSetzen(s:UploadStand|null){uploadStand=s;for(const fn of uploadZuhoerer)fn(s);}
 const GUELTIG = 4 * 60 * 60;
 
 /*
@@ -241,6 +247,18 @@ export async function signiereEine(
 
   const speicher = await speicherFuer(client);
   if (!speicher) return null;
+  if (pfad.startsWith('instants/')) {
+    const server = (process.env.EXPO_PUBLIC_WEB_URL || 'https://all-media-website.onrender.com').replace(/\/$/, '');
+    if (!/^https:\/\//.test(server) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(server)) throw new Error('Ungültiger Instants-Server');
+    const r = await fetch(`${server}/api/instants/signatur`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${speicher.token}` },
+      body: JSON.stringify({ pfad }), redirect: 'error',
+    });
+    const data = await r.json();
+    if (!r.ok || !data?.bild) throw new Error('Instant nicht mehr verfügbar');
+    if (await speicherFuer(client) !== speicher) return null;
+    return data.bild;
+  }
   const eintrag = speicher.eintraege.get(pfad);
   if (eintrag && eintrag.ablauf - PUFFER_MS > Date.now()) return eintrag.url;
 

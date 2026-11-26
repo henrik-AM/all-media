@@ -1,0 +1,79 @@
+=== bunny-bilder
+OK 1 Feed zeigt 1/12 und lädt fernes Medium nicht
+OK 2 Weiterwischen/Knopf zeigt Video 2/12 und lädt dessen Bytes
+OK 3 Weiterblättern entzieht dem unsichtbaren Video die Quelle
+OK 4 Vollbild öffnet bei aktuellem Medium und bleibt wischbar
+OK 5 Fremdes Profil zeigt Medienzahl und öffnet das wischbare Karussell
+OK 6 Gemischte Auswahl sortieren, entfernen und ohne Upload abbrechen
+OK 7 Website-Upload zeigt echte Prüfphase; Server speichert erst nach XHR-Erfolg
+OK 8 Website-Abbruch liefert Fehler und keinen Beitrag
+OK 9 Vollständiger Website-Erstellenweg speichert geordnete gemischte Liste über Server
+OK 10 Tatsächliche App-Bibliothek lädt mit Bytefortschritt über Server hoch
+OK 11 Tatsächliche App-Bibliothek signiert und löscht über denselben Server
+OK 12 App signiert mehr als 500 Medien in getrennten zulässigen Paketen
+OK 13 Tatsächliche App-Bibliothek bricht Upload ab und meldet keinen Erfolg
+OK 14 Website ohne JavaScript-Absturz
+14/14 Browser-/App-Bibliotheksprüfungen bestanden; native Sichtprüfung offen.
+=== bunny-anschluss
+OK 1 Ohne Anmeldung 401, kein Speicherzugriff
+OK 2 Upload über echte Route: dauerhafte DB-Adresse und getrennte Anzeige
+OK 3 Pull-Nachbau liefert tatsächlich die gespeicherten Bytes
+OK 4 Eigentümer kann serverseitig signieren
+OK 5 Fremdes Konto bekommt keine private Signatur
+OK 6 Sichtbare Referenz erlaubt anderem Konto; Widerruf wirkt vor neuer Signatur
+OK 7 Fehlende Rechteprüfung bleibt geschlossen
+OK 8 Minderjährigen-Freigabe wird vor Bunny-Upload geprüft
+OK 9 Fremdes Löschen erreicht Bunny nicht
+OK 10 Verzeichnis-/Traversal-Löschung erreicht Bunny nicht
+OK 11 Fehlender Metadatenbeleg entfernt empfangene Datei und liefert Fehler
+OK 12 Falsche Formatbytes erreichen Bunny nicht
+OK 13 Alte Supabase-Datei wird beim eingeschalteten Bunny weiter über Supabase signiert
+OK 14 Schalter aus: Upload bleibt Supabase, kein Bunny-Aufruf
+OK 15 Rückweg: Uploads Supabase, vorhandene Bunny-Dateien weiterhin lesbar
+OK 16 Eigener Löschweg entfernt Bytes und Metadaten
+OK 17 20-Minuten-Video durchläuft Route und echte Byteprüfung; Registry enthält Dauer und Hash
+OK 18 Instant-Upload hat Nutzerordner, keine Vorsignatur; allgemeines Signieren bleibt gesperrt
+OK 19 Gemischter Instant-Aufräumer entfernt Bunny- und Supabase-Bytes vor Metadaten
+OK 20 Verlorene Löschantwort bleibt wiederholbar: 404 bestätigt bekannten eigenen Beleg
+OK 21 Profil-Detailroute liefert einzelne Medienliste signiert; anonym/ungültige ID geschlossen
+OK 22 Abbruch während Bunny-Ablage: kein Beleg, Datei bereinigt
+22/22 Prüfungen bestanden (lokaler Server + Nachbau; keine Live-RLS)
+=== af-fix-bilder
+OK 1 B7 Browser: unbekannte Zahl zeigt Laden statt Null
+OK 2 B7 Browser: Fehler zeigt nicht verfügbar, keine feste Null
+OK 3 B7 Browser: erfolgreiche leere Liste zeigt bestätigte Null
+OK 4 B5 Browser: Pflichttext blockiert vor Upload
+OK 5 B5 Browser: DB-Fehler zeigt Formular, Wiederholen lädt nicht erneut hoch
+OK 6 B1 Browser/Server: veröffentlichte Bunny-Datei bleibt vor Löschung geschützt
+OK 7 B5 Browser: endgültiger Abbruch räumt Bunny-Restdatei auf
+OK 8 B5 Browser: endgültiger Abbruch räumt Supabase-Restdatei auf
+OK 9 Browser bleibt ohne JavaScript-Absturz
+9/9 Browser-/Serverprüfungen bestanden; vier Bilder gesondert ansehen.
+tsc grün
+=== bunny-bilder (nach B4-Suche)
+OK 1 Feed zeigt 1/12 und lädt fernes Medium nicht
+OK 2 Weiterwischen/Knopf zeigt Video 2/12 und lädt dessen Bytes
+OK 3 Weiterblättern entzieht dem unsichtbaren Video die Quelle
+OK 4 Vollbild öffnet bei aktuellem Medium und bleibt wischbar
+OK 5 Fremdes Profil zeigt Medienzahl und öffnet das wischbare Karussell
+OK 6 Gemischte Auswahl sortieren, entfernen und ohne Upload abbrechen
+OK 7 Website-Upload zeigt echte Prüfphase; Server speichert erst nach XHR-Erfolg
+OK 8 Website-Abbruch liefert Fehler und keinen Beitrag
+OK 9 Vollständiger Website-Erstellenweg speichert geordnete gemischte Liste über Server
+OK 10 Tatsächliche App-Bibliothek lädt mit Bytefortschritt über Server hoch
+OK 11 Tatsächliche App-Bibliothek signiert und löscht über denselben Server
+OK 12 App signiert mehr als 500 Medien in getrennten zulässigen Paketen
+OK 13 Tatsächliche App-Bibliothek bricht Upload ab und meldet keinen Erfolg
+OK 14 Website ohne JavaScript-Absturz
+14/14 Browser-/App-Bibliotheksprüfungen bestanden; native Sichtprüfung offen.
+=== af-fix-bilder (nach B4-Suche)
+OK 1 B7 Browser: unbekannte Zahl zeigt Laden statt Null
+OK 2 B7 Browser: Fehler zeigt nicht verfügbar, keine feste Null
+OK 3 B7 Browser: erfolgreiche leere Liste zeigt bestätigte Null
+OK 4 B5 Browser: Pflichttext blockiert vor Upload
+OK 5 B5 Browser: DB-Fehler zeigt Formular, Wiederholen lädt nicht erneut hoch
+OK 6 B1 Browser/Server: veröffentlichte Bunny-Datei bleibt vor Löschung geschützt
+OK 7 B5 Browser: endgültiger Abbruch räumt Bunny-Restdatei auf
+OK 8 B5 Browser: endgültiger Abbruch räumt Supabase-Restdatei auf
+OK 9 Browser bleibt ohne JavaScript-Absturz
+9/9 Browser-/Serverprüfungen bestanden; vier Bilder gesondert ansehen.

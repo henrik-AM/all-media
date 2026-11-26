@@ -1,3 +1,6 @@
+const Einzelbeitrag = require('../../../gemeinsam/einzelbeitrag') as typeof import('../../../gemeinsam/einzelbeitrag');
+import * as Reel from '../../../gemeinsam/reel';
+import { reaktion } from '../../../gemeinsam/rang';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -45,6 +48,7 @@ interface Props {
    * Profilraster hierher. Gleiche Regel wie in HomeFeedScreen.
    */
   startBei?: string | null;
+  einzelZiel?: string | null;
   /** Nachtrag 4.3: Kommentar aus einer Mitteilung — Blatt öffnet sich dort. */
   startKommentar?: { beitrag: string; kommentar: string } | null;
   onStartErreicht?: () => void;
@@ -57,6 +61,7 @@ export const VideoFeedScreen = ({
   onOpenProfile,
   onShare,
   startBei,
+  einzelZiel,
   startKommentar,
   onStartErreicht,
   onNotice,
@@ -89,8 +94,8 @@ export const VideoFeedScreen = ({
    * Feed - ausser man kommt ueber genau diesen Beitrag aus dem Profil.
    */
   const sichtbareVideos = useMemo(
-    () => videos.filter((v) => v.id === startBei || !keinInteresse.includes(v.id)),
-    [videos, keinInteresse, startBei]
+    () => videos.filter((v) => Einzelbeitrag.imFeed(v,einzelZiel||startBei,keinInteresse)),
+    [videos, keinInteresse, startBei, einzelZiel]
   );
 
   useEffect(() => {
@@ -153,7 +158,10 @@ export const VideoFeedScreen = ({
    * gelegt wuerde die oberste alle Beruehrungen schlucken, und die beiden
    * darunter waeren tot.
    */
+  const [fortschritt, setFortschritt] = useState<Record<string, { bei: number; gesamt: number }>>({});
   const spieler = useRef<Record<string, VideoSteuerung | null>>({});
+  /** AF5: Breite der Sprungleiste je Reel (statt measure, RN 0.88). */
+  const leisteBreite = useRef<Record<string, number>>({});
   const letzterTipp = useRef(0);
   const tippZeitgeber = useRef<ReturnType<typeof setTimeout> | null>(null);
   const halten = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -225,9 +233,14 @@ export const VideoFeedScreen = ({
   const toggleLike = async (video: Video) => {
     haptic.impact('medium');
     const zurueck = () =>
-      update(video.id, (v) => ({ ...v, liked: video.liked, likes: video.likes }));
-    update(video.id, (v) => ({ ...v, liked: !v.liked, likes: v.likes + (v.liked ? -1 : 1) }));
+      update(video.id, (v) => ({ ...v, liked: video.liked, disliked: video.disliked, likes: video.likes }));
+    update(video.id, (v) => reaktion(v, 'like'));
     aktion.like(video.id, zurueck);
+  };
+
+  const toggleDislike = (video: Video) => {
+    update(video.id, (v) => reaktion(v, 'dislike'));
+    aktion.dislike(video.id, () => update(video.id, () => video));
   };
 
   const toggleSave = async (video: Video) => {
@@ -345,6 +358,18 @@ export const VideoFeedScreen = ({
 
     return (
       <View style={[styles.slide, slideHeight > 0 && { height: slideHeight }]}>
+        <View style={{ position:'absolute', bottom:4, left:16, right:16, zIndex:20, backgroundColor:'rgba(0,0,0,.6)', padding:8, borderRadius:8 }}>
+          <Text style={{color:'white',fontSize:12}}>{Reel.zeit(fortschritt[item.id]?.bei || 0)} / {Reel.zeit(fortschritt[item.id]?.gesamt || 0)}</Text>
+          <Pressable accessibilityRole="adjustable" accessibilityLabel="Videoposition"
+            accessibilityValue={{min:0,max:fortschritt[item.id]?.gesamt || 0,now:fortschritt[item.id]?.bei || 0}}
+            accessibilityActions={[{name:'increment'},{name:'decrement'}]}
+            onAccessibilityAction={(e) => spieler.current[item.id]?.springen(Math.max(0,Math.min(fortschritt[item.id]?.gesamt || 0,(fortschritt[item.id]?.bei || 0)+(e.nativeEvent.actionName==='increment'?10:-10))))}
+            onLayout={(e) => { leisteBreite.current[item.id] = e.nativeEvent.layout.width; }}
+            onPress={(e) => { const f=fortschritt[item.id]; const w=leisteBreite.current[item.id] || 1; spieler.current[item.id]?.springen(Reel.ziel(e.nativeEvent.locationX/w,f?.gesamt || 0)); }}
+            style={{height:24,justifyContent:'center'}}>
+            <View style={{height:4,backgroundColor:'#888'}}><View style={{height:4,backgroundColor:'#fff',width:`${100*Reel.ziel((fortschritt[item.id]?.bei || 0)/(fortschritt[item.id]?.gesamt || 1),1)}%`}} /></View>
+          </Pressable>
+        </View>
         <Pressable
           style={styles.stage}
           onPress={() => flaecheGetippt(item)}
@@ -367,6 +392,7 @@ export const VideoFeedScreen = ({
             icon="play-outline"
             iconSize={72}
             dunkel
+            onFortschritt={(bei, gesamt) => { if (sichtbar === item.id) setFortschritt((p) => ({ ...p, [item.id]: { bei, gesamt } })); }}
             style={styles.stageBild}
           />
           {pause && sichtbar === item.id && (
@@ -399,6 +425,9 @@ export const VideoFeedScreen = ({
         </Pressable>
 
         <View style={styles.rail}>
+          <Druck style={styles.railBtn} onPress={() => toggleDislike(item)} accessibilityLabel="Gefällt mir nicht" accessibilityState={{ selected: !!item.disliked }}>
+            <Ionicons name={item.disliked ? 'thumbs-down' : 'thumbs-down-outline'} size={24} color={colors.white} />
+          </Druck>
           <Druck style={styles.railBtn} onPress={() => toggleLike(item)} accessibilityLabel="Gefällt mir">
             <Ionicons
               name={item.liked ? 'heart' : 'heart-outline'}
@@ -614,7 +643,7 @@ const styles = themenStyles((colors) => ({
   railBtn: { width: '100%', alignItems: 'center', gap: 4 },
   railLabel: { color: colors.white, fontSize: 11, fontWeight: '600' },
 
-  meta: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, paddingRight: 78 },
+  meta: { paddingHorizontal: spacing.lg, paddingBottom: 76, paddingRight: 78 },
   author: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: spacing.sm },
   authorTap: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   authorName: { color: colors.white, fontSize: 14.5, fontWeight: '700' },

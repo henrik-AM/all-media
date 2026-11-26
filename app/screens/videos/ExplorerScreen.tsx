@@ -127,8 +127,10 @@ const ExplorerSeite = ({
   const treffer = useMemo(() => {
     // Was gerade erst angelegt wurde, steht noch nicht in der geladenen Liste
     // - es käme erst beim nächsten Laden mit. Deshalb vorne dran.
-    const beitraege = [...eigeneBeitraege, ...alleBeitraege];
-    const videos = [...eigeneVideos, ...alleVideos];
+    // Gezielt geöffnete Fremdbeiträge (nurEinzeln) gehören nicht in den Explorer.
+    const beitraege = [...eigeneBeitraege, ...alleBeitraege].filter((p) => !p.nurEinzeln);
+    const videos = [...eigeneVideos, ...alleVideos].filter((v) => !v.nurEinzeln);
+    const querformat = clips.filter((c) => !c.nurEinzeln);
 
     const q = (ziel.suche ?? '').trim().toLowerCase();
     const hit = (text?: string) => !q || (text ?? '').toLowerCase().includes(q);
@@ -143,7 +145,7 @@ const ExplorerSeite = ({
           ? nachInteresse(videos.filter((v) => hit(v.description) || hit(v.music) || hit(name(v.userId))), (v) => v.likes, gefolgt)
           : [],
         clips: ziel.art === 'querformat'
-          ? nachInteresse(clips.filter((c) => hit(c.title) || hit(name(c.userId))), (c) => c.views, gefolgt)
+          ? nachInteresse(querformat.filter((c) => hit(c.title) || hit(name(c.userId))), (c) => c.views, gefolgt)
           : [],
         beitraege: ziel.art === 'beitraege'
           ? nachInteresse(beitraege.filter((p) => hit(p.description) || hit(p.music) || hit(name(p.userId))), (p) => p.likes, gefolgt)
@@ -160,7 +162,7 @@ const ExplorerSeite = ({
 
     return {
       reels: nachInteresse(videos.filter(passt), (v) => v.likes, gefolgt),
-      clips: nachInteresse(clips.filter(passt), (c) => c.views, gefolgt),
+      clips: nachInteresse(querformat.filter(passt), (c) => c.views, gefolgt),
       beitraege: nachInteresse(beitraege.filter(passt), (p) => p.likes, gefolgt),
     };
   }, [ziel, uebersicht, platz, sound, clips, eigeneBeitraege, eigeneVideos, alleBeitraege, alleVideos, folgtPerson]);

@@ -1,0 +1,438 @@
+
+=== _bunny_einheit ===
+
+1. Token-Rechnung gegen die offiziellen Prüfwerte
+  OK   Prüfwert plain  — HS256-o10JRWlsAItyAsdKS6jJKjabHN4FrFsplDHPV1idcX4
+  OK   Prüfwert countries_only  — HS256-i5s3Uv7mnrFfN5nznwU2BxhILpnipYeE18TapV0WNFM
+  OK   Prüfwert blocked_only  — HS256-JS8dSuBSjSH-W2-xhdkCPC36-2rlxfDCQJjlNMPqKZQ
+  OK   Prüfwert path_only  — HS256-uVZvT3SbEoVKYJyDJgbcsDmSFf73cv-uNUVaJiKWpbQ
+  OK   Prüfwert ignore_params  — HS256-1lwWBD_c1IAGSj1UKPoxreu8ePDQ-Z9FoWLcRn_RRH0
+  OK   Prüfwert limit_only  — HS256-DAVapqNNED3Z7JkjRTYX0UOIHNtbHEuuhRNEc4A7mMQ
+  OK   Ganze Adresse wie im Prüfwert countries_only
+  OK   Verzeichnis-Token steht im Pfad
+
+2. Konfiguration
+  OK   Ohne Variablen: nicht bereit, nennt die Namen  — BUNNY_STORAGE_ZONE,BUNNY_STORAGE_KEY,BUNNY_PULL_HOST,BUNNY_TOKEN_KEY
+  OK   Fremder Speicher-Host wird abgelehnt
+  OK   http nur lokal
+  OK   Echter Regions-Host geht
+  OK   Teilweise falsch: nennt nur Namen, keinen Schlüssel
+  OK   Nicht eingerichtet: hochladen sagt es, ohne Anfrage
+  OK   Nicht eingerichtet: keine Adresse
+  OK   Lokale Konfiguration bereit
+
+3. Hochladen
+  OK   JPEG hochgeladen
+  OK   url ist die beständige Supabase-Form  — https://ijztosbjfybdgotpdixw.supabase.co/storage/v1/object/public/media/posts/test-bild.jpg
+  OK   pfad zurück
+  OK   anzeige ist unterschriebene Pull-Adresse  — http://127.0.0.1:55043/posts/test-bild.jpg?token=HS256-4y4iWwlIrGKeS9JWmXF_DP7kLkvA8WdpNcEN28xtGeM&expires=1793034000
+  OK   Inhalt kam unverändert an
+  OK   MP4 (Typ mit Zusatz) hochgeladen
+  OK   Push-to-Talk M4A geht in ptt
+  OK   ablegen baut Pfad mit 32 Zufallszeichen  — avatars/nutzer-1-1793017200000-a29f0350f686c75feb78cb3ab01c11ad.png
+  OK   ablegen zweimal → zwei Pfade (kein Überschreiben)
+
+4. Falscher Schlüssel
+  OK   Hochladen abgelehnt
+  OK   Löschen abgelehnt, Datei bleibt
+  OK   Auflisten abgelehnt
+  OK   Kein Schlüssel und keine Speicheradresse in Rückgabe/Protokoll  — Bunny: Hochladen fehlgeschlagen: Status 401 | Bunny: Löschen fehlgeschlagen: Status 401 | Bunny: Auflisten fehlgeschlagen: Status 401
+
+5. Zu große Dateien
+  OK   Bild über 10 MB abgelehnt  — Die Datei ist zu groß (11 MB, höchstens 10 MB).
+  OK   Video über 50 MB abgelehnt  — Die Datei ist zu groß (51 MB, höchstens 50 MB).
+  OK   Video mit genau 50 MB geht
+  OK   Leere Datei abgelehnt
+  OK   Abgelehnte gingen nie zum Speicher  — 1 Anfragen
+
+6. Falsche Typen
+  OK   WebM abgelehnt
+  OK   MOV abgelehnt
+  OK   HTML als image/jpeg abgelehnt (Inhalt passt nicht)
+  OK   Video als Profilbild abgelehnt
+  OK   M4A außerhalb ptt abgelehnt
+  OK   SVG abgelehnt
+  OK   Kein Buffer abgelehnt
+
+7. Pfadmanipulation
+  OK   Hochladen: 17 böse Pfade abgelehnt
+  OK   Löschen: alle bösen Pfade abgelehnt (vor allem „posts/" = ganzes Verzeichnis)
+  OK   Keine davon kam beim Speicher an  — 0 Anfragen
+  OK   Verzeichnis posts/ ist noch da
+  OK   signierteAdresse lehnt ../ ab
+  OK   pfadAus lehnt kodiertes ../ ab
+  OK   pfadAus nimmt gültige Adresse
+  OK   auflisten lehnt fremden Ordner ab
+  OK   Umzug darf beispiel/ ablegen (pruefen:false)
+
+8. Löschen und Auflisten
+  OK   Auflisten nennt Name und Größe
+  OK   Löschen
+  OK   Zweites Löschen: gibt es nicht
+
+9. Ablauf und Fenster
+  OK   ablaufFuer rundet auf volle Stunde
+  OK   ablaufFuer: genau auf der Stunde bleibt
+  OK   Im selben Fenster dieselbe Adresse (Browser-Cache!)
+  OK   Im nächsten Fenster neue Adresse
+  OK   Gültig mindestens sekunden, höchstens + 1 Stunde  — 6000 s
+  OK   Pull Zone liefert mit gültigem Token
+  OK   Pull Zone lehnt abgelaufenen Token ab
+  OK   Pull Zone lehnt fremden Pfad mit diesem Token ab
+  OK   Pull Zone lehnt verlängertes expires ab
+  OK   Pull Zone lehnt fehlenden Token ab
+  OK   Höchstens 7 Tage
+  OK   Unsinnige Dauer → Standard 4 Stunden
+
+10. Zentraler Signierweg (Leserechte vor jeder Unterschrift)
+  OK   Adapter exportiert keinen zweiten Listen-Signierweg
+  OK   Erlaubter Pfad wird unterschrieben
+  OK   Verbotener Pfad bleibt unverändert
+  OK   Fremde Adresse und Text unverändert
+  OK   Eingabe nicht verändert
+  OK   Jeder Abruf prüft beide Pfade erneut
+  OK   Prüfung fällt aus → nichts unterschrieben
+  OK   Zentraler Batchweg berücksichtigt freigegebenen Pfad
+
+11. Umzugsskript
+  OK   Trockenlauf ist Vorgabe: zählt 3, lädt nichts  — {"gelistet":3,"gelistetBytes":432,"schonFertig":0,"offen":3,"offenBytes":432,"geholt":0,"geholtBytes":0,"listeBytes":0,"hochgeladen":0,"fehler":0,"nichtMp4":1,"pruefAbweichungen":0,"status":"trockenlauf"}
+  OK   Trockenlauf zählt WebM als nicht MP4
+  OK   Trockenlauf schreibt keine Zustandsdatei
+  OK   Echt ohne --zustand verweigert
+  OK   Echter Lauf aus Ordner: 3/3 abgelegt, 0 Abweichungen  — {"gelistet":3,"gelistetBytes":432,"schonFertig":0,"offen":3,"offenBytes":432,"geholt":3,"geholtBytes":0,"listeBytes":0,"hochgeladen":3,"fehler":0,"nichtMp4":1,"pruefAbweichungen":0,"status":"fertig"}
+  OK   Pfade gleich wie in der Quelle
+  OK   Zustandsdatei: 3 Zeilen mit SHA256
+  OK   Fortsetzen: 3 schon fertig, nur die neue geladen  — {"gelistet":4,"gelistetBytes":636,"schonFertig":3,"offen":1,"offenBytes":204,"geholt":1,"geholtBytes":0,"listeBytes":0,"hochgeladen":1,"fehler":0,"nichtMp4":1,"pruefAbweichungen":0,"status":"fertig"}
+  OK   Supabase echt ohne Budget verweigert
+  OK   Supabase-Trockenlauf holt keine Datei
+  OK   Budget: hält vor der Datei an, die es sprengen würde  — {"gelistet":3,"gelistetBytes":4408,"schonFertig":0,"offen":3,"offenBytes":4408,"geholt":1,"geholtBytes":204,"listeBytes":397,"hochgeladen":1,"fehler":0,"nichtMp4":0,"pruefAbweichungen":0,"status":"budget"}
+  OK   Budget nie überschritten
+  OK   Fortsetzen nach Budget: s1 übersprungen  — {"gelistet":3,"gelistetBytes":4408,"schonFertig":1,"offen":2,"offenBytes":4204,"geholt":2,"geholtBytes":4204,"listeBytes":397,"hochgeladen":1,"fehler":1,"nichtMp4":0,"pruefAbweichungen":0,"status":"fehler"}
+  OK   MD5 passt nicht → Fehler, nicht als fertig vermerkt
+  OK   Schlüssel nicht im Zähler
+
+12. Anschluss: Instants und kurze Signaturen
+  OK   Instant-Pfad mit Nutzerordner hochladbar
+  OK   Instant-Pfad sicher lesbar
+  OK   Instant ohne Nutzerordner unzulässig
+  OK   Instant-Foto höchstens 250 KB
+  OK   Instant-Video abgelehnt
+  OK   QuickTime als MP4 umbenannt abgelehnt
+  OK   Instant-Signatur exakt 60 Sekunden, keine Stundenrundung
+  OK   Instant-Verzeichnis niemals löschbar
+  OK   Instant-Datei einzeln löschbar
+
+12. Protokoll
+  OK   Kein Schlüssel, kein Token im Protokoll  — 3 Zeilen
+
+98 von 98 Pruefungen bestanden
+
+=== bunny-upload ===
+OK 1 Bytefortschritt und Prüfen sind verschiedene Phasen
+OK 2 Abbruch beendet XHR und liefert nie Erfolg
+OK 3 Vorher abgebrochen sendet kein Byte
+OK 4 HTTP 401 meldet verständlichen Fehler
+OK 5 HTTP 413 meldet verständlichen Fehler
+OK 6 HTTP 429 meldet verständlichen Fehler
+OK 7 HTTP 500 meldet verständlichen Fehler
+OK 8 Fehler auch bei HTTP 200 bleibt Fehler
+OK 9 HTML-Fehlerseite wird nicht als Upload gewertet
+OK 10 onerror
+OK 11 ontimeout
+OK 12 Header, Bytes und Zeitgrenze werden tatsächlich gesetzt
+12/12 Prüfungen bestanden
+
+=== af4-karussell ===
+OK 1 101 gemischte Aufnahmen ohne Stückgrenze
+OK 2 Verschieben bewahrt alle Aufnahmen und Eingabe
+OK 3 Entfernen bewahrt Reihenfolge
+OK 4 Ungültiges Verschieben verändert nichts
+OK 5 Alter Bildbeitrag bleibt lesbar
+OK 6 Alter Videobeitrag mit Signatur bleibt lesbar
+OK 7 Leerer Altbeitrag bleibt leer
+OK 8 Neue Liste hat Vorrang vor Titelmedium
+OK 9 Falsche Typen werden verständlich zurückgewiesen
+OK 10 App schreibt gesamte Reihenfolge atomar mit Beitrag; lokale Zusatzwerte entfallen
+OK 11 App-Persistenzfehler wird nicht zum Erfolg
+11/11 Prüfungen bestanden
+
+=== af4-profilsprung ===
+OK 1 Profil wartet auf geladenen Beitrag vor Navigation
+OK 2 Eigene Rasterart reel führt zum richtigen Spieler
+OK 3 Eigene Rasterart clip führt zum richtigen Spieler
+OK 4 Unsichtbarer/gelöschter Beitrag öffnet kein leeres Ziel
+OK 5 Nachladefehler steht sichtbar im Hinweis
+OK 6 Nachladeantwort einmal in richtigen Feed übernommen
+OK 7 Nachladeantwort nach Kontowechsel verworfen
+OK 8 Einzelnachladen filtert ID vor DB-Abruf und begrenzt auf eine Zeile
+8/8 Prüfungen bestanden
+
+=== af3-negativ ===
+OK 1 Negativ an, ohne öffentliche Zahl
+OK 2 Negativ zurücknehmen
+OK 3 Like verdrängt Negativ
+OK 4 Negativ verdrängt Like
+OK 5 Like zurücknehmen
+OK 6 Eingabe bleibt unverändert
+OK 7 Rangfaktor eigen
+OK 8 Rangfaktor Autor
+OK 9 Rangfaktor Thema
+OK 10 Rangfaktor neutral
+OK 11 Abwertung 100 → 2, ähnlicher Autor 100 → 30, Thema 100 → 50
+11/11 Prüfungen bestanden
+
+=== af5-reels ===
+OK 1 ungültige Länge 0
+OK 2 ungültige Länge -1
+OK 3 ungültige Länge NaN
+OK 4 ungültige Länge Infinity
+OK 5 ungültige Länge undefined
+OK 6 ungültige Länge 1200
+OK 7 zulässig 0.1
+OK 8 zulässig 60
+OK 9 zulässig 1199.99
+OK 10 zulässig 1200
+OK 11 20:00.001 abgelehnt
+OK 12 Zeitformat
+OK 13 Hälfte 10:00
+OK 14 Sprung an Grenzen
+OK 15 unbekannte Abspieldauer als 0:00
+OK 16 unbekannte Abspieldauer erlaubt keinen unendlichen Sprung
+16/16 Prüfungen bestanden
+
+=== af6-instants ===
+OK 1 leere Liste gesperrt
+OK 2 100 Zeichen erlaubt
+OK 3 101 Zeichen abgewiesen
+OK 4 Größengrenze 250 KB
+OK 5 Grenze überschritten
+OK 6 leere Datei gesperrt
+OK 7 großes Foto proportional verkleinern
+OK 8 kleines Foto nicht aufblasen
+OK 9 native Kamera nur Größe unter 1080
+OK 10 keine passende Kameraauflösung
+OK 11 ungeöffnet und frisch sichtbar
+OK 12 am Ablauf unsichtbar
+OK 13 geöffnet unsichtbar
+OK 14 blockiert unsichtbar
+OK 15 abgelehntes DELETE wird als Fehler gemeldet
+OK 16 bestätigtes DELETE erfolgreich
+OK 17 Web prüft RLS und signiert als Dienst nur 60 Sekunden
+OK 18 RLS-Verweigerung erreicht Dienstsignatur niemals
+OK 19 fehlender Dienstschlüssel scheitert geschlossen
+OK 20 falscher Medienpfad abgewiesen
+OK 21 App holt jede Instant-Adresse am kontrollierten Server mit Kontotoken
+OK 22 Kontowechsel während Instant-Signatur verwirft das alte Bild
+OK 23 Serververweigerung wird nicht als Bild angezeigt
+OK 24 Badge liest nur eine Zahl
+OK 25 Postfach lädt die nächste Seite gezielt
+OK 26 Dateifehler löscht keine Metadaten
+OK 27 Datei zuerst löschen, dann Zeilen bestätigen; verwaiste Datei ohne ID
+27/27 Prüfungen bestanden
+
+=== af7-analysen ===
+OK 1 beide Zeitfenster
+OK 2 erreichte Konten
+OK 3 echte Aufrufe
+OK 4 Follower
+OK 5 Nicht-Follower
+OK 6 Dauer in Minuten
+OK 7 Interaktionen
+OK 8 kleine Ländergruppe verborgen
+OK 9 Länder als Band statt Einzelzahl
+OK 10 pro Beitrag Aufrufe und Reichweite
+OK 11 keine erfundenen Nullwerte bei Fehler
+OK 12 fehlender Zeitraum abgelehnt
+OK 13 begrenzte Vorwahlabdeckung offen ausgewiesen
+13/13 Prüfungen bestanden
+
+=== af-nachpruefung ===
+OK 1 App-Uploadfehler: kein Post, keine Restkachel, verständlicher Fehler
+OK 2 App normal: Upload vor genau einer Veröffentlichung, echte Medienreferenz
+OK 3 Web: verspätete Analyse von A nach Kontowechsel B verworfen
+OK 4 Web: verspätete Fehler von A nach Kontowechsel B verworfen
+OK 5 Native Instant-Hintergrund lädt nur Stand; Ausfall zeigt unbekannt statt Null
+5/5 Prüfungen bestanden
+
+=== af-folgerunde ===
+OK 1 Gemeinsames Archiv enthält beide Bereiche, keine aktiven/Doppelten
+OK 2 Native Archivliste liest separaten Bestand und bietet echten Rückweg
+OK 3 Native Wiederherstellung speichert false vor Nachladen und Erfolg
+OK 4 Native Wiederherstellung meldet Fehler statt Erfolg
+OK 5 Native Likes: frische Liste, Konto zugeordnet, verzögerte Antwort verworfen
+OK 6 Native Likesfehler endet sichtbar statt endlosem Laden
+OK 7 Kamera: Galerie funktioniert ohne Kameralinse, Dauer weitergereicht
+OK 8 Explorer meldet fehlgeschlagenes Speichern nicht als hinzugefügt
+8/8 Prüfungen bestanden
+
+=== af-video-beleg ===
+OK 1 Containerangabe allein reicht nicht
+OK 2 Paketzeitachse entlarvt gelogene kurze Containerdauer
+OK 3 Kein Videostream abgewiesen
+OK 4 Echte 20-Minuten-Datei lokal geprüft
+OK 5 Echte 20:01-Datei lokal abgewiesen
+OK 6 Beschädigte Bytes abgewiesen
+OK 7 Zulässige Bytes → Upload → gebundener SHA256-Beleg
+OK 8 Überlanges Video erreicht Speicher nicht
+OK 9 Datenadresse durchläuft dieselbe Byteprüfung
+OK 10 Fehlender DB-Beleg: Datei entfernt, kein Upload-Erfolg
+OK 11 Ohne Dienstschlüssel vor Upload geschlossen
+11/11 Prüfungen bestanden
+
+=== af-fix-b1 ===
+OK 1 Referenziertes Video wird auch ohne Bunny-Schalter nicht gelöscht
+OK 2 Eigener unreferenzierter Post-Upload wird ausschließlich vom Dienst entfernt
+OK 3 Fehler der Besitzprüfung bleibt geschlossen
+3/3 Prüfungen bestanden
+
+=== af-fix-b3 ===
+OK 1 Mitteilung öffnet und verbraucht den Sprung genau einmal
+OK 2 Rückkehr zur Chatliste öffnet kein altes Blatt
+OK 3 Kontowechsel übernimmt keinen verbrauchten Sprung
+OK 4 Neue Mitteilung öffnet wieder genau einmal
+4/4 Prüfungen bestanden
+
+=== af-fix-b4 ===
+OK 1 Negativreaktion korrekt benannt und nach Schreibfehler zurückgesetzt
+1/1 Prüfungen bestanden
+
+=== af-fix-b5 ===
+OK 1 DB-Ablehnung und Wiederholen verwendet denselben Upload
+OK 2 Beschreibung und Zeitpunkt werden vor dem ersten Upload geprüft
+OK 3 Endgültiges Schließen nach DB-Fehler räumt genau den Upload auf
+OK 4 Teilweiser Karussellfehler behält erfolgreiche Datei für Wiederholen
+OK 5 Schließen während Upload wartet und veröffentlicht nichts
+OK 6 Erfolg bleibt bei erneutem Absenden ohne zweite Veröffentlichung
+6/6 Prüfungen bestanden
+
+=== af-fix-b5-app ===
+OK 1 App entfernt neuen Video-Upload nach abgelehntem Beitrag
+OK 2 App entfernt nur neue Karussellmedien, bewahrt bereits bestehende
+OK 3 App prüft Beschreibung vor dem Upload
+3/3 Prüfungen bestanden
+
+=== af-fix-b7 ===
+OK 1 App Instants zeigt vor Antwort keine erfundene Null
+OK 2 App Instants zeigt nach Fehler unbekannt und sperrt die Kamera
+OK 3 App Enge Freunde vor Laden und nach Fehler ohne feste Null
+OK 4 App Enge Freunde zeigt bestätigte leere Liste als echte Null
+OK 5 Website Enge Freunde zeigt während Antwort Laden und nach Fehler unbekannt
+OK 6 Website bestätigte leere Liste zeigt echte Null
+OK 7 Website falsch geformte Antwort zeigt keine Zahl
+7/7 Prüfungen bestanden
+
+=== bunny-fix-b1 ===
+OK 1 Bunny-Altbestand signiert zweimaligen Abruf nur einmal, Rechte zweimal
+OK 2 Anderer Nutzer bekommt eine eigene Signatur
+OK 3 Entzogenes Leserecht erhält keinen Cache-Link
+OK 4 App-Servermodus behält gemeinsame Cache-Adresse für Liste und Einzelmedium
+OK 5 App-Kontowechsel verwirft alten Cache
+OK 6 App respektiert tatsächlichen Server-Ablauf
+6/6 Prüfungen bestanden
+
+=== bunny-fix-b2 ===
+OK 1 App Feed/Einzelbeitrag mit Schema113=false
+OK 2 Website Feed/Einzelbeitrag mit Schema113=false
+OK 3 App Profilraster mit Schema113=false
+OK 4 Einzelmedium post auf App/Website mit Schema113=false
+OK 5 Einzelmedium reel auf App/Website mit Schema113=false
+OK 6 Einzelmedium clip auf App/Website mit Schema113=false
+OK 7 App Feed/Einzelbeitrag mit Schema113=true
+OK 8 Website Feed/Einzelbeitrag mit Schema113=true
+OK 9 App Profilraster mit Schema113=true
+OK 10 Einzelmedium post auf App/Website mit Schema113=true
+OK 11 Einzelmedium reel auf App/Website mit Schema113=true
+OK 12 Einzelmedium clip auf App/Website mit Schema113=true
+OK 13 Mehrere Aufnahmen ohne Schema werden ausdrücklich abgelehnt, kein stiller Verlust
+OK 14 Andere DB-Fehler werden niemals durch einen zweiten Insert verdeckt
+OK 15 PostgREST-Schemacachefehler wird gezielt erkannt, andere fehlende Spalten nicht
+15/15 Prüfungen bestanden
+Beitrag anlegen fehlgeschlagen: Hier ist derzeit nur eine Aufnahme je Beitrag möglich. Bitte die übrigen entfernen und erneut versuchen.
+
+=== bunny-fix-b3 ===
+OK 1 Karussell-DB-Fehler entfernt ausschließlich neu hochgeladene Medien
+OK 2 Einzelvideo-DB-Fehler räumt den neuen Upload auf
+OK 3 Bestätigter Beitrag behält alle Dateien
+OK 4 Fehlgeschlagenes Aufräumen wird sichtbar gemeldet
+4/4 Prüfungen bestanden
+Der Beitrag fehlgeschlagen: DB abgelehnt
+Der Beitrag fehlgeschlagen: DB abgelehnt
+Der Beitrag fehlgeschlagen: DB abgelehnt Unveröffentlichte Aufnahmen konnten nicht vollständig entfernt werden.
+
+=== bunny-fix-b4 ===
+OK 1 Website hängt Einzelbeitrag markiert hinten an und hält ihn aus normalem Feed
+OK 2 App posts: einzelnes Nachladen bleibt markiert, zeitliche Feedreihenfolge erhalten
+OK 3 App videos: einzelnes Nachladen bleibt markiert, zeitliche Feedreihenfolge erhalten
+OK 4 App clips: einzelnes Nachladen bleibt markiert, zeitliche Feedreihenfolge erhalten
+OK 5 App posts: nur explizites Ziel sichtbar, nach Home-Rückkehr wieder weg
+OK 6 App videos: nur explizites Ziel sichtbar, nach Home-Rückkehr wieder weg
+6/6 Prüfungen bestanden
+
+=== bunny-fix-b4-app ===
+OK 1 ProfilProvider übernimmt gezielt nachgeladenen Clip ohne neues Bootstrap
+OK 2 Normale Querformatübersicht filtert den Einzelclip aus
+2/2 Prüfungen bestanden
+
+=== bunny-fix-b4-suche ===
+OK 1 App Explorer-Übersicht reels ohne Einzelöffnung
+OK 2 App Explorer-Übersicht querformat ohne Einzelöffnung
+OK 3 App Explorer-Übersicht beitraege ohne Einzelöffnung
+OK 4 App Explorer Hashtag ohne Einzelöffnung
+OK 5 App Videosuche ohne Einzelöffnung
+OK 6 Website Videosuche/Explorer-Übersichten ohne Einzelöffnung
+OK 7 Website renderHashtagExplorer ohne Einzelöffnung
+OK 8 Website renderPlaceExplorer ohne Einzelöffnung
+8/8 Prüfungen bestanden
+
+=== bunny-fix-b5 ===
+OK 1 Eigene vorläufige post-Kachel öffnet lokalen Inhalt
+OK 2 Unbekannte lokale Kennung wird nicht als eigener Inhalt geöffnet
+OK 3 Eigene vorläufige reel-Kachel öffnet lokalen Inhalt
+OK 4 Unbekannte lokale Kennung wird nicht als eigener Inhalt geöffnet
+OK 5 Eigene vorläufige clip-Kachel öffnet lokalen Inhalt
+OK 6 Unbekannte lokale Kennung wird nicht als eigener Inhalt geöffnet
+6/6 Prüfungen bestanden
+
+=== bunny-fix-b6 ===
+OK 1 Ungültige Liste auf App/Server verständlich abgewiesen: "abc"
+OK 2 Ungültige Liste auf App/Server verständlich abgewiesen: [null]
+OK 3 Ungültige Liste auf App/Server verständlich abgewiesen: null
+OK 4 Ungültige Liste auf App/Server verständlich abgewiesen: [{"url":"x","typ":"audio"}]
+4/4 Prüfungen bestanden
+Beitrag anlegen fehlgeschlagen: Die Medienliste ist ungültig.
+Beitrag anlegen fehlgeschlagen: Eine Aufnahme ist ungültig.
+Beitrag anlegen fehlgeschlagen: Die Medienliste ist ungültig.
+Beitrag anlegen fehlgeschlagen: Eine Aufnahme ist ungültig.
+
+=== bunny-fix-b8 ===
+OK 1 Schwächerer Signierweg weder am Modul noch an Adapterinstanzen exportiert
+OK 2 Zentraler Weg prüft jedes Mal Batch-Leserechte, hält Blockierung und Instants geschlossen
+2/2 Prüfungen bestanden
+
+=== bunny-fix-b11 ===
+OK 1 Ungültige Pfade beeinträchtigen keine gültige Signatur, Instants bleiben zu
+OK 2 Form- und Paketgrenzen bleiben wirksam
+OK 3 App sammelt ausschließlich erlaubte allgemeine Medienpfade
+3/3 Prüfungen bestanden
+  Hinweis: SUPABASE_URL/SUPABASE_ANON_KEY sind nicht gesetzt — es gelten die eingebauten Standardwerte.
+
+=== _owasp_medien_einheit ===
+OK Gleiche Sitzung verwendet eine Freigabe wieder
+OK Kontowechsel am selben Client erbt keine Stapelfreigabe
+OK Kontowechsel erbt auch keine einzelne Freigabe
+OK Verschiedene Clients teilen keinen Speicher
+OK Abmeldung benutzt keine alte Freigabe
+OK Neue Sitzung desselben Kontos prueft erneut
+OK Kontowechsel waehrend Einzelunterschrift verwirft das Ergebnis
+OK Kontowechsel waehrend Stapelunterschrift verwirft das Ergebnis
+OK Abgelaufene Freigabe wird nicht wiederverwendet
+OK Mehr als 1000 Pfade verdrangen den aeltesten Eintrag
+10/10 Regressionen bestanden
+Medienadressen unterschreiben fehlgeschlagen: Synthetisch abgelehnt
+Adresse unterschreiben fehlgeschlagen: Synthetisch abgelehnt
+Adresse unterschreiben fehlgeschlagen: Synthetisch abgelehnt
+Adresse unterschreiben fehlgeschlagen: Synthetisch abgelehnt
+Adresse unterschreiben fehlgeschlagen: Synthetisch abgelehnt
+Adresse unterschreiben fehlgeschlagen: Synthetisch abgelehnt
+
+28/28 Läufe; 310/310 Offlineprüfungen bestanden. Dokumentabnahme/SQL/Browser getrennt.

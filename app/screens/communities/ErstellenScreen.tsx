@@ -6,11 +6,12 @@ import {
   Platform,
   ScrollView,
   Share,
-  Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { Schalter } from '../../components/Schalter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ExpoCrypto from 'expo-crypto';
@@ -39,8 +40,8 @@ interface Props {
 }
 
 /**
- * „Community erstellen“ und „Unterthema erstellen“ nach dem Figma-Prototyp
- * (Kästen 28/10.2 und 16).
+ * Gemeinsames All-Media-Formular für „Community erstellen“ und
+ * „Unterthema erstellen“ (Kästen 28/10.2 und 16).
  *
  * Henrik am 28.09.2026: „…halte dich, wenn ich auf Neues Unterthema
  * erstellen drücke, explizit an meinen Figma Prototypen. Deine Seite weicht
@@ -62,6 +63,9 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
   const insets = useSafeAreaInsets();
   const { supabase } = useSupabase();
   const istCommunity = art === 'community';
+  const { height, width } = useWindowDimensions();
+  const kompakt = !istCommunity && height - insets.top - insets.bottom < 850;
+  const qrGroesse = Math.min(200, width - 2 * spacing.lg);
 
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
@@ -131,16 +135,22 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
         </Druck>
       </View>
 
-      <ScrollView contentContainerStyle={styles.inhalt} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.inhalt}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.pflichtZeile}>
-          <Text style={styles.stern}>✳</Text>
+          <Text style={styles.stern}>{'✳\uFE0E'}</Text>
           <Text style={styles.pflichtText}>{T.pflichtfeld}</Text>
         </View>
 
         <View style={styles.nameFeld}>
           <TextInput
             value={name}
-            onChangeText={setName}
+            onChangeText={(eingabe) => {
+              setName(eingabe);
+              setMeldung(null);
+            }}
             placeholder={istCommunity ? T.communityName : T.unterthemaName}
             placeholderTextColor={colors.text2}
             style={styles.nameEingabe}
@@ -148,7 +158,7 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
             accessibilityLabel={istCommunity ? T.communityName : T.unterthemaName}
             testID="erstellen-name"
           />
-          <Text style={[styles.stern, styles.sternEcke]}>✳</Text>
+          <Text style={[styles.stern, styles.sternEcke]}>{'✳\uFE0E'}</Text>
         </View>
 
         {istCommunity && (
@@ -178,7 +188,7 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
                 <ActivityIndicator color={colors.white} />
               </View>
             )}
-            <Text style={[styles.stern, styles.sternEcke]}>✳</Text>
+            <Text style={[styles.stern, styles.sternEcke]}>{'✳\uFE0E'}</Text>
           </Druck>
         )}
 
@@ -257,11 +267,10 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
             <Text style={styles.schalterTitel}>{istCommunity ? T.privatCommunity : T.privatUnterthema}</Text>
             <Text style={styles.schalterSub}>{istCommunity ? T.privatCommunitySub : T.privatUnterthemaSub}</Text>
           </View>
-          {/* Markenfarbe wie in den Einstellungen. */}
-          <Switch
+          {/* Gleicher Schalter wie in den Einstellungen (grau ↔ grün, E16-1.2). */}
+          <Schalter
             value={privat}
             onValueChange={setPrivat}
-            trackColor={{ true: colors.brand, false: colors.surface3 }}
             accessibilityLabel={istCommunity ? T.privatCommunity : T.privatUnterthema}
             testID="erstellen-privat"
           />
@@ -271,10 +280,14 @@ export const ErstellenScreen = ({ art, communityName, onClose, onFertig, absende
           <Text style={styles.einladenText}>{T.einladen}</Text>
         </Druck>
         <Text style={styles.qrText}>{T.qr}</Text>
-        <View style={styles.qr} accessibilityLabel={`QR-Code: ${einladung}`} testID="erstellen-qr">
-          <QrCode text={einladung} groesse={200} />
+        <View
+          style={[styles.qr, kompakt && styles.qrKompakt]}
+          accessibilityLabel={`QR-Code: ${einladung}`}
+          testID="erstellen-qr"
+        >
+          <QrCode text={einladung} groesse={qrGroesse} />
         </View>
-        <Text style={styles.qrHinweis}>{T.qrHinweis}</Text>
+        <Text style={[styles.qrHinweis, kompakt && styles.qrHinweisKompakt]}>{T.qrHinweis}</Text>
       </ScrollView>
 
       <View style={[styles.fuss, { paddingBottom: insets.bottom + spacing.md }]}>
@@ -442,4 +455,6 @@ const styles = themenStyles((c) => ({
     alignItems: 'center' as const,
   },
   fertigText: { fontSize: 17, color: c.white },
+  qrKompakt: { marginTop: spacing.sm },
+  qrHinweisKompakt: { marginTop: spacing.xs },
 }));

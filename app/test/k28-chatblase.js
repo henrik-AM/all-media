@@ -137,7 +137,7 @@ function teilA() {
   pruefe('7.3 App: Karte öffnet den Beitrag (onOpenBeitrag → kachelOeffnen)',
     /onOpenBeitrag=\{\(b\) => kachelOeffnen\(b\)\}/.test(appTsx) && /onOpenBeitrag\(\{ id: g\.id, kind: g\.kind/.test(chat));
   pruefe('7.3 Website: Karte öffnet den Beitrag in Chat und Unterthema',
-    /beitragOeffnen\(b\.dataset\.beitragkind, b\.dataset\.beitrag\)/.test(web) && (web.match(/geteiltBinden\(/g) || []).length >= 2);
+    /beitragOeffnen\(b\.dataset\.beitragkind, b\.dataset\.beitrag[,)]/.test(web) && (web.match(/geteiltBinden\(/g) || []).length >= 2);
   pruefe('7.1 Großes Vorschaubild auf beiden Seiten', /geteiltBild: \{ width: 248, height: 310 \}/.test(chat) && /\.msg__geteiltRahmen \{[^}]*aspect-ratio: 4 \/ 5/.test(css));
 
   pruefe('Baustein in UMD_BAUSTEINE', /\['chatblase', 'Chatblase'\]/.test(lies('app/test/_modulquelle.js')));
@@ -189,8 +189,17 @@ async function teilBC() {
   let original = null;
   let antwortVonTest = null;
   let beitrag = null;
+  let browser, page;
+  const ohneBrowser = Boolean(process.env.OHNE_BROWSER);
+  const { vorbereiten, schliesse } = require('./_konto');
 
   try {
+    if (!ohneBrowser) {
+      const { chromium } = require('playwright-core');
+      browser = await chromium.launch();
+      page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+      if (!(await vorbereiten(page, BASIS))) throw new Error('Website-Anmeldung');
+    }
     await pruefeAsync('Prüfcommunity mit zwei Unterthemen anlegen (@prueflauf)', async () => {
       const { data, error } = await pr.from('communities')
         .insert({ name: 'Prüfcommunity Chatblase ' + Date.now(), topic: 'Prüflauf k28', visibility: 'public', created_by: prId })
@@ -240,32 +249,26 @@ async function teilBC() {
       if (!error) throw new Error('wurde angenommen');
     });
 
-    // Kasten 7 im Unterthema: @test teilt einen eigenen Beitrag.
-    const { data: posts } = await te.from('posts').select('id, kind, title, description').eq('user_id', teId)
-      .order('created_at', { ascending: false }).limit(1);
-    beitrag = (posts || [])[0] || null;
-    pruefe('7.x @test hat einen eigenen Beitrag zum Teilen', !!beitrag, 'Testbestand ohne Beitrag von @test');
+    await pruefeAsync('7.x Prüfbeitrag mit Titel, Beschreibung und Beispielbild anlegen', async () => {
+      const { data, error } = await pr.from('posts').insert({
+        user_id: prId, kind: 'post', title: 'Prüftitel K28', description: 'Prüfbeschreibung K28',
+        media_url: URL.replace(/\/$/, '') + '/storage/v1/object/public/media/beispiel/story-berge.jpg',
+      }).select('id, kind, title, description').single();
+      if (error) throw error;
+      beitrag = data;
+    });
     if (beitrag) {
-      await pruefeAsync('7.4 @test teilt den Beitrag ins Unterthema', async () => {
-        const { error } = await te.from('community_channel_messages')
-          .insert({ channel_id: kanal1, sender_id: teId, text: 'Beitrag geteilt', shared_post_id: beitrag.id });
+      await pruefeAsync('7.4 @prueflauf teilt den eigenen Beitrag ins Unterthema', async () => {
+        const { error } = await pr.from('community_channel_messages')
+          .insert({ channel_id: kanal1, sender_id: prId, text: 'Beitrag geteilt', shared_post_id: beitrag.id });
         if (error) throw error;
       });
     }
 
     /* ------------------------------------------------------- C Website */
-    if (process.env.OHNE_BROWSER) return;
-    console.log('\nC  Website (Port 3000, @prueflauf)');
-    const { chromium } = require('playwright-core');
-    const { vorbereiten, schliesse } = require('./_konto');
-    const browser = await chromium.launch();
+    if (ohneBrowser) return;
+    console.log('\nC  Website (' + BASIS + ', @prueflauf)');
     try {
-      const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
-      const ok = await vorbereiten(page, BASIS);
-      if (ok === false) {
-        pruefe('Website-Anmeldung', false);
-        return;
-      }
       const holen = () =>
         page.evaluate(([c, k]) => fetch(`/api/communities/${c}/channels/${k}`).then((r) => r.json()), [communityId, kanal1]);
       let kanalDaten = null;
@@ -282,7 +285,7 @@ async function teilBC() {
           if (!m) throw new Error('keine Karte');
           const g = m.geteilt;
           if (g.titel !== String(beitrag.title || '').trim()) throw new Error('titel ' + g.titel);
-          if (!g.kind) throw new Error('kein kind');
+          if (g.beschreibung !== beitrag.description || g.kind !== beitrag.kind || !g.bild) throw new Error('unvollständige Vorschau');
         });
       }
 
@@ -302,8 +305,10 @@ async function teilBC() {
       await pruefeAsync('4.4 Antworten-Knopf erscheint beim Überfahren', async () => {
         const blase = page.locator(`[data-msgid="${antwortVonTest}"]`);
         await blase.hover();
-        const o = await blase.locator('.msg__antworten').evaluate((el) => getComputedStyle(el).opacity);
-        if (Number(o) < 0.9) throw new Error('opacity ' + o);
+        await page.waitForFunction((id) => {
+          const knopf = document.querySelector(`[data-msgid="${id}"] .msg__antworten`);
+          return knopf && Number(getComputedStyle(knopf).opacity) > 0.9;
+        }, antwortVonTest, { timeout: 3000 });
       });
       await pruefeAsync('4.4 Ziehen mit der Maus setzt die Leiste „Antworten"', async () => {
         const box = await page.locator(`[data-msgid="${antwortVonTest}"]`).boundingBox();
@@ -334,24 +339,30 @@ async function teilBC() {
           const breite = await page.locator(`[data-beitrag="${beitrag.id}"]`).evaluate((el) => el.getBoundingClientRect().width);
           if (breite < 200) throw new Error('Breite ' + breite);
         });
-        await pruefeAsync('7.3 Klick auf die Karte öffnet den Beitrag', async () => {
+        await pruefeAsync('7.3 Klick zeigt genau den geteilten Beitrag ohne Chat davor', async () => {
           await page.locator(`[data-beitrag="${beitrag.id}"]`).click();
-          await page.waitForTimeout(800);
-          const ort = await page.evaluate(() => ({ area: state.area, kanal: !!document.querySelector('#commMsgs') }));
-          // Beitrag/Reel → Bereich Videos; Querformat → Player über dem Kanal.
-          if (ort.area !== 'videos' && ort.kanal) throw new Error(JSON.stringify(ort));
+          const zielBeitrag = page.locator(`#post-${beitrag.id}`);
+          await zielBeitrag.waitFor({ state: 'visible', timeout: 10000 });
+          await page.locator('#overlay').waitFor({ state: 'hidden', timeout: 5000 });
+          const inhalt = await zielBeitrag.innerText();
+          if (!inhalt.includes(beitrag.description)) throw new Error('Beschreibung am Zielbeitrag fehlt');
+          if (process.env.BILDER) await page.screenshot({ path: path.join(process.env.BILDER, 'k28-7.3-beitrag-sichtbar.png') });
         });
       }
-      await schliesse(browser);
     } catch (e) {
       pruefe('Website-Teil', false, e.message);
-      try { await browser.close(); } catch { /* egal */ }
     }
   } finally {
+    if (browser) await schliesse(browser);
     if (communityId) {
       await pr.from('communities').delete().eq('id', communityId);
-      const { data } = await pr.from('communities').select('id').eq('id', communityId).maybeSingle();
-      pruefe('Aufräumen: Prüfcommunity gelöscht (gegengeprüft)', !data);
+      const { data, error } = await pr.from('communities').select('id').eq('id', communityId).maybeSingle();
+      pruefe('Aufräumen: Prüfcommunity gelöscht (gegengeprüft)', !error && !data);
+    }
+    if (beitrag) {
+      await pr.from('posts').delete().eq('id', beitrag.id).throwOnError();
+      const { data } = await pr.from('posts').select('id').eq('id', beitrag.id).throwOnError();
+      pruefe('Aufräumen: eigener Prüfbeitrag gelöscht (gegengeprüft)', data.length === 0);
     }
   }
 }

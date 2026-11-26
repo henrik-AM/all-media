@@ -39,6 +39,9 @@ interface Props {
  *
  * Zahlungsmethode und Spenden-Code gehören zu Kasten 13.
  *
+ * Solange kein Zahlungsdienst angeschlossen ist, heißt alles „vorgemerkt,
+ * nicht bezahlt" (Offene Punkte 0c, 26.10.2026) — Texte in spende.js.
+ *
  * Gegenstück auf der Website: spendeKarte() / openSpendenziel() in
  * web/public/app.js.
  */
@@ -72,7 +75,7 @@ export const SpendeKarte = ({ spende, empfaengerId, name, onNotice }: Props) => 
   const gespendet = async (cent: number) => {
     const ok = await aktionen.spenden(empfaengerId, cent, null);
     if (ok) {
-      onNotice(`${Spende.euro(cent / 100)} an ${name} gespendet`);
+      onNotice(Spende.bestaetigung(cent, name));
       laden();
     }
   };
@@ -111,7 +114,7 @@ export const SpendeKarte = ({ spende, empfaengerId, name, onNotice }: Props) => 
           {!!stand.text && <Text style={styles.blattText}>{stand.text}</Text>}
 
           <View style={styles.zeilen}>
-            <Zeile label="Erreicht" wert={Spende.euro(stand.erreicht)} />
+            <Zeile label="Vorgemerkt" wert={Spende.euro(stand.erreicht)} />
             <Zeile label="Ziel" wert={stand.ziel > 0 ? Spende.euro(stand.ziel) : 'ohne festes Ziel'} />
             {stand.prozent !== null && <Zeile label="Fortschritt" wert={`${stand.prozent} %`} />}
             <Zeile
@@ -122,6 +125,9 @@ export const SpendeKarte = ({ spende, empfaengerId, name, onNotice }: Props) => 
           </View>
           {balken}
           <Text style={styles.zahlen}>{stand.spender === null ? stand.zahlenText : `${stand.zahlenText} · ${stand.spenderText}`}</Text>
+          <Text style={styles.hinweis} testID="spende-nicht-bezahlt">
+            {Spende.HINWEIS}
+          </Text>
 
           <Druck
             style={[styles.knopf, (eigen || stand.abgelaufen) && styles.knopfAus]}

@@ -19,6 +19,7 @@ const { PROFIL_RUECKGABE_SPALTEN } = require('../../gemeinsam/spalten');
 const Profilfelder = require('../../gemeinsam/profilfelder');
 // Kästen 28/9 und 15: Beitrittsanfragen, Mitgliederliste, Suche (Schema 97).
 const Beitritt = require('../../gemeinsam/beitritt');
+const Beitragschema = require('../../gemeinsam/beitragschema');
 // Kasten 28/15.4: Befreunden unter Communitys (Schema 98).
 const Freundschaft = require('../../gemeinsam/freundschaft');
 // Kästen 28/10.2 und 16: Community und Unterthema erstellen, Einladung (Schema 99).
@@ -58,7 +59,11 @@ async function umschalten(client, tabelle, schluessel) {
     for (const [spalte, wert] of Object.entries(schluessel)) loeschen = loeschen.eq(spalte, wert);
     const { error, count: geloescht } = await loeschen;
     if (error) throw error;
-    if (!geloescht) throw new Error(`Zeile in ${tabelle} liess sich nicht entfernen`);
+    if (!geloescht) {
+      // Ohne Tabellennamen — der Satz geht an den Browser (Paket 8).
+      console.error(`Zeile in ${tabelle} liess sich nicht entfernen`);
+      throw new Error('Das ließ sich gerade nicht entfernen. Bitte versuch es noch einmal.');
+    }
     return false;
   }
 
@@ -76,9 +81,34 @@ function handler(name, fn) {
       return await fn(client, ...rest);
     } catch (fehler) {
       console.error(`${name} fehlgeschlagen:`, fehler.message);
-      return { ok: false, fehler: fehler.message };
+      return { ok: false, fehler: fuerMenschen(fehler) };
     }
   };
+}
+
+/*
+ * Was von einem Datenbankfehler an den Browser geht (Paket 8, OWASP A10-001;
+ * Sicherheitsprüfung 17.10.2026 Fund 14).
+ *
+ * Bis dahin ging jede Meldung von Postgres/PostgREST unverändert hinaus:
+ * „new row violates row-level security policy for table …", „column … does
+ * not exist", Namen von Regeln und Constraints — ein Lageplan der Datenbank
+ * für jeden, der absichtlich falsche Eingaben schickt. Durch dürfen nur die
+ * Sätze, die wir selbst für Menschen geschrieben haben: eigene
+ * `throw new Error(…)` hier im Server und `raise exception '…'` aus unseren
+ * Funktionen — die tragen teils eigene Codes (42501 in Schema 117, 54000 an
+ * der Bremse). Darum entscheidet nicht der Code allein, sondern ob der Text
+ * nach Postgres-Innenleben aussieht. Im Serverprotokoll steht er weiter.
+ */
+const INTERNER_TEXT =
+  /["`]|\b(relation|column|constraint|violates|row-level security|policy|permission denied|syntax error|duplicate key|null value|invalid input|does not exist|schema cache|could not|operator|function|PGRST|JWT|timeout|canceling statement|deadlock|lock|serializ|transaction|statement|tuple|index|trigger|cache lookup|out of memory|connection|server closed|internal)\b/i;
+
+function fuerMenschen(fehler) {
+  const text = String((fehler && fehler.message) || '').trim();
+  const code = fehler && fehler.code;
+  if (text && !INTERNER_TEXT.test(text) && text.length <= 300) return text;
+  if (code === '42501') return 'Das ist nicht erlaubt.';
+  return 'Das hat nicht geklappt. Bitte versuch es noch einmal.';
 }
 
 // ---------------------------------------------------------------- Profil --
@@ -531,7 +561,7 @@ const handleAcceptRequest = handler('Anfrage', async (client, nutzerId, chatId, 
     .from('chats')
     .update({ anfrage_zustand: annehmen ? 'angenommen' : 'abgelehnt' })
     .eq('id', chatId);
-  if (error) return { ok: false, fehler: error.message };
+  if (error) return { ok: false, fehler: fuerMenschen(error) };
 
   /*
    * Wer im Messenger annimmt, hat die Person damit auch in den Kontakten.
@@ -568,7 +598,7 @@ const handleAcceptRequest = handler('Anfrage', async (client, nutzerId, chatId, 
  */
 const handleMessengerAnfragen = handler('Messenger-Anfrage', async (client, nutzerId, chatId) => {
   const { data, error } = await client.rpc('messenger_anfragen', { p_chat: chatId });
-  if (error) return { ok: false, fehler: error.message };
+  if (error) return { ok: false, fehler: fuerMenschen(error) };
   return data;
 });
 
@@ -579,7 +609,7 @@ const handleMessengerAnfrageBeantworten = handler(
       p_chat: chatId,
       p_annehmen: annehmen,
     });
-    if (error) return { ok: false, fehler: error.message };
+    if (error) return { ok: false, fehler: fuerMenschen(error) };
     return data;
   }
 );
@@ -1398,9 +1428,12 @@ const handleMarkChatAsRead = handler('Chat gelesen', async (client, nutzerId, ch
 // --------------------------------------------------------------- Beiträge --
 
 const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, felder = {}) => {
-  const { data, error } = await client
-    .from('posts')
-    .insert({
+  if(felder.medien!==undefined){const fehler=require('../../gemeinsam/karussell').pruefen(felder.medien);if(fehler)throw new Error(fehler);}
+  if (felder.art === 'reel' || (felder.art === 'clip' && felder.sekunden !== undefined)) {
+    const fehler = require('../../gemeinsam/reel').pruefen(felder.sekunden);
+    if (fehler) throw new Error(fehler);
+  }
+  const { data, error } = await Beitragschema.schreiben(client,{
       user_id: nutzerId,
       kind: felder.art || 'post',
       title: felder.titel || '',
@@ -1409,7 +1442,8 @@ const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, fel
       music: felder.musik || '',
       // Schema 67: welche Stelle des Sounds (sound_id setzt die Datenbank aus music).
       sound_ab: felder.soundAb || 0,
-      media_url: felder.mediaUrl || null,
+      media_url: felder.mediaUrl || felder.medien?.[0]?.url || null,
+      ...(felder.medien?.length?{medien:felder.medien.map(({url,typ})=>({url,typ}))}:{}),
       thumbnail_url: felder.thumbnail || null,
       duration: felder.dauer || null,
       // „Später posten": ein Zeitpunkt in der Zukunft hält den Beitrag
@@ -1417,9 +1451,7 @@ const handleCreatePost = handler('Beitrag anlegen', async (client, nutzerId, fel
       publish_at: felder.geplantAb || null,
       // 'live' nur fuer den laufenden Stream, siehe /api/stream/start.
       format: felder.format || 'standard',
-    })
-    .select()
-    .single();
+    });
   if (error) throw error;
 
   /*
@@ -1439,32 +1471,37 @@ const handleDeleteContent = handler('Inhalt löschen', async (client, nutzerId, 
   const tabelle = art === 'comment' ? 'comments' : art === 'story' ? 'stories' : 'posts';
   const Medien = require('./medien');
   let medien = null;
-  if (art === 'post' && Medien.mitBunny()) {
-    const {data, error} = await client.from('posts').select('media_url, thumbnail_url').eq('id', id).eq('user_id', nutzerId).maybeSingle();
+  if (art === 'post') {
+    // Gegenprüfung R1: auch das zweite bis n-te Medium eines Karussells.
+    const {data, error} = await client.from('posts').select('media_url, thumbnail_url, medien').eq('id', id).eq('user_id', nutzerId).maybeSingle();
     if (error) throw error;
-    medien = data;
+    medien = data ? [data.media_url, data.thumbnail_url, ...(Array.isArray(data.medien) ? data.medien.map((m) => m?.url) : [])] : null;
   }
   const { data: weg, error } = await client.from(tabelle).delete().eq('id', id).eq('user_id', nutzerId).select('id');
   if (error) throw error;
   if (!weg?.length) return {ok:false, error:'Dieser Inhalt ließ sich nicht löschen'};
-  for (const adresse of new Set(Object.values(medien || {}))) {
+  let liegen = 0;
+  for (const adresse of new Set(medien || [])) {
     if (!Medien.istMedienAdresse(adresse)) continue;
     const pfad = Medien.pfadAus(adresse);
-    // Geteilte Dateien bleiben erhalten; Altmedien werden hier nicht entfernt.
-    const {data: anbieter, error: recht} = await client.rpc('medium_loeschrecht', {p_pfad:pfad});
-    if (recht) throw recht;
-    if (anbieter !== 'bunny') continue;
-    const geloescht = await Medien.loeschen(client, nutzerId, pfad);
-    if (!geloescht.ok) throw new Error(geloescht.error);
+    try {
+      // Geteilte Dateien bleiben erhalten. Die Freigabe gilt für beide Anbieter.
+      const { data: anbieter, error: recht } = await client.rpc('medium_loeschrecht', { p_pfad: pfad });
+      if (recht) throw recht;
+      if (!anbieter) continue;
+      const geloescht = await Medien.loeschen(client, nutzerId, pfad);
+      if (!geloescht.ok) throw new Error(geloescht.error);
+    } catch {
+      liegen++;
+      console.error('Beitragsmedium blieb liegen:', pfad.split('/')[0]);
+    }
   }
-  return { ok: true };
+  return { ok: true, ...(liegen ? { medienLiegen: liegen } : {}) };
 });
 
 const handleLikeContent = handler('Like', async (client, nutzerId, beitragId) => {
-  const gesetzt = await umschalten(client, 'post_likes', {
-    post_id: beitragId,
-    user_id: nutzerId,
-  });
+  const { data: gesetzt, error } = await client.rpc('beitrag_reaktion', { p_post: beitragId, p_art: 'like' });
+  if (error) throw error;
   return { ok: true, geliked: gesetzt };
 });
 
@@ -3106,6 +3143,7 @@ const handleImpressionen = handler('Sichtungen', async (client, nutzerId, eintra
 });
 
 module.exports = {
+  fuerMenschen,
   handleEinladungSpeichern,
   handleEinladungAnnehmen,
   handleUpdateProfile,

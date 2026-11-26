@@ -140,7 +140,8 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     await page.click('[data-setting="Sicherheits-/Entsperrcode"]');
     await page.waitForSelector('#f_code');
     // Schema 87: Vorgabe ist die Spenden-PIN — ein eigener Code ist die aktive Wahl.
-    await page.selectOption('#f_art', 'Eigener Code');
+    // E16-1.5: Auswahl als Kreiszeilen statt Aufklappliste.
+    await page.click('[data-feldwahl="art"][data-wert="Eigener Code"]');
     await page.fill('#f_code', '12');
     await page.fill('#f_wdh', '12');
     await page.click('#formOk');
@@ -182,10 +183,10 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   await pruefe('Zurück zur Spenden-PIN nimmt den eigenen Code weg', async () => {
     await page.waitForFunction(() => bz.stand?.eigene_art === 'eigen', null, { timeout: 8000 }).catch(() => {});
     await page.click('[data-setting="Sicherheits-/Entsperrcode"]');
-    await page.waitForSelector('#f_art');
+    await page.waitForSelector('#f_art', { state: 'attached' });
     const vorher = await page.$eval('#f_art', (el) => el.value);
     if (vorher !== 'Eigener Code') throw new Error('vorbelegt: ' + vorher);
-    await page.selectOption('#f_art', 'Spenden-PIN verwenden');
+    await page.click('[data-feldwahl="art"][data-wert="Spenden-PIN verwenden"]');
     await page.fill('#f_bisher', 'ab!9');
     await page.click('#formOk');
     await page

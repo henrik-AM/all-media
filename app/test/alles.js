@@ -113,12 +113,16 @@ const BEOBACHTET = [
   path.join(__dirname, '..', '..', 'web', 'public'),
 ];
 
+// Dieser laufend neu erzeugte Beleg liegt aus historischen Gründen neben
+// den Prüfscripten. Er ist kein Eingang für eine Prüfung.
+const AF_FIX_VORHER_BELEG = path.join(__dirname, 'ergebnisse-af-fix', 'vorher.txt');
+
 function stempel(pfade = BEOBACHTET) {
   const hash = crypto.createHash('sha256');
   const dateien = [];
 
   const sammle = (ort) => {
-    if (!fs.existsSync(ort)) return;
+    if (ort === AF_FIX_VORHER_BELEG || !fs.existsSync(ort)) return;
     const eintrag = fs.statSync(ort);
     if (eintrag.isFile()) return dateien.push(ort);
     for (const kind of fs.readdirSync(ort, { withFileTypes: true })) {
@@ -214,6 +218,11 @@ const LAEUFE = [
   ['krypto-app', '_krypto_app_einheit.js'],
   ['krypto-web', '_krypto_web_einheit.js'],
   ['krypto-server', '_krypto_server_einheit.js'],
+  // Paket 8 (Sicherheit/OWASP, 20.11.2026): Fehlertexte, Logs, Konto-Bremse,
+  // CSS-Bildadressen, Token-Herkunft, Unterschriften je Nutzer — ohne Netz.
+  ['paket8-einheit', '_paket8_einheit.js'],
+  ['owasp-server', '_owasp_server_einheit.js'],
+  ['egress', '_egress_offline.js'],
   ['paket6-offline', '_paket6_offline.js'],
   ['paket6-opus', '_paket6_opus.cjs'],
   ['paket6-browser', '_paket6_browser_offline.cjs'],
@@ -249,6 +258,25 @@ const LAEUFE = [
   ['bildschirmzeit', '_bildschirmzeit.js'],
   ['vorschlaege', '_vorschlaege.js'],
   ['lenkung-einheit', '_lenkung_einheit.js'],
+  ['af3-negativ', 'af3-negativ.js'],
+  ['af5-reels', 'af5-reels.js'],
+  ['bunny', '_bunny_einheit.js'],
+  ['af-fix-vorher', 'af-fix-vorher.js'],
+  ['af-fix-b3', 'af-fix-b3.js'],
+  ['af-fix-b4', 'af-fix-b4.js'],
+  ['af-fix-b5', 'af-fix-b5.js'],
+  ['af-fix-b5-app', 'af-fix-b5-app.js'],
+  ['af-fix-b7', 'af-fix-b7.js'],
+  ['af-fix-b1', 'af-fix-b1.js'],
+  ['bunny-upload', 'bunny-upload.js'],
+  ['af4-karussell', 'af4-karussell.js'],
+  ['af4-profilsprung', 'af4-profilsprung.js'],
+  ['af7-analysen', 'af7-analysen.js'],
+  ['af6-instants', 'af6-instants.js'],
+  ['af-nachpruefung', 'af-nachpruefung.js'],
+  // 26.10.2026: Spendenstand „vorgemerkt, nicht bezahlt“ (Offene Punkte 0c).
+  // Braucht keinen Server — liest nur die Bausteine und den Quelltext.
+  ['spende-vorgemerkt', 'spende-vorgemerkt.js'],
   ['lenken', '_lenken.js'],
   ['markierung-einheit', '_markierung_einheit.js'],
   ['markieren', '_markieren.js'],
@@ -261,6 +289,13 @@ const LAEUFE = [
   ['einwilligung-einheit', '_einwilligung_einheit.js'],
   // Kasten 28 (Feedback 28.09.), eingehängt mit Paket 5 am 09.11.2026.
   // Ohne Supabase: Attrappe bzw. isolierte Renderer.
+  ['k28-profil', 'k28-profil.js'],
+  ['k28-suchen', 'k28-suchen.js'],
+  ['k28-profilseite', 'k28-profilseite.js'],
+  ['k28-chatblase', 'k28-chatblase.js'],
+  ['k28-kommentare', 'k28-kommentare.js'],
+  ['k28-anhaenge', 'k28-anhaenge.js'],
+  ['ortsuche-einheit', '_ortsuche_einheit.js'],
   ['k28-communitys', 'k28-communitys.js'],
   ['k28-kopf-offline', 'k28-kopf-offline.js'],
   ['k28-filter-offline', 'k28-filter-offline.js'],
@@ -271,6 +306,7 @@ const LAEUFE = [
   ['k28-commbild', 'k28-commbild.js'],
   ['k28-gruppe', 'k28-gruppe.js'],
   ['k28-karte', 'k28-karte.js'],
+  ['k28-anruf-ptt', 'k28-anruf-ptt.js'],
   ['chatklingel-einheit', '_chatklingel_einheit.js'],
   ['paket7-offline', '_paket7_regression.cjs'],
   ['paket7-stumm', '_paket7_stumm_regression.cjs'],
@@ -379,7 +415,11 @@ async function haupt() {
     }
     const gescheitert = ergebnisse.filter(e => e.code !== 0 || (e.zahlen && e.zahlen.gut !== e.zahlen.gesamt));
     const ohneZahlen = ergebnisse.filter(e => !e.zahlen || e.zahlen.gesamt === 0);
-    console.log(`\n  ${gesamtGut} von ${gesamtAlle} Prüfungen bestanden, ${ergebnisse.length}/${LAEUFE.length} Läufe.`);
+    // Grüne Läufe zählen, nicht gestartete: „106/106 Läufe“ bei fünf roten Läufen
+    // landete so in der Abschlussmeldung von Paket 8 (20.11.2026).
+    const gruen = ergebnisse.filter(e => !gescheitert.includes(e) && !ohneZahlen.includes(e)).length;
+    console.log(`\n  ${gesamtGut} von ${gesamtAlle} Prüfungen bestanden, ${gruen}/${LAEUFE.length} Läufe grün` +
+      ` (${ergebnisse.length}/${LAEUFE.length} gelaufen).`);
     if (ohneZahlen.length) console.log(`  Ohne zählbare Prüfungen: ${ohneZahlen.map(e => e.name).join(', ')}`);
     if (gescheitert.length) console.log(`  Nicht durchgekommen: ${gescheitert.map(e => e.name).join(', ')}`);
     const verwackelt = stempel() !== stempelVorher;

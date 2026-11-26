@@ -275,6 +275,7 @@ export interface Comment {
   time: string;
   likes: number;
   liked: boolean;
+  disliked?: boolean;
   /**
    * Nachtrag 4.3b (11.10.2026): die Wurzel, an der diese Antwort hängt
    * (`comments.reply_to`, Schema 92). Leer = Kommentar oben.
@@ -285,6 +286,9 @@ export interface Comment {
 }
 
 export interface Post {
+  /** Nur bei gezielter Profilöffnung anzeigen, nicht im normalen Feed. */
+  nurEinzeln?: boolean;
+  medien?: import('../../gemeinsam/karussell').Medium[];
   id: string;
   userId: string;
   location: string;
@@ -294,6 +298,7 @@ export interface Post {
   likes: number;
   comments: number;
   liked: boolean;
+  disliked?: boolean;
   saved: boolean;
   following: boolean;
   notify: boolean;
@@ -313,6 +318,8 @@ export interface Post {
 }
 
 export interface Video {
+  /** Nur bei gezielter Profilöffnung anzeigen, nicht im normalen Feed. */
+  nurEinzeln?: boolean;
   id: string;
   userId: string;
   description: string;
@@ -327,6 +334,7 @@ export interface Video {
   comments: number;
   shares: number;
   liked: boolean;
+  disliked?: boolean;
   saved: boolean;
   reposted: boolean;
   notify: boolean;
@@ -408,6 +416,7 @@ export interface Story {
   viewed: boolean;
   own?: boolean;
   liked?: boolean;
+  disliked?: boolean;
   caption?: string;
   /**
    * Bei der eigenen Story: die aufgenommene Datei. Solange leer, fuehrt ein
@@ -443,6 +452,8 @@ export type StoryText = import('../../gemeinsam/story').StoryText;
 export type ClipArt = 'standard' | '360' | 'live';
 
 export interface Clip {
+  /** Nur bei gezielter Profilöffnung anzeigen, nicht im normalen Feed. */
+  nurEinzeln?: boolean;
   id: string;
   userId: string;
   title: string;
@@ -482,6 +493,7 @@ export interface Clip {
   likedBy?: string;
   comments?: number;
   liked?: boolean;
+  disliked?: boolean;
   saved?: boolean;
   reposted?: boolean;
 }
@@ -591,7 +603,8 @@ export type MitteilungArt =
   | 'beitritt_ok'
   // Kasten 28/15.4 (Schema 98): Befreunden unter Communitys.
   | 'freund_anfrage'
-  | 'freund_ok';
+  | 'freund_ok'
+  | 'instant';
 
 export type MitteilungsBereich = 'videos' | 'communities';
 
@@ -600,7 +613,7 @@ export interface MitteilungsZiel {
   /** 'comment': Herz an einem Kommentar (Schema 49), @ im Kommentar (Kasten 25). */
   /** 'meldung': eine Rechtsmitteilung zu einer Meldung (Kasten RS 3, Schema 102). */
   /** 'channel': ein Unterthema (Kasten 8.3, Schema 90). */
-  art: 'post' | 'video' | 'profile' | 'community' | 'chat' | 'story' | 'comment' | 'meldung' | 'channel';
+  art: 'instant' | 'post' | 'video' | 'profile' | 'community' | 'chat' | 'story' | 'comment' | 'meldung' | 'channel';
   id: string;
 }
 
@@ -615,6 +628,7 @@ export interface Mitteilung {
   ziel: MitteilungsZiel;
   /** Wie lange her, in Minuten. Daraus wird "vor 10 min", "vor 3 W" ... */
   minuten: number;
+  zeitpunkt?: string;
   gelesen: boolean;
 }
 
@@ -645,6 +659,8 @@ export interface Spende {
 
 /** Ein Eintrag im eigenen Beitragsraster. */
 export interface RasterEintrag {
+  art?:'post'|'reel'|'clip';
+  medienAnzahl?:number;
   id: string;
   kind: 'image' | 'video';
   /** Selbst aufgenommen - dann steht in mediaUri das Bild. */

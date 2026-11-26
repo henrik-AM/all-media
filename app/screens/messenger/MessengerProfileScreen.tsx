@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Schalter } from '../../components/Schalter';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from '../../components/Avatar';
@@ -185,10 +186,10 @@ export const MessengerProfileScreen = ({ onSwitchArea, onSwitchAccount, onOpenSe
           {einstellungen === null ? (
             <Text style={styles.itemValue}>…</Text>
           ) : (
-            <Switch
+            <Schalter
               value={lesebestaetigung}
               onValueChange={(an) => void lesebestaetigungSetzen(an)}
-              trackColor={{ false: colors.border, true: colors.brand }}
+              accessibilityLabel="Lesebestätigung"
             />
           )}
         </View>

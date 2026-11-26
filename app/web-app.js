@@ -26,6 +26,54 @@ const METRO_PFADE = [
   '/debugger-ui', '/open-debugger', '/status', '/openurl',
 ];
 
+/*
+ * Was NIE weitergereicht wird (Sicherheitsprüfung 17.10.2026): der
+ * JS-Debugger von React Native. Über `/json/list` und
+ * `/inspector/debug?device=…` führt jeder, der diesen Server erreicht,
+ * beliebigen Code in der angemeldeten App aus — Sitzung und geheimer
+ * Chatschlüssel inklusive. Metro selbst lässt das nur von localhost zu; weil
+ * diese Weiche aber selbst von 127.0.0.1 aus weiterreicht, sah Metro jede
+ * Anfrage als örtlich an. Im WLAN (und über ngrok im Internet) war der
+ * Debugger damit offen. Debuggen geht weiter direkt am Mac über Port 8081.
+ */
+const GESPERRT = ['/inspector', '/json', '/open-debugger', '/debugger-ui', '/debugger-frontend', '/openurl', '/_expo/open', '/_expo/debugger', '/open-stack-frame'];
+
+/*
+ * Den Pfad so lesen, wie Metro ihn nach dem Normalisieren sieht (Codex-
+ * Gegenprüfung Paket 8): %-Kodierung, doppelte Schrägstriche, `.`/`..`,
+ * Groß-/Kleinschreibung. Sonst führte `//inspector`, `/%69nspector` oder
+ * `/x/../json` an der Sperre vorbei. Unlesbare Pfade gelten als gesperrt.
+ */
+function normalerPfad(url, alsUrl = false) {
+  let pfad = String(url || '/');
+  if (alsUrl) {
+    // Absolutes Anfrageziel (`GET http://host/inspector`) wie Metro über URL lesen.
+    try { pfad = new URL(pfad, 'http://weiche.invalid').pathname; } catch { return null; }
+  } else {
+    pfad = pfad.split(/[?#]/)[0];
+  }
+  for (let i = 0; i < 3; i++) {
+    let neu;
+    try { neu = decodeURIComponent(pfad); } catch { return null; }
+    if (neu === pfad) break;
+    pfad = neu;
+  }
+  pfad = pfad.replace(/\\/g, '/').replace(/\/{2,}/g, '/');
+  const teile = [];
+  for (const t of pfad.split('/')) {
+    if (!t || t === '.') continue;
+    if (t === '..') teile.pop(); else teile.push(t);
+  }
+  return ('/' + teile.join('/')).toLowerCase();
+}
+
+function istGesperrt(req) {
+  // Beide Lesarten prüfen: Rohpfad (Connect-Routing) und URL.pathname (Metro-Upgrade).
+  return [normalerPfad(req.url), normalerPfad(req.url, true)].some((pfad) =>
+    pfad === null || // Connect trennt auch an „.“ (`/_expo/debugger.x`) — darum auch dort sperren.
+    GESPERRT.some((p) => pfad === p || pfad.startsWith(p + '/') || pfad.startsWith(p + '.')));
+}
+
 function istExpoAnfrage(req) {
   // Expo Go schickt bei der ersten Anfrage immer diesen Kopfeintrag mit.
   if (req.headers['expo-platform']) return true;
@@ -55,6 +103,10 @@ function weiterleiten(req, res) {
 }
 
 const server = http.createServer((req, res) => {
+  if (istGesperrt(req)) {
+    res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+    return res.end('Der Debugger ist nur direkt am Mac erreichbar.');
+  }
   if (istExpoAnfrage(req)) return weiterleiten(req, res);
   app(req, res);
 });
@@ -82,6 +134,7 @@ server.listen(PORT, '0.0.0.0', () => {
 // Expos automatisches Neuladen laeuft ueber eine dauerhafte Verbindung.
 // Die muss ebenfalls an Metro weitergereicht werden.
 server.on('upgrade', (req, socket, kopf) => {
+  if (istGesperrt(req)) return socket.destroy();
   const anfrage = http.request({
     host: '127.0.0.1',
     port: METRO_PORT,

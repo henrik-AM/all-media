@@ -18,10 +18,20 @@ for(const [typ,bytes,name] of [
   ['video/quicktime',Array.from(Buffer.from('0000ftypqt  ')),'aufnahme.mp4'],
 ]) test('Upload sendet '+typ+' anhand Aufnahmeinhalt/Videoendung',async()=>{
   let gesendet;
-  const storage=modul('lib/supabaseStorage.ts',{'./medien':{medienServerBasis:()=> 'https://attrappe.invalid'}},{fetch:async(url,opts)=>{
-    if(!opts)return {ok:true,arrayBuffer:async()=>new Uint8Array(bytes).buffer};
-    gesendet=opts.headers['Content-Type'];return {ok:true,json:async()=>({ok:true,url:'bestaendig',anzeige:'signiert'})};
-  }});
+  const storage=modul('lib/supabaseStorage.ts',{
+    './medien':{
+      medienServerBasis:()=> 'https://attrappe.invalid',
+      uploadIstAktiv:()=>false,
+      uploadStandSetzen:()=>{},
+    },
+    '../../gemeinsam/upload':{senden: async (opts)=>{
+      gesendet=opts.headers['Content-Type'];
+      return {ok:true,url:'bestaendig',anzeige:'signiert'};
+    }},
+  },{
+    AbortController,
+    fetch:async()=>({ok:true,arrayBuffer:async()=>new Uint8Array(bytes).buffer}),
+  });
   const r=await storage.ladeHoch(client,'file://aufnahme','posts',name);
   assert.equal(r.success,true);assert.equal(gesendet,typ);
 });

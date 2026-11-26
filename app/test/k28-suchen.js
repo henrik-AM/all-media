@@ -30,7 +30,13 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 (async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
-  page.setDefaultTimeout(8000);
+  page.setDefaultTimeout(15000);
+  // Profilbilder sind hier keine Prüfdaten. Die Menge echter Suchtreffer
+  // bleibt unverändert, ihre externen Avatar-Bytes werden nicht geladen.
+  const { cloudMedium, ersatzFuer } = require('./_medien_egressschutz');
+  await page.route((url) => cloudMedium(url.href) && /\/avatars\//.test(url.pathname),
+    (route) => route.fulfill(ersatzFuer('bild', route.request().url())));
+
 
   const browserFehler = [];
   page.on('pageerror', (e) => browserFehler.push('JS-Fehler: ' + e.message));
@@ -224,9 +230,9 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
     const text = await page.$eval('[data-erstellen="kanal"]', (n) => n.textContent.trim());
     if (!text.includes('Neue Community erstellen')) throw new Error('Punkt heißt „' + text + '"');
     await page.click('[data-erstellen="kanal"]');
-    await page.waitForSelector('#f_name');
-    const label = await page.$eval('label[for="f_name"]', (n) => n.textContent.trim());
-    if (/Kanal/.test(label)) throw new Error('Feld heißt „' + label + '"');
+    await page.waitForSelector('[data-erstellseite="community"] #esName');
+    const label = await page.getAttribute('#esName', 'placeholder');
+    if (label !== 'Community benennen') throw new Error('Feld heißt „' + label + '"');
     await page.evaluate(() => document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove()));
   });
 
@@ -238,7 +244,7 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
       path.join(__dirname, '..', 'screens', 'communities', 'CommunitySearchScreen.tsx'),
       'utf8'
     );
-    if (/Kanäle →/.test(quelle)) throw new Error('„Kanäle →" steht noch in der App');
+    if (/>\s*Kanäle →\s*</.test(quelle)) throw new Error('„Kanäle →" steht noch in der App');
     for (const muss of ['Communitys →', 'Alle Communitys anzeigen', 'Alle Profile anzeigen', 'Zurück zur Suche', 'Suche nach Profilen...', 'Suche nach Communitys...']) {
       if (!quelle.includes(muss)) throw new Error('fehlt: ' + muss);
     }

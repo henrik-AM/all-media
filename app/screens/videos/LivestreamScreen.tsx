@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, StyleSheet, Switch, Text, TextInput, View, type TextInputInstance } from 'react-native';
+import { FlatList, StyleSheet, Text, TextInput, View, type TextInputInstance } from 'react-native';
+import { Schalter } from '../../components/Schalter';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +12,9 @@ import { useAktionen } from '../../lib/useAktionen';
 import { ladeSpendenSumme, ladeStreamKommentare } from '../../lib/daten';
 import * as Aktion from '../../lib/aktionen';
 import { LiveAntwortLeiste, LiveKommentarZeile } from '../../components/LiveAntwort';
+
+// Spendentexte („vorgemerkt, nicht bezahlt“) — einmal für App und Website.
+const Spende = require('../../../gemeinsam/spende') as typeof import('../../../gemeinsam/spende');
 
 interface Props {
   /** Nach dem Ende — ob die Aufzeichnung veroeffentlicht oder geloescht wurde. */
@@ -281,11 +285,10 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
           </Text>
           {/* Spenden waehrend des Streams — das Handbuch nennt sie
               ausdruecklich ("Geld senden/spenden -> bei Spendenlinks und
-              Livestreams"). Der Betrag steht in Euro, gerechnet wird in Cent. */}
+              Livestreams"). Der Betrag steht in Euro, gerechnet wird in Cent.
+              Ohne Zahlungsdienst nur vorgemerkt, nie als echtes Geld. */}
           {spenden > 0 && (
-            <Text style={styles.spenden}>
-              {(spenden / 100).toFixed(2).replace('.', ',')} € gespendet
-            </Text>
+            <Text style={styles.spenden}>{Spende.liveText(spenden)}</Text>
           )}
         </View>
         {vorbei ? (
@@ -304,7 +307,7 @@ export const LivestreamScreen = ({ onEnd, onStart, onNotice }: Props) => {
           <>
             <View style={styles.auto}>
               <Text style={styles.autoText}>Aufzeichnung automatisch veröffentlichen</Text>
-              <Switch
+              <Schalter
                 value={auto}
                 onValueChange={(an) => void einstellungen.setzen('liveAutoVeroeffentlichen', an ? 'an' : 'aus')}
                 accessibilityLabel="Aufzeichnung automatisch veröffentlichen"

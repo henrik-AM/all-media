@@ -59,6 +59,32 @@ const OEFFENTLICH = '/storage/v1/object/public/media/';
  */
 const zwischenspeicher = new Map();
 const PUFFER_MS = 10 * 60 * 1000;
+const MAX_EINTRAEGE = 5000;
+
+/*
+ * Geschlüsselt je Nutzer UND Pfad, nicht nur je Pfad (Paket 8; Entwurf
+ * 17.10.2026, OWASP 25.10.2026). Supabase unterschreibt nur Dateien, die der
+ * Nutzer sehen darf (Schema 95/128). Ein gemeinsamer Speicher gab B die
+ * Adresse, die für A unterschrieben wurde — die Regel lief am Server vorbei.
+ * Das Konto hängt die Anmeldung in app.js an den Client (client.nutzerId).
+ */
+function speicherSchluessel(client, pfad) {
+  return `${(client && client.nutzerId) || '-'}:${pfad}`;
+}
+
+/** Merken, abgelaufene Einträge entfernen, höchstens MAX_EINTRAEGE behalten. */
+function merkeUnterschrift(client, pfad, url, ablauf) {
+  const jetzt = Date.now();
+  for (const [schluessel, eintrag] of zwischenspeicher) {
+    if (eintrag.ablauf - PUFFER_MS <= jetzt) zwischenspeicher.delete(schluessel);
+  }
+  const schluessel = speicherSchluessel(client, pfad);
+  zwischenspeicher.delete(schluessel);
+  while (zwischenspeicher.size >= MAX_EINTRAEGE) {
+    zwischenspeicher.delete(zwischenspeicher.keys().next().value);
+  }
+  zwischenspeicher.set(schluessel, { url, ablauf });
+}
 
 /*
  * Eigene Adresse = eigener Host + Medienpfad, und der GANZE Wert ist eine
@@ -100,7 +126,8 @@ function pfadAus(adresse) {
  * wenn gar nichts zu unterschreiben ist. Sonst laedt jeder Betrachter ein
  * Bild von einem fremden Server.
  */
-async function signiereMedien(client, daten, sekunden = 4 * 60 * 60) {
+const STANDARD_SEKUNDEN = 4 * 60 * 60;
+async function signiereMedien(client, daten, sekunden = STANDARD_SEKUNDEN) {
   if (daten == null) return daten;
   // Ohne Client wird nichts unterschrieben — fremde Hosts fallen trotzdem weg.
   if (!client) return ohneFremdeMedien(daten);
@@ -114,7 +141,8 @@ async function signiereMedien(client, daten, sekunden = 4 * 60 * 60) {
   const jetzt = Date.now();
   const fehlend = [];
   for (const pfad of pfade) {
-    const eintrag = zwischenspeicher.get(pfad);
+    // Kurze Links (Moderation, 5 min) nie aus dem 4-h-Speicher (Codex-Gegenprüfung).
+    const eintrag = sekunden === STANDARD_SEKUNDEN ? zwischenspeicher.get(speicherSchluessel(client, pfad)) : null;
     if (eintrag && eintrag.ablauf - PUFFER_MS > jetzt) {
       karte.set(pfad, eintrag.url);
     } else {
@@ -130,7 +158,7 @@ async function signiereMedien(client, daten, sekunden = 4 * 60 * 60) {
       for (const eintrag of data || []) {
         if (eintrag?.signedUrl && !eintrag.error) {
           karte.set(eintrag.path, eintrag.signedUrl);
-          zwischenspeicher.set(eintrag.path, { url: eintrag.signedUrl, ablauf });
+          if (sekunden === STANDARD_SEKUNDEN) merkeUnterschrift(client, eintrag.path, eintrag.signedUrl, ablauf);
         }
       }
     } catch (fehler) {
@@ -207,7 +235,7 @@ function ersetze(wert, karte) {
  * Wer die unterschriebene in die Datenbank schreibt, hat dort nach vier
  * Stunden eine tote Adresse stehen.
  */
-const ORDNER = ['messages', 'stories', 'avatars', 'posts', 'insights', 'ptt'];
+const ORDNER = ['messages', 'stories', 'avatars', 'posts', 'insights', 'ptt', 'instants'];
 
 async function hochladen(client, nutzerId, ordner, datenadresse) {
   if (!client) return { ok: false, error: 'Nicht angemeldet' };
@@ -218,6 +246,8 @@ async function hochladen(client, nutzerId, ordner, datenadresse) {
 
   const typ = treffer[1];
   const inhalt = Buffer.from(treffer[2], 'base64');
+  if (typ.startsWith('video/')) return hochladenVideo(client, nutzerId, ordner, typ, inhalt);
+  if (ordner === 'instants' && (typ !== 'image/jpeg' || inhalt.length > 250*1024 || inhalt[0] !== 0xff || inhalt[1] !== 0xd8)) return {ok:false,error:'Nur Kamera-Fotos als JPEG bis 250 KB.'};
   return ablegen(client, nutzerId, ordner, typ, inhalt);
 }
 
@@ -236,7 +266,7 @@ async function hochladen(client, nutzerId, ordner, datenadresse) {
  * Erlaubt sind nur die Videotypen des Eimers (StoryRegeln.videoTyp); die
  * Größe prüft express.raw, die Länge der Browser vor dem Hochladen.
  */
-async function hochladenVideo(client, nutzerId, ordner, mime, inhalt) {
+async function hochladenVideo(client, nutzerId, ordner, mime, inhalt, optionen) {
   if (!client) return { ok: false, error: 'Nicht angemeldet' };
   if (!ORDNER.includes(ordner)) return { ok: false, error: 'Unbekannte Ablage' };
   const typ = StoryRegeln.videoTyp(mime);
@@ -244,12 +274,15 @@ async function hochladenVideo(client, nutzerId, ordner, mime, inhalt) {
   if (!Buffer.isBuffer(inhalt)) return { ok: false, error: 'Das ist keine lesbare Aufnahme' };
   const zuGross = StoryRegeln.videoPruefen({ bytes: inhalt.length });
   if (zuGross) return { ok: false, error: zuGross };
-  return ablegen(client, nutzerId, ordner, typ, inhalt);
+  if (ordner === 'instants' && (typ !== 'image/jpeg' || inhalt.length > 250*1024 || inhalt[0] !== 0xff || inhalt[1] !== 0xd8)) return {ok:false,error:'Nur Kamera-Fotos als JPEG bis 250 KB.'};
+  return ablegen(client, nutzerId, ordner, typ, inhalt, optionen);
 }
 
 /** Der gemeinsame Teil: Datei in den Eimer, zwei Adressen zurück. */
-async function ablegen(client, nutzerId, ordner, typ, inhalt) {
-  if (mitBunny()) return bunnyAblegen(client, nutzerId, ordner, typ, inhalt);
+async function ablegen(client, nutzerId, ordner, typ, inhalt, {signal}={}) {
+  if(signal?.aborted)return {ok:false,error:'Hochladen abgebrochen.'};
+  // Instants bleiben im privaten Supabase-Eimer (60-s-Signaturen, Schema 131).
+  if (mitBunny() && ordner !== 'instants') return bunnyAblegen(client, nutzerId, ordner, typ, inhalt, {signal});
   if (!inhalt.length) return { ok: false, error: 'Die Aufnahme ist leer' };
 
   /*
@@ -265,14 +298,36 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
    * app/lib/supabaseStorage.ts: `<kennung>-<zeitstempel>` heisst, dass man
    * nur noch die Millisekunde raten muss.
    */
-  const zufall = Math.random().toString(36).slice(2, 10);
-  const pfad = `${ordner}/${nutzerId}-${Date.now()}-${zufall}.${endung}`;
+  const zufall = require('node:crypto').randomBytes(16).toString('hex');
+  const pfad = ordner === 'instants' ? `instants/${nutzerId}/${Date.now()}-${zufall}.jpg` : `${ordner}/${nutzerId}-${Date.now()}-${zufall}.${endung}`;
 
-  const { error } = await client.storage.from('media').upload(pfad, inhalt, {
-    cacheControl: '3600',
+  let sekunden, dienst;
+  // Gegenprüfung R2: Beitragsdateien darf nur der Dienst löschen (Schema 134) —
+  // auch beim Abbruch eines Bild-Uploads.
+  if (ordner === 'posts') {
+    try { dienst = require('./videopruefung').dienstclient(); }
+    catch { return { ok: false, error: 'Der Medienspeicher ist derzeit nicht verfügbar.' }; }
+  }
+  // Vor dem Ablegen aus den empfangenen Bytes bestimmen; Clientwerte ignorieren.
+  if (ordner === 'posts' && typ.startsWith('video/')) {
+    const pruefung = require('./videopruefung');
+    try {
+      sekunden = await pruefung.pruefen(inhalt);
+    } catch (e) {
+      if (e instanceof pruefung.VideoFehler) return { ok: false, error: e.message };
+      throw e;
+    }
+  }
+  const { data: upload, error } = await client.storage.from('media').upload(pfad, inhalt, {
+    cacheControl: ordner === 'instants' ? '0' : '3600',
     contentType: typ,
     upsert: false,
   });
+  if (signal?.aborted && !error) {
+    const {error:wegFehler}=await (dienst || client).storage.from('media').remove([pfad]);
+    if(wegFehler)console.error('Abgebrochener Upload blieb liegen:', ordner);
+    return {ok:false,error:'Hochladen abgebrochen.'};
+  }
   if (error) {
     // Sichtbar machen, nicht verschlucken: das Verschweigen war der Grund,
     // warum der Fehler in der App ein Vierteljahr unbemerkt blieb.
@@ -280,8 +335,29 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
     return { ok: false, error: 'Die Aufnahme ließ sich nicht speichern' };
   }
 
+  if (dienst && sekunden !== undefined) {
+    try {
+      if (!upload?.id) throw new Error('Der Uploadbeleg fehlt.');
+      const { error: belegFehler } = await dienst.from('video_upload_belege').insert({
+        objekt_id: upload.id, user_id: nutzerId, pfad, sekunden,
+        bytes: inhalt.length, sha256: require('node:crypto').createHash('sha256').update(inhalt).digest('hex'),
+      });
+      if (belegFehler) throw belegFehler;
+    } catch (e) {
+      await (dienst || client).storage.from('media').remove([pfad]);
+      return { ok: false, error: 'Das Video konnte nicht bestätigt werden. Bitte erneut versuchen.' };
+    }
+  }
+  // Gegenprüfung R1: Beitragsdateien sind für Clients löschgesperrt (Schema 132),
+  // darum entfernt der Dienst; Fehler werden gemeldet, nicht verschluckt.
+  if(signal?.aborted){
+    const {error:wegFehler}=await (dienst || client).storage.from('media').remove([pfad]);
+    if(wegFehler)console.error('Abgebrochener Upload blieb liegen:', pfad.split('/')[0]);
+    return {ok:false,error:'Hochladen abgebrochen.'};
+  }
   const { data } = client.storage.from('media').getPublicUrl(pfad);
   let anzeige = null;
+  if (ordner === 'instants') return {ok:true,url:data.publicUrl,anzeige:null,pfad};
   try {
     const { data: unterschrift } = await client.storage
       .from('media')
@@ -290,8 +366,14 @@ async function ablegen(client, nutzerId, ordner, typ, inhalt) {
   } catch (fehler) {
     console.error('Unterschreiben nach dem Hochladen fehlgeschlagen:', fehler.message);
   }
+  // Runde 3: Abbruch während des Signierens räumt ebenfalls auf.
+  if (signal?.aborted) {
+    const {error:wegFehler}=await (dienst || client).storage.from('media').remove([pfad]);
+    if(wegFehler)console.error('Abgebrochener Upload blieb liegen:', ordner);
+    return {ok:false,error:'Hochladen abgebrochen.'};
+  }
 
-  return { ok: true, url: data.publicUrl, anzeige, pfad };
+  return { ok: true, url: data.publicUrl, anzeige, pfad, sekunden };
 }
 
 async function hochladenDatei(client, nutzerId, ordner, mime, inhalt, optionen) {
@@ -299,6 +381,7 @@ async function hochladenDatei(client, nutzerId, ordner, mime, inhalt, optionen) 
   if (!ORDNER.includes(ordner) || !Buffer.isBuffer(inhalt)) return {ok:false,error:'Unbekannte Aufnahme'};
   const typ=String(mime || '').split(';')[0].toLowerCase();
   if (typ.startsWith('video/')) return hochladenVideo(client,nutzerId,ordner,typ,inhalt,optionen);
+  if (ordner === 'instants' && (typ !== 'image/jpeg' || inhalt.length > 250*1024 || inhalt[0] !== 0xff || inhalt[1] !== 0xd8)) return {ok:false,error:'Nur Kamera-Fotos als JPEG bis 250 KB.'};
   if (!['image/jpeg','image/png','image/webp','audio/mp4'].includes(typ)) return {ok:false,error:'Dieses Dateiformat wird nicht unterstützt.'};
   if (inhalt.length>10*1024*1024 && typ.startsWith('image/')) return {ok:false,error:'Das Bild darf höchstens 10 MB groß sein.'};
   return ablegen(client,nutzerId,ordner,typ,inhalt,optionen);
@@ -328,12 +411,28 @@ async function signiereMitBunny(client,daten,sekunden) {
       const {data:signiert,error:e}=await client.storage.from('media').createSignedUrls(alt,sekunden);
       if(!e)for(const z of signiert || [])if(z.signedUrl&&!z.error) {
         karte.set(z.path,z.signedUrl);
-        zwischenspeicher.set(z.path,{url:z.signedUrl,ablauf:Date.now()+sekunden*1000});
+        if (sekunden === STANDARD_SEKUNDEN) merkeUnterschrift(client,z.path,z.signedUrl,Date.now()+sekunden*1000);
       }
     }
   }
   return ersetze(daten,karte);
 }
+// Nur die Moderationsroute ruft dies nach der Prüfung und dem Vermerk der Meldung auf.
+async function signiereMeldebeleg(client, adresse, sekunden) {
+  if (!MedienAdresse.gespeichert(adresse, Bunny.ORDNER_LESEN, eigeneBasis())) return null;
+  const pfad = Bunny.pfadPruefen(pfadAus(adresse), Bunny.ORDNER_LESEN);
+  if (!pfad || pfad.startsWith('instants/')) return null;
+  if (mitBunny()) {
+    const { data: anbieter, error } = await client.rpc('bunny_medium_anbieter', { p_pfad: pfad });
+    if (error && error.code !== 'PGRST202') return null;
+    if (anbieter === 'bunny') return Bunny.signierteAdresse(pfad, sekunden, { genauerAblauf: true });
+    if (!error && anbieter !== 'supabase') return null;
+  }
+  // Für Bestandsdateien prüft die Storage-Policy gemeldetes_medium mit der Moderationssitzung.
+  const { data, error } = await client.storage.from('media').createSignedUrl(pfad, sekunden);
+  return error ? null : data?.signedUrl || null;
+}
+
 async function unterschreiben(client,pfade) {
   if(!Array.isArray(pfade)||pfade.length>500)return {ok:false,error:'Ungültige Medienliste'};
   const gueltig=p=>!!Bunny.pfadPruefen(p,Bunny.ORDNER_LESEN)&&!p.startsWith('instants/');
@@ -353,14 +452,14 @@ async function unterschreiben(client,pfade) {
   return {ok:true,dateien:pfade.map(p=>{
     const pfad=typeof p==='string'?p:null;
     const url=gueltig(p)?signiert.get(p):null;
-    const eintrag=zwischenspeicher.get(pfad);
+    const eintrag=zwischenspeicher.get(speicherSchluessel(client,pfad));
     const tokenAblauf=url?Number(new URL(url).searchParams.get('expires'))*1000:0;
     return {pfad,url,ablauf:url?(eintrag?.url===url?eintrag.ablauf:tokenAblauf||Date.now()+4*60*60*1000):null};
   })};
 }
 
 /** Bunny braucht einen dauerhaften Eigentumsbeleg. Ohne Schema 113 geschlossen bleiben. */
-async function bunnyAblegen(client,nutzerId,ordner,typ,inhalt) {
+async function bunnyAblegen(client,nutzerId,ordner,typ,inhalt,{signal}={}) {
   const {data:frei,error}=await client.rpc('medium_upload_erlaubt');
   if(error?.code==='PGRST202')return {ok:false,error:'Der Medienspeicher ist noch nicht freigeschaltet. Bitte später erneut versuchen.'};
   if(error || frei!==true)return {ok:false,error:'Dieses Konto darf derzeit keine Medien hochladen.'};
@@ -371,17 +470,38 @@ async function bunnyAblegen(client,nutzerId,ordner,typ,inhalt) {
   // Auch den Metadatenvertrag vor dem ersten Datei-Byte prüfen.
   const {error:bereit}=await dienst.from('medien_objekte').select('pfad').limit(0);
   if(bereit)return {ok:false,error:'Der Medienspeicher ist noch nicht freigeschaltet. Bitte später erneut versuchen.'};
-  const hoch=await Bunny.ablegen(nutzerId,ordner,typ,inhalt);
+  /*
+   * AF5 (Schema 132): Videos für Beiträge misst der Server aus den Bytes
+   * (ffprobe, höchstens 20 Minuten). Die Sekunden stehen im Beleg; die
+   * Datenbank nimmt die Dauer eines Video-Beitrags nur von dort.
+   */
+  let sekunden;
+  if(ordner==='posts' && String(typ).startsWith('video/')) {
+    const pruefung=require('./videopruefung');
+    try { sekunden=await pruefung.pruefen(inhalt); }
+    catch(e) { if(e instanceof pruefung.VideoFehler)return {ok:false,error:e.message}; throw e; }
+  }
+  if(signal?.aborted)return {ok:false,error:'Hochladen abgebrochen.'};
+  const hoch=await Bunny.ablegen(nutzerId,ordner,typ,inhalt,{signal});
   if(!hoch.ok)return hoch;
-  const {error:beleg}=await dienst.from('medien_objekte').insert({pfad:hoch.pfad,owner_id:nutzerId,typ,bytes:inhalt.length,sha256:require('crypto').createHash('sha256').update(inhalt).digest('hex')});
+  const zeile={pfad:hoch.pfad,owner_id:nutzerId,typ,bytes:inhalt.length,sha256:require('crypto').createHash('sha256').update(inhalt).digest('hex')};
+  if(sekunden!==undefined)zeile.sekunden=sekunden;
+  const {error:beleg}=await dienst.from('medien_objekte').insert(zeile);
   if(beleg){await Bunny.loeschen(hoch.pfad);return {ok:false,error:'Die Aufnahme konnte nicht bestätigt werden.'};}
-  return hoch;
+  if(signal?.aborted){
+    await Bunny.loeschen(hoch.pfad);
+    await dienst.from('medien_objekte').delete().eq('pfad',hoch.pfad).eq('owner_id',nutzerId);
+    return {ok:false,error:'Hochladen abgebrochen.'};
+  }
+  return sekunden!==undefined?{...hoch,sekunden}:hoch;
 }
 async function loeschen(client,nutzerId,pfad) {
   if(!Bunny.pfadPruefen(pfad,Bunny.ORDNER_LESEN))return {ok:false,error:'Ungültige Datei'};
-  if(mitBunny()) {
-    const {data:anbieter,error}=await client.rpc('medium_loeschrecht',{p_pfad:pfad});
-    if(error || !anbieter)return {ok:false,error:'Diese Datei darfst du nicht löschen oder die Datenbankfreigabe fehlt.'};
+  // Paket 9 (B1): Besitz und „nirgends verwendet" prüft die Datenbank immer,
+  // auch ohne Bunny-Schalter (medium_loeschrecht, Schema 115/133).
+  const {data:anbieter,error}=await client.rpc('medium_loeschrecht',{p_pfad:pfad});
+  if(error || !anbieter)return {ok:false,error:'Diese Datei darfst du nicht löschen oder die Datenbankfreigabe fehlt.'};
+  {
     if(anbieter==='bunny') {
       if(!process.env.SUPABASE_SERVICE_ROLE_KEY)return {ok:false,error:'Der Medienspeicher ist derzeit nicht vollständig eingerichtet.'};
       const {createClient}=require('@supabase/supabase-js');
@@ -392,7 +512,46 @@ async function loeschen(client,nutzerId,pfad) {
     }
     if(anbieter!=='supabase')return {ok:false,error:'Unbekannte Ablage'};
   }
-  const {error}=await client.storage.from('media').remove([pfad]);
-  return error?{ok:false,error:'Datei nicht gelöscht'}:{ok:true};
+  // Beitragsdateien sind für Clients löschgesperrt (Schema 132); nach der
+  // Prüfung oben entfernt sie der Dienst.
+  let speicher=client;
+  if(pfad.startsWith('posts/')) {
+    const pruefung=require('./videopruefung');
+    try { speicher=pruefung.dienstclient(); }
+    catch { return {ok:false,error:'Der Medienspeicher ist derzeit nicht vollständig eingerichtet.'}; }
+  }
+  const {error:weg}=await speicher.storage.from('media').remove([pfad]);
+  return weg?{ok:false,error:'Datei nicht gelöscht'}:{ok:true};
 }
-module.exports = { mitBunny, hochladenDatei, unterschreiben, loeschen, signiereMedien, istMedienAdresse, istFremdeMedienAdresse, ohneFremdeMedien, pfadAus, hochladen, hochladenVideo };
+async function instantUnterschrift(client,pfad,dienst) {
+  if(!/^instants\/[0-9a-f-]{36}\/[A-Za-z0-9_-]+\.jpg$/.test(pfad))throw new Error('Ungültiger Instant-Pfad');
+  // Zuerst RLS im Namen des Nutzers, erst danach privilegiert signieren.
+  const {data:zeile,error:leseFehler}=await client.from('instants').select('bild_pfad').eq('bild_pfad',pfad).single();
+  if(leseFehler || zeile?.bild_pfad!==pfad)throw new Error('Instant nicht mehr verfügbar');
+  if(!dienst){
+    if(!process.env.SUPABASE_SERVICE_ROLE_KEY)throw new Error('Instants sind derzeit nicht verfügbar.');
+    const {createClient}=require('@supabase/supabase-js');
+    const {supabaseUrl}=require('./supabase');
+    dienst=createClient(supabaseUrl,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+  }
+  /*
+   * Paket 9, Gegenprüfung R1: keine signierte Adresse mehr. Ein 60-s-Link
+   * ist ein Inhaberlink — weitergegeben, nach Öffnen, Blockieren oder
+   * Zurückziehen noch abrufbar. Der Server lädt die (≤ 250 KB) JPEG-Datei
+   * nach der RLS-Prüfung selbst und liefert sie nur an dieses Konto aus.
+   */
+  const {data,error}=await dienst.storage.from('media').download(pfad);
+  if(error||!data)throw new Error('Instant nicht mehr verfügbar');
+  const bytes=Buffer.from(await data.arrayBuffer());
+  if(bytes.length>256000||bytes[0]!==0xff||bytes[1]!==0xd8)throw new Error('Instant nicht mehr verfügbar');
+  return 'data:image/jpeg;base64,'+bytes.toString('base64');
+}
+async function instantsAufraeumen(client) {
+  const {data,error}=await client.rpc('instant_loeschkandidaten');if(error)throw error;
+  const zeilen=data||[];if(!zeilen.length)return 0;
+  const {error:loeschFehler}=await client.storage.from('media').remove(zeilen.map(z=>z.bild_pfad));
+  if(loeschFehler)throw loeschFehler;
+  const {error:bestaetigung}=await client.rpc('instant_loeschbestaetigen',{p_ids:zeilen.map(z=>z.id).filter(Boolean)});
+  if(bestaetigung)throw bestaetigung;return zeilen.length;
+}
+module.exports = { instantUnterschrift, instantsAufraeumen, mitBunny, hochladenDatei, unterschreiben, loeschen, signiereMedien, signiereMeldebeleg, istMedienAdresse, istFremdeMedienAdresse, ohneFremdeMedien, pfadAus, hochladen, hochladenVideo };

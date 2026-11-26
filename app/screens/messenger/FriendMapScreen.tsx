@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View, type ScrollViewInstance } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
+import { Schalter } from '../../components/Schalter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Druck } from '../../components/Druck';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -199,10 +200,10 @@ export const FriendMapScreen = ({ onOpenProfile, onEditSelectedContacts, onNotic
             <Text style={styles.freigabeTitel}>Deinen Standort teilen</Text>
             <Text style={styles.freigabeSub}>{STUFEN_TEXT[sicht.stufe]}</Text>
           </View>
-          <Switch
+          <Schalter
             value={sichtbar}
             onValueChange={schalten}
-            trackColor={{ true: colors.brand, false: colors.surface3 }}
+            accessibilityLabel="Deinen Standort teilen"
           />
         </View>
 

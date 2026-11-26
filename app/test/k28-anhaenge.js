@@ -169,164 +169,191 @@ async function teilBC() {
     pruefe('Beide Konten melden sich an', false, e.message);
   }
 
-  const aufraeumen = () =>
-    page.evaluate(() => {
-      document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove());
-    });
-  const kachelTexte = () => page.$$eval('.anhangraster__text', (els) => els.map((e) => e.textContent.trim()));
-
-  /* ------------------------------------------------ Zweierchat mit @test */
-  console.log('\nB  Website — Zweierchat mit @test');
+  const Testpaar = require('./_testpaar');
   let chatId = null;
-  if (pruefer && fremder) {
-    const { data: meine } = await pruefer.client.from('chat_members').select('chat_id, chats(is_group)').eq('user_id', pruefer.id);
-    const ids = (meine || []).filter((m) => m.chats && !m.chats.is_group).map((m) => m.chat_id);
-    if (ids.length) {
-      const { data: andere } = await pruefer.client.from('chat_members').select('chat_id').in('chat_id', ids).eq('user_id', fremder.id);
-      chatId = andere?.[0]?.chat_id || null;
-    }
-  }
-  pruefe('Zweierchat @prueflauf ↔ @test vorhanden (Testbestand)', !!chatId);
+  let eigenesTestpaar = false;
+  let communityId = null;
+  try {
+    const aufraeumen = () =>
+      page.evaluate(() => {
+        document.querySelectorAll('.sheet-backdrop').forEach((e) => e.remove());
+      });
+    const kachelTexte = () => page.$$eval('.anhangraster__text', (els) => els.map((e) => e.textContent.trim()));
 
-  if (chatId) {
-    await page.evaluate((id) => window.openChat(id), chatId);
-    await page.waitForSelector('#attach');
-
-    await pruefeAsync('6.1/6.2 Anhang-Blatt im Zweierchat: Raster ohne Kamera/GIF/Sticker', async () => {
-      await page.click('#attach');
-      await page.waitForSelector('.anhangraster__kachel');
-      const t = await kachelTexte();
-      const soll = ['Galerie', 'Dokument', 'Standort', 'Standort anfragen', 'Kontakt'];
-      if (JSON.stringify(t) !== JSON.stringify(soll)) throw new Error(t.join(' | '));
-      const runde = await page.$eval('.anhangraster__kreis', (e) => getComputedStyle(e).borderRadius);
-      if (!/50%|29px/.test(runde)) throw new Error('Symbol nicht rund: ' + runde);
-      await aufraeumen();
-    });
-
-    await pruefeAsync('6.1 Kamera-Knopf im Eingabefeld vorhanden', async () => {
-      if (!(await page.$('#camBtn'))) throw new Error('#camBtn fehlt');
-    });
-
-    await pruefeAsync('6.3 GIF/Sticker-Knopf öffnet Reiter, Sticker landet im Chat', async () => {
-      const vorher = await page.$$eval('.msg__sticker', (e) => e.length);
-      await page.click('#gifStickerBtn');
-      await page.waitForSelector('[data-reiter="gif"]');
-      await page.click('[data-reiter="gif"]');
-      if (!(await page.isVisible('[data-gifwahl]'))) throw new Error('GIF-Reiter zeigt keinen Galerie-Knopf');
-      await page.click('[data-reiter="sticker"]');
-      await page.click('[data-sticker]');
-      await page.waitForFunction((n) => document.querySelectorAll('.msg__sticker').length > n, vorher);
-    });
-
-    await pruefeAsync('6.5 Standort über die Suche senden → Karte in der Blase', async () => {
-      await page.click('#attach');
-      await page.click('[data-anhang="standort"]');
-      await page.waitForSelector('#ortSucheFeld');
-      await page.fill('#ortSucheFeld', 'Prüfplatz München');
-      await page.click('#ortSucheKnopf');
-      await page.waitForSelector('[data-treffer="0"]');
-      await page.click('[data-treffer="0"]');
-      await page.click('#ortSenden');
-      await page.waitForSelector('.msg__standort[data-msglat]');
-      const name = await page.$eval('.msg__standort[data-msglat]:last-of-type .msg__standortName', (e) => e.textContent.trim());
-      if (name !== 'Prüfplatz') throw new Error('Name in der Blase: ' + name);
-    });
-    pruefe('6.5 Ortssuche abgefangen, nicht am echten Dienst', ortsAnfragen >= 1, String(ortsAnfragen));
-
-    await pruefeAsync('6.5 Antippen öffnet die Karte des Ortes', async () => {
-      await page.click('.msg__standort[data-msglat]');
-      await page.waitForSelector('#ortAnsichtKarte');
-      await aufraeumen();
-    });
-
-    console.log('\nC  Wirkung — @test liest den Standort');
-    await pruefeAsync('6.5 @test sieht den Standort (Klartext mit geo:-Zeile oder Chiffre mit Kuvert für @test)', async () => {
-      const { data, error } = await fremder.client
-        .from('messages')
-        .select('id, text, krypto, place_id, sender_id')
-        .eq('chat_id', chatId)
-        .eq('sender_id', pruefer.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      if (error) throw error;
-      if (data.place_id) throw new Error('place_id gesetzt — frei gewählter Ort gehört in den Text');
-      if (Number(data.krypto) > 0) {
-        if (data.text) throw new Error('verschlüsselt, aber Klartext in text');
-        const { data: schluessel } = await fremder.client.from('krypto_schluessel').select('id').eq('user_id', fremder.id);
-        const ids = (schluessel || []).map((s) => s.id);
-        if (!ids.length) throw new Error('@test hat kein Gerät — Kuvert nicht prüfbar');
-        const { count } = await fremder.client.from('message_keys').select('*', { count: 'exact', head: true }).eq('message_id', data.id).in('schluessel_id', ids);
-        if (!count) throw new Error('kein Kuvert für @test');
-      } else {
-        const ort = OrtSuche.ausText(data.text);
-        if (!ort || ort.name !== 'Prüfplatz' || Math.abs(ort.lat - 48.137154) > 1e-5) throw new Error('Text: ' + JSON.stringify(data.text));
+    /* ------------------------------------------------ Zweierchat mit @test */
+    console.log('\nB  Website — Zweierchat mit @test');
+    if (pruefer && fremder) {
+      const { data: meine } = await pruefer.client.from('chat_members').select('chat_id, chats(is_group)').eq('user_id', pruefer.id);
+      const ids = (meine || []).filter((m) => m.chats && !m.chats.is_group).map((m) => m.chat_id);
+      if (ids.length) {
+        const { data: andere } = await pruefer.client.from('chat_members').select('chat_id').in('chat_id', ids).eq('user_id', fremder.id);
+        chatId = andere?.[0]?.chat_id || null;
       }
-    });
-  }
+    }
+    if (!chatId && pruefer?.id === Testpaar.PRUEFKONTO && fremder?.id === Testpaar.TESTKONTO) {
+      eigenesTestpaar = true;
+      chatId = await Testpaar.testpaarSichern();
+      await page.reload({ waitUntil: 'load' });
+    }
+    pruefe('Zweierchat @prueflauf ↔ @test vorhanden (Testbestand)', !!chatId);
 
-  /* ---------------------------------------------- Unterthema (Prüfcommunity) */
-  console.log('\nB  Website — Unterthema einer Prüfcommunity');
-  const neu = await page.evaluate(async (name) =>
-    (await fetch('/api/communities', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, thema: 'Prüflauf', sichtbarkeit: 'private' }),
-    })).json(), 'Prüfanhang ' + Date.now().toString(36));
-  const communityId = neu.community?.id;
-  pruefe('Prüfcommunity angelegt (zuruecksetzen() räumt sie ab)', !!communityId, neu.error || '');
+    if (chatId) {
+      await page.evaluate((id) => window.openChat(id), chatId);
+      await page.waitForSelector('#attach');
 
-  if (communityId && pruefer) {
-    const { data: kanal } = await pruefer.client.from('community_channels').select('id, name').eq('community_id', communityId).limit(1).single();
-    pruefe('Unterthema vorhanden', !!kanal?.id);
-    if (kanal?.id) {
-      await page.evaluate(
-        ({ c, k }) => {
-          const community = ((typeof state !== 'undefined' && state.communities) || []).find((x) => x.id === c) || { id: c, name: 'Prüfanhang' };
-          return window.renderCommunityChat(community, k, k.name);
-        },
-        { c: communityId, k: kanal }
-      );
-      await page.waitForSelector('#commAttach');
-
-      await pruefeAsync('6.6 Unterthema: dasselbe Raster, ohne „Standort anfragen"', async () => {
-        await page.click('#commAttach');
+      await pruefeAsync('6.1/6.2 Anhang-Blatt im Zweierchat: Raster ohne Kamera/GIF/Sticker', async () => {
+        await page.click('#attach');
         await page.waitForSelector('.anhangraster__kachel');
         const t = await kachelTexte();
-        const soll = ['Galerie', 'Dokument', 'Standort', 'Kontakt'];
+        const soll = ['Galerie', 'Dokument', 'Standort', 'Standort anfragen', 'Kontakt'];
         if (JSON.stringify(t) !== JSON.stringify(soll)) throw new Error(t.join(' | '));
+        const runde = await page.$eval('.anhangraster__kreis', (e) => getComputedStyle(e).borderRadius);
+        if (!/50%|29px/.test(runde)) throw new Error('Symbol nicht rund: ' + runde);
         await aufraeumen();
       });
-      await pruefeAsync('6.1/6.3 Unterthema: Kamera und GIF/Sticker im Eingabefeld', async () => {
-        if (!(await page.$('#commKamera'))) throw new Error('#commKamera fehlt');
-        await page.click('#commGifSticker');
-        await page.waitForSelector('[data-sticker]');
-        await page.click('[data-sticker]');
-        await page.waitForSelector('#commMsgs .msg__sticker');
+
+      await pruefeAsync('6.1 Kamera-Knopf im Eingabefeld vorhanden', async () => {
+        if (!(await page.$('#camBtn'))) throw new Error('#camBtn fehlt');
       });
-      await pruefeAsync('6.5 Unterthema: Standort senden → Zeile in community_channel_messages', async () => {
-        await page.click('#commAttach');
+
+      await pruefeAsync('6.3 GIF/Sticker-Knopf öffnet Reiter, Sticker landet im Chat', async () => {
+        const vorher = await page.$$eval('.msg__sticker', (e) => e.length);
+        await page.click('#gifStickerBtn');
+        await page.waitForSelector('[data-reiter="gif"]');
+        await page.click('[data-reiter="gif"]');
+        if (!(await page.isVisible('[data-gifwahl]'))) throw new Error('GIF-Reiter zeigt keinen Galerie-Knopf');
+        await page.click('[data-reiter="sticker"]');
+        await page.click('[data-sticker]');
+        await page.waitForFunction((n) => document.querySelectorAll('.msg__sticker').length > n, vorher);
+      });
+
+      await pruefeAsync('6.5 Standort über die Suche senden → Karte in der Blase', async () => {
+        await page.click('#attach');
         await page.click('[data-anhang="standort"]');
-        await page.fill('#ortSucheFeld', 'Prüfplatz');
+        await page.waitForSelector('#ortSucheFeld');
+        await page.fill('#ortSucheFeld', 'Prüfplatz München');
         await page.click('#ortSucheKnopf');
+        await page.waitForSelector('[data-treffer="0"]');
         await page.click('[data-treffer="0"]');
         await page.click('#ortSenden');
-        await page.waitForSelector('#commMsgs .msg__standort[data-msglat]');
-        const { data } = await pruefer.client
-          .from('community_channel_messages')
-          .select('text, place_id')
-          .eq('channel_id', kanal.id)
+        await page.waitForSelector('.msg__standort[data-msglat]');
+        const name = await page.locator('.msg__standort[data-msglat] .msg__standortName').last().textContent();
+        if (name !== 'Prüfplatz') throw new Error('Name in der Blase: ' + name);
+      });
+      pruefe('6.5 Ortssuche abgefangen, nicht am echten Dienst', ortsAnfragen >= 1, String(ortsAnfragen));
+
+      await pruefeAsync('6.5 Antippen öffnet die Karte des Ortes', async () => {
+        await page.click('.msg__standort[data-msglat]');
+        await page.waitForSelector('#ortAnsichtKarte');
+        await aufraeumen();
+      });
+
+      console.log('\nC  Wirkung — @test liest den Standort');
+      await pruefeAsync('6.5 @test sieht den Standort (Klartext mit geo:-Zeile oder Chiffre mit Kuvert für @test)', async () => {
+        const { data, error } = await fremder.client
+          .from('messages')
+          .select('id, text, krypto, place_id, sender_id')
+          .eq('chat_id', chatId)
+          .eq('sender_id', pruefer.id)
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
-        const ort = OrtSuche.ausText(data?.text);
-        if (!ort || ort.name !== 'Prüfplatz' || data.place_id) throw new Error(JSON.stringify(data));
+        if (error) throw error;
+        if (data.place_id) throw new Error('place_id gesetzt — frei gewählter Ort gehört in den Text');
+        if (Number(data.krypto) > 0) {
+          if (data.text) throw new Error('verschlüsselt, aber Klartext in text');
+          const { data: schluessel } = await fremder.client.from('krypto_schluessel').select('id').eq('user_id', fremder.id);
+          const ids = (schluessel || []).map((s) => s.id);
+          if (!ids.length) throw new Error('@test hat kein Gerät — Kuvert nicht prüfbar');
+          const { count } = await fremder.client.from('message_keys').select('*', { count: 'exact', head: true }).eq('message_id', data.id).in('schluessel_id', ids);
+          if (!count) throw new Error('kein Kuvert für @test');
+        } else {
+          const ort = OrtSuche.ausText(data.text);
+          if (!ort || ort.name !== 'Prüfplatz' || Math.abs(ort.lat - 48.137154) > 1e-5) throw new Error('Text: ' + JSON.stringify(data.text));
+        }
       });
     }
-  }
 
-  pruefe('Keine Skriptfehler auf der Seite', jsFehler.length === 0, jsFehler.slice(0, 3).join(' | '));
-  await schliesse(browser);
+    /* ---------------------------------------------- Unterthema (Prüfcommunity) */
+    if (chatId) {
+      await page.click('#chatBack');
+      await page.waitForSelector('#attach', { state: 'detached' });
+    }
+    console.log('\nB  Website — Unterthema einer Prüfcommunity');
+    const neu = await page.evaluate(async (name) =>
+      (await fetch('/api/communities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, thema: 'Prüflauf', sichtbarkeit: 'private' }),
+      })).json(), 'Prüfanhang ' + Date.now().toString(36));
+    communityId = neu.community?.id;
+    pruefe('Prüfcommunity angelegt', !!communityId, neu.error || '');
+
+    if (communityId && pruefer) {
+      const { data: kanal } = await pruefer.client.from('community_channels').select('id, name').eq('community_id', communityId).limit(1).single();
+      pruefe('Unterthema vorhanden', !!kanal?.id);
+      if (kanal?.id) {
+        await page.evaluate(
+          ({ c, k }) => {
+            const community = ((typeof state !== 'undefined' && state.communities) || []).find((x) => x.id === c) || { id: c, name: 'Prüfanhang' };
+            return window.renderCommunityChat(community, k, k.name);
+          },
+          { c: communityId, k: kanal }
+        );
+        await page.waitForSelector('#commAttach');
+
+        await pruefeAsync('6.6 Unterthema: dasselbe Raster, ohne „Standort anfragen"', async () => {
+          await page.click('#commAttach');
+          await page.waitForSelector('.anhangraster__kachel');
+          const t = await kachelTexte();
+          const soll = ['Galerie', 'Dokument', 'Standort', 'Kontakt'];
+          if (JSON.stringify(t) !== JSON.stringify(soll)) throw new Error(t.join(' | '));
+          await aufraeumen();
+        });
+        await pruefeAsync('6.1/6.3 Unterthema: Kamera und GIF/Sticker im Eingabefeld', async () => {
+          if (!(await page.$('#commKamera'))) throw new Error('#commKamera fehlt');
+          await page.click('#commGifSticker');
+          await page.waitForSelector('[data-sticker]');
+          await page.click('[data-sticker]');
+          await page.waitForSelector('#commMsgs .msg__sticker');
+        });
+        await pruefeAsync('6.5 Unterthema: Standort senden → Zeile in community_channel_messages', async () => {
+          await page.click('#commAttach');
+          await page.click('[data-anhang="standort"]');
+          await page.fill('#ortSucheFeld', 'Prüfplatz');
+          await page.click('#ortSucheKnopf');
+          await page.click('[data-treffer="0"]');
+          await page.click('#ortSenden');
+          await page.waitForSelector('#commMsgs .msg__standort[data-msglat]');
+          const { data } = await pruefer.client
+            .from('community_channel_messages')
+            .select('text, place_id')
+            .eq('channel_id', kanal.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          const ort = OrtSuche.ausText(data?.text);
+          if (!ort || ort.name !== 'Prüfplatz' || data.place_id) throw new Error(JSON.stringify(data));
+        });
+      }
+    }
+
+    pruefe('Keine Skriptfehler auf der Seite', jsFehler.length === 0, jsFehler.slice(0, 3).join(' | '));
+  } finally {
+    try {
+      if (communityId && pruefer) {
+        await pruefer.client.from('communities').delete().eq('id', communityId).throwOnError();
+        const { data } = await pruefer.client.from('communities').select('id').eq('id', communityId).throwOnError();
+        pruefe('Eigene Prüfcommunity entfernt', data.length === 0);
+      }
+    } finally {
+      try {
+        if (eigenesTestpaar) await Testpaar.testpaarLoesen();
+      } finally {
+        await schliesse(browser);
+      }
+    }
+  }
 }
 
 (async () => {

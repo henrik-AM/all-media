@@ -18,7 +18,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import { AlleDaten, ladeAlles, ladeChatlisten, ladeChatlistenStand, ladePersonen } from '../lib/daten';
+import { AlleDaten, ladeAlles, ladeChatlisten, ladeChatlistenStand, ladePersonen, ladeBeitraege } from '../lib/daten';
 import type { Profile, User } from '../types';
 import { meinSchluessel } from '../lib/krypto';
 import { AuthContext } from './AuthContext';
@@ -74,6 +74,7 @@ interface DatenWert extends AlleDaten {
    */
   fehler: string | null;
   neuLaden: () => Promise<void>;
+  beitragNachladen:(id:string)=>Promise<boolean>;
   /**
    * Nur die Chatlisten neu holen (Kasten 27) — nach dem Zurueckkehren aus
    * einem Chat und im Takt, wenn sich ihr Stand in der Datenbank geaendert
@@ -117,6 +118,7 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
   const { supabase } = useSupabase();
   const { user } = useContext(AuthContext);
   const ichId = user?.id ?? '';
+  const kontoRef=useRef(ichId);kontoRef.current=ichId;
 
   const [daten, setDaten] = useState<AlleDaten>(LEER);
   const [laedt, setLaedt] = useState(false);
@@ -340,6 +342,22 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
     [supabase, ichId]
   );
 
+  const beitragNachladen=useCallback(async(id:string)=>{
+    if([...daten.posts,...daten.videos,...daten.clips].some(p=>p.id===id))return true;
+    if(!supabase||!ichId||!/^[0-9a-f-]{36}$/i.test(id))return false;
+    const {data:vor}=await supabase.auth.getSession();const token=vor.session?.access_token;
+    const teil=await ladeBeitraege(supabase,ichId,id);
+    const {data:nach}=await supabase.auth.getSession();
+    if(kontoRef.current!==ichId||!token||nach.session?.access_token!==token)return false;
+    const gefunden=[...teil.posts,...teil.videos,...teil.clips].some(p=>p.id===id);
+    if(gefunden)setDaten(d=>d.ichId!==ichId?d:{...d,
+      posts:[...d.posts.filter(p=>p.id!==id),...teil.posts.map(p=>({...p,nurEinzeln:true}))],
+      videos:[...d.videos.filter(p=>p.id!==id),...teil.videos.map(p=>({...p,nurEinzeln:true}))],
+      clips:[...d.clips.filter(p=>p.id!==id),...teil.clips.map(p=>({...p,nurEinzeln:true}))]});
+    return gefunden;
+  },[supabase,ichId,daten.posts,daten.videos,daten.clips]);
+
+
   const wert = useMemo<DatenWert>(
     () => ({
       ...daten,
@@ -353,8 +371,9 @@ export const DatenProvider = ({ children }: { children: React.ReactNode }) => {
       keinInteresseMerken,
       personMerken,
       personenNachladen,
+      beitragNachladen,
     }),
-    [daten, users, profile, laedt, fehler, laden, chatsNeuLaden, chatsGelesenSeit, keinInteresseMerken, personMerken, personenNachladen]
+    [daten, users, profile, laedt, fehler, laden, chatsNeuLaden, chatsGelesenSeit, keinInteresseMerken, personMerken, personenNachladen, beitragNachladen]
   );
 
   return <DatenContext.Provider value={wert}>{children}</DatenContext.Provider>;

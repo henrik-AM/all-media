@@ -1,0 +1,10 @@
+OK ohne_messwert_7_tage
+OK ohne_messwert_30_tage
+OK livestream_ende_90
+OK livestream_wiederholung_90
+OK livestream_ende_91
+OK livestream_wiederholung_91
+OK livestream_ende_92
+OK livestream_wiederholung_92
+Schema 137: 8/8, verworfen
+Rollback-Kontrolle: 1/1 (Wegwerfkonten und neues Schema fehlen)

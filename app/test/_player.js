@@ -137,9 +137,10 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await zumPlayer();
 
-  await pruefe('Alle fünf Aktionen stehen nebeneinander', async () => {
+  // Paket 9 (AF3): sechs Aktionen — „Gefällt mir nicht“ kam dazu.
+  await pruefe('Alle sechs Aktionen stehen nebeneinander', async () => {
     const knoepfe = await page.$$eval('.post__actions--fuenf .postbtn', (n) => n.length);
-    if (knoepfe !== 5) throw new Error(knoepfe + ' Knöpfe');
+    if (knoepfe !== 6) throw new Error(knoepfe + ' Knöpfe');
   });
 
   await pruefe('Sie sind gleichmäßig verteilt, keiner klebt am Rand', async () => {

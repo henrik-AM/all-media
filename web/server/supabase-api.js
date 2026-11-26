@@ -33,6 +33,7 @@ const {
 } = require('../../gemeinsam/spalten');
 // Kasten 1.3 (Nachtrag 10.10.2026): Pronomen und Links — gemeinsam mit der App.
 const Profilfelder = require('../../gemeinsam/profilfelder');
+const Beitragschema = require('../../gemeinsam/beitragschema');
 
 /*
  * Die Reihenfolge des Feeds — ebenfalls einmal fuer Website und App. Die
@@ -1040,9 +1041,10 @@ function spalteFehlt(fehler) {
 async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200, nurIds = null } = {}) {
   if (!client) return null;
 
-  let abfrage = client
+  const {data,error}=await Beitragschema.lesen((mitMedien)=>{
+    let abfrage = client
     .from('posts')
-    .select(BEITRAG_SPALTEN)
+    .select(Beitragschema.spalten(BEITRAG_SPALTEN,mitMedien))
     // Geplante Beiträge ("später posten") bleiben draußen, bis ihr Zeitpunkt
     // erreicht ist. Gleiche Regel wie in app/lib/daten.ts.
     .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
@@ -1054,11 +1056,15 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200, nurI
   }
   if (arten && arten.length > 0) abfrage = abfrage.in('kind', arten);
 
-  const { data, error } = await abfrage;
+    return abfrage;
+  });
   if (error) throw error;
 
   const beitraege = data || [];
   const ids = beitraege.map((b) => b.id);
+
+  const { data: negativ } = ids.length ? await client.from('post_dislikes').select('post_id').eq('user_id', nutzerId).in('post_id', ids) : { data: [] };
+  const abgelehnt = new Set((negativ || []).map((z) => z.post_id));
 
   // Eigener Zustand je Beitrag: gefällt mir, gespeichert, geteilt, Glocke.
   const [{ data: likes }, { data: gespeichert }, { data: geteilt }, { data: glocke }, lenkung] =
@@ -1164,6 +1170,7 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200, nurI
     description: b.description || '',
     location: b.location || '',
     music: b.music || '',
+    medien: b.medien || [],
     mediaUrl: b.media_url,
     thumbnail: b.thumbnail_url,
     duration: b.duration || '',
@@ -1180,6 +1187,7 @@ async function ladeBeitraege(client, nutzerId, { arten = null, limit = 200, nurI
     // hier nur der Sockel — jedes Teilen verpuffte, die Zahl blieb stehen.
     shares: Number(b.shares_basis || 0) + (b.shares?.[0]?.count ?? 0),
     liked: gemocht.has(b.id),
+    disliked: abgelehnt.has(b.id),
     likedBy: likerNamen.get(b.id) || '',
     saved: gemerkt.has(b.id),
     reposted: repostet.has(b.id),

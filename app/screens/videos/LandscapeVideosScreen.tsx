@@ -53,6 +53,7 @@ export const LandscapeVideosScreen = ({ onOpenClip, onNotice }: Props) => {
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
     return clips.filter((c) => {
+      if(c.nurEinzeln)return false;
       if (!passtZu(filter, c.art ?? 'standard')) return false;
       if (!q) return true;
       return c.title.toLowerCase().includes(q) || alleNutzer[c.userId].name.toLowerCase().includes(q);

@@ -1,0 +1,179 @@
+-- Schema 130 — AF7 Konto-Analysen (Paket 9, 20.11.2026). Entwurf 110 aus dem
+-- Sammelzweig, auf den Live-Stand gebracht. Nach 129.
+-- Keine Rückrechnung historischer Follower-/Vorwahlmerkmale: Messung ab Einspielung.
+-- post_impressions bleibt privat; der Verfasser erhält ausschließlich Aggregate.
+-- impression_vermerken() bleibt die Fassung aus Schema 122 (beitrag_lesbar,
+-- stilles Nichtstun ohne Orakel). Die 1000-ms-Grenze und die Freigabe gelten
+-- erst beim Übertragen in konto_sichtungen (Auslöser unten), damit der
+-- Feed-Algorithmus seine kurzen Sichtungen weiter sieht.
+create table if not exists public.konto_analysen_start (
+  id boolean primary key default true check(id), seit timestamptz not null default now()
+);
+insert into public.konto_analysen_start(id) values(true) on conflict do nothing;
+alter table public.konto_analysen_start enable row level security;
+revoke all on public.konto_analysen_start from public,anon,authenticated;
+drop policy if exists nur_freigegebene on public.konto_analysen_start;
+create policy nur_freigegebene on public.konto_analysen_start as restrictive for all to authenticated
+using((select public.konto_freigegeben())) with check((select public.konto_freigegeben()));
+
+create table if not exists public.konto_sichtungen (
+  impression_id uuid primary key references public.post_impressions(id) on delete cascade,
+  post_id uuid not null references public.posts(id) on delete cascade,
+  zuschauer uuid not null references public.profiles(id) on delete cascade,
+  tag date not null,
+  folgt boolean not null,
+  land text,
+  sichtungen bigint not null check(sichtungen>=0),
+  dauer_ms bigint not null check(dauer_ms>=0)
+);
+create index if not exists konto_sichtungen_post_tag on public.konto_sichtungen(post_id,tag);
+alter table public.konto_sichtungen enable row level security;
+revoke all on public.konto_sichtungen from public,anon,authenticated;
+-- Keine permissive Leseregel: auch Eigentümer dürfen keine Zuschauerlisten lesen.
+drop policy if exists nur_freigegebene on public.konto_sichtungen;
+create policy nur_freigegebene on public.konto_sichtungen as restrictive for all to authenticated
+using((select public.konto_freigegeben())) with check((select public.konto_freigegeben()));
+
+-- Nur explizite internationale Vorwahlen; keine Annahme 0... = Deutschland.
+-- Quelle: ITU https://www.itu.int/oth/t0202/es . +1/+7 und unbekannte bleiben NULL.
+create or replace function public.analyse_vorwahlland(nummer text) returns text
+language sql immutable set search_path=public as $$
+ select case
+ when nummer !~ '^\s*(\+|00)' then null
+ else (select land from (values
+ ('49','Deutschland'),('43','Österreich'),('41','Schweiz'),('34','Spanien'),
+ ('33','Frankreich'),('31','Niederlande'),('32','Belgien'),('45','Dänemark'),
+ ('46','Schweden'),('47','Norwegen'),('48','Polen'),('351','Portugal'),
+ ('353','Irland'),('352','Luxemburg'),('420','Tschechien'),('421','Slowakei')
+ ) as l(vorwahl,land)
+ where regexp_replace(regexp_replace(nummer,'^\s*(\+|00)','','g'),'[^0-9]','','g') like vorwahl||'%'
+ order by length(vorwahl) desc limit 1) end;
+$$;
+revoke execute on function public.analyse_vorwahlland(text) from public,anon,authenticated;
+
+create or replace function public.konto_sichtung_messen() returns trigger
+language plpgsql security definer set search_path=public as $$
+declare autor uuid; delta_s bigint; delta_d bigint;
+begin
+ select user_id into autor from public.posts where id=new.post_id;
+ if autor=new.user_id or not public.konto_freigegeben() then return new; end if;
+ delta_s := greatest(0,new.sichtungen-case when tg_op='UPDATE' then old.sichtungen else 0 end);
+ delta_d := greatest(0,new.dauer_ms-case when tg_op='UPDATE' then old.dauer_ms else 0 end);
+ -- Auch privilegierte Direktimporte mit Null-/Kurzsichtungen nicht auswerten.
+ if delta_s<1 or delta_d<1000 then return new;end if;
+ insert into public.konto_sichtungen(impression_id,post_id,zuschauer,tag,folgt,land,sichtungen,dauer_ms)
+ values(new.id,new.post_id,new.user_id,(now() at time zone 'utc')::date,
+   exists(select 1 from public.follows where follower_id=new.user_id and followee_id=autor),
+   (select public.analyse_vorwahlland(phone) from public.profiles where id=new.user_id),delta_s,delta_d)
+ on conflict(impression_id) do update set sichtungen=public.konto_sichtungen.sichtungen+delta_s,
+   dauer_ms=public.konto_sichtungen.dauer_ms+delta_d;
+ return new;
+end $$;
+revoke execute on function public.konto_sichtung_messen() from public,anon,authenticated;
+drop trigger if exists konto_sichtung_messen on public.post_impressions;
+create trigger konto_sichtung_messen after insert or update on public.post_impressions
+for each row execute function public.konto_sichtung_messen();
+-- Zähler/Bezüge ausschließlich vom Trigger; direkte DML zusätzlich zu RLS widerrufen.
+drop trigger if exists spalten_fest on public.konto_sichtungen;
+create trigger spalten_fest before update on public.konto_sichtungen for each row
+execute function public.spalten_fest('impression_id','post_id','zuschauer','tag','folgt','land','sichtungen','dauer_ms');
+
+-- Netto-Interaktionen ausschließlich ab Messbeginn, mit Serverzeit.
+-- Alte created_at-Werte (teils vom Client setzbar) werden nicht als Verlauf ausgegeben.
+create table if not exists public.konto_interaktionen (
+ art text not null, schluessel text not null,
+ post_id uuid not null references public.posts(id) on delete cascade,
+ akteur uuid not null references public.profiles(id) on delete cascade,
+ zeitpunkt timestamptz not null default now(), primary key(art,schluessel)
+);
+create index if not exists konto_interaktionen_post_zeit on public.konto_interaktionen(post_id,zeitpunkt);
+alter table public.konto_interaktionen enable row level security;
+revoke all on public.konto_interaktionen from public,anon,authenticated;
+drop policy if exists nur_freigegebene on public.konto_interaktionen;
+create policy nur_freigegebene on public.konto_interaktionen as restrictive for all to authenticated
+using((select public.konto_freigegeben())) with check((select public.konto_freigegeben()));
+drop trigger if exists spalten_fest on public.konto_interaktionen;
+create trigger spalten_fest before update on public.konto_interaktionen for each row
+execute function public.spalten_fest('art','schluessel','post_id','akteur','zeitpunkt');
+create or replace function public.konto_interaktion_messen() returns trigger
+language plpgsql security definer set search_path=public as $$
+declare alt jsonb;neu jsonb;k text;
+begin
+ if tg_op<>'INSERT' then
+  alt:=to_jsonb(old);k:=coalesce(alt->>'id',(alt->>'post_id')||':'||(alt->>'user_id'));
+  delete from public.konto_interaktionen where art=tg_table_name and schluessel=k;
+ end if;
+ if tg_op<>'DELETE' then
+  neu:=to_jsonb(new);k:=coalesce(neu->>'id',(neu->>'post_id')||':'||(neu->>'user_id'));
+  insert into public.konto_interaktionen(art,schluessel,post_id,akteur)
+  select tg_table_name,k,(neu->>'post_id')::uuid,(neu->>'user_id')::uuid
+  where exists(select 1 from public.posts p where p.id=(neu->>'post_id')::uuid and p.user_id<>(neu->>'user_id')::uuid)
+  on conflict(art,schluessel) do nothing;
+ end if;
+ return null;
+end $$;
+revoke execute on function public.konto_interaktion_messen() from public,anon,authenticated;
+do $$ declare t text;begin
+ foreach t in array array['post_likes','comments','saves','reposts'] loop
+ execute format('drop trigger if exists konto_interaktion_messen on public.%I',t);
+ execute format('create trigger konto_interaktion_messen after insert or delete or update of post_id,user_id on public.%I for each row execute function public.konto_interaktion_messen()',t);
+ end loop;
+end $$;
+
+create or replace function public.meine_kontoanalysen() returns jsonb
+language plpgsql stable security definer set search_path=public as $$
+declare ich uuid:=auth.uid(); tage int; ab date; fenster jsonb:='[]'; z jsonb;
+begin
+ if ich is null or not public.konto_freigegeben() then raise exception 'Konto nicht freigegeben'; end if;
+ foreach tage in array array[7,30] loop
+  ab := (now() at time zone 'utc')::date-(tage-1);
+  with eigen as (select id,title,description from public.posts where user_id=ich),
+  basis as (select s.* from public.konto_sichtungen s join eigen e on e.id=s.post_id where s.tag>=ab),
+  laender as (select land, count(distinct zuschauer) as konten from basis where land is not null group by land having count(distinct zuschauer)>=10),
+  pro_post as (select e.id,coalesce(nullif(e.title,''),nullif(e.description,''),'Beitrag') as titel,
+    coalesce(sum(b.sichtungen),0) as aufrufe,count(distinct b.zuschauer) as reichweite
+    from eigen e left join basis b on b.post_id=e.id group by e.id,e.title,e.description),
+  interaktionen as (
+    select k.akteur from public.konto_interaktionen k join eigen e on e.id=k.post_id
+    where k.zeitpunkt >= (ab::timestamp at time zone 'UTC')
+  )
+  select jsonb_build_object('tage',tage,
+    'reichweite',(select count(distinct zuschauer) from basis),
+    'aufrufe',(select coalesce(sum(sichtungen),0) from basis),
+    'followerAufrufe',(select coalesce(sum(sichtungen),0) from basis where folgt),
+    'nichtFollowerAufrufe',(select coalesce(sum(sichtungen),0) from basis where not folgt),
+    'sichtzeitMs',(select coalesce(sum(dauer_ms),0) from basis),
+    'interaktionen',(select count(*) from interaktionen),
+    'laender',coalesce((select jsonb_agg(jsonb_build_object('land',land,'ab',floor(konten/10.0)*10)) from laender),'[]'),
+    'beitraege',coalesce((select jsonb_agg(to_jsonb(t)) from (select * from pro_post order by aufrufe desc,id limit 100) t),'[]')
+  ) into z;
+  fenster:=fenster||jsonb_build_array(z);
+ end loop;
+ return jsonb_build_object('seit',(select seit from public.konto_analysen_start where id), 'mindestzahl',10,'zeitraeume',fenster);
+end $$;
+revoke execute on function public.meine_kontoanalysen() from public,anon;
+grant execute on function public.meine_kontoanalysen() to authenticated;
+
+-- ------------------------------------------------------------ Nachweis --
+do $$
+declare t text;
+begin
+  foreach t in array array['konto_analysen_start','konto_sichtungen','konto_interaktionen'] loop
+    if has_table_privilege('authenticated','public.'||t,'select')
+       or has_table_privilege('authenticated','public.'||t,'insert')
+       or has_table_privilege('anon','public.'||t,'select') then
+      raise exception 'Schema 130: % direkt zugreifbar', t;
+    end if;
+  end loop;
+  if has_function_privilege('anon','public.meine_kontoanalysen()','execute') then
+    raise exception 'Schema 130: anon darf meine_kontoanalysen';
+  end if;
+  if has_function_privilege('authenticated','public.konto_sichtung_messen()','execute')
+     or has_function_privilege('authenticated','public.konto_interaktion_messen()','execute')
+     or has_function_privilege('authenticated','public.analyse_vorwahlland(text)','execute') then
+    raise exception 'Schema 130: Hilfsfunktion direkt aufrufbar';
+  end if;
+  if position('beitrag_lesbar(' in pg_get_functiondef('public.impression_vermerken(uuid,integer,text)'::regprocedure)) = 0 then
+    raise exception 'Schema 130: impression_vermerken ohne beitrag_lesbar (122 überschrieben?)';
+  end if;
+end $$;

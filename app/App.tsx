@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useContext, useRef, useState } from 'react';
-import { Modal, StatusBar, StyleSheet, View } from 'react-native';
+import { AppState, Modal, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext, AuthProvider } from './contexts/AuthContext';
 import { ThemeContext, ThemeProvider } from './contexts/ThemeContext';
@@ -20,12 +20,15 @@ import { profilOeffnerSetzen } from './lib/markierung';
 import { NewGroupSheet } from './components/NewGroupSheet';
 import { TeilenBereich, TeilenSheet, TeilenZiel } from './components/TeilenSheet';
 import { useAktionen } from './lib/useAktionen';
-import { kommentarOrt, ladeEinstellungen } from './lib/daten';
+import { kommentarOrt, ladeCommunityZuUnterthema, ladeEinstellungen, ladeMitteilungen } from './lib/daten';
 import { KontoWechsel } from './components/KontoWechsel';
 import { KontoFreigabe } from './components/KontoFreigabe';
 import { NeueBedingungen } from './components/NeueBedingungen';
 import { TabBar } from './components/TabBar';
 import { INSEL_ABSTAND, INSEL_HOEHE, TopSwitcher } from './components/TopSwitcher';
+import { KarussellEditor } from './components/KarussellEditor';
+import type { Medium } from '../gemeinsam/karussell';
+import { UploadAnzeige } from './components/UploadAnzeige';
 import { Toast } from './components/Toast';
 import { CaptchaHost } from './components/CaptchaHost';
 import { BildschirmzeitSperre } from './components/BildschirmzeitSperre';
@@ -86,7 +89,7 @@ const ChatAbgleich = require('../gemeinsam/chatabgleich') as typeof import('../g
 const Beitritt = require('../gemeinsam/beitritt') as typeof import('../gemeinsam/beitritt');
 
 type Overlay =
-  | { kind: 'chat'; chat: Chat; extra?: Message[] }
+  | { kind: 'chat'; chat: Chat; extra?: Message[]; kanalCommunity?: Community }
   /**
    * `liste`: durch welche Storys geblättert wird. Aus der Leiste ist es die
    * ganze Leiste, von einem Ring am Profilbild nur diese Person (Kasten 11.1).
@@ -203,6 +206,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
 
   // Jeder Bereich merkt sich seinen zuletzt offenen Unterpunkt — genau wie im
   // Prototyp, wo die obere Leiste zum Bereich gehoert.
+  const [instantSprung, setInstantSprung] = useState(0);
+  useEffect(() => setInstantSprung(0), [user?.id]);
   const [area, setArea] = useState<AreaKey>(rueckkehr?.area ?? 'messenger');
   const [subs, setSubs] = useState<Record<AreaKey, SubKey>>(() =>
     rueckkehr ? { ...defaultSub, [rueckkehr.area]: rueckkehr.sub } : defaultSub
@@ -305,6 +310,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
   // Bereich - Videos oder Communitys. Beide haben eigene Mitteilungen und ein
   // eigenes Erstellen-Menue, so wie im Prototyp.
   const [profilBereich, setProfilBereich] = useState<MitteilungsBereich>('videos');
+  const [karussellStart,setKarussellStart]=useState<Medium[]|null>(null);
   const [formular, setFormular] = useState<Formular | null>(null);
   // Kästen 28/10.2 und 16: Community bzw. Unterthema erstellen (eigene Seite).
   const [erstellen, setErstellen] = useState<
@@ -321,6 +327,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * sobald er dort ist; sonst spraenge er bei jedem Neubau zurueck.
    */
   const [startBeitrag, setStartBeitrag] = useState<string | null>(null);
+  const [einzelZiel,setEinzelZiel]=useState<string|null>(null);
   // Nachtrag 4.3: Kommentar aus einer Mitteilung — das Blatt öffnet sich dort.
   const [startKommentar, setStartKommentar] = useState<{ beitrag: string; kommentar: string } | null>(null);
   const { supabase: sbClient } = useSupabase();
@@ -335,7 +342,61 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
   const profil = useProfil();
 
   const sub = subs[area];
-  const setSub = (next: SubKey) => setSubs((prev) => ({ ...prev, [area]: next }));
+  const { pttMitteilungenErgaenzen, communityMerken } = profil;
+  const profilCommunities = useRef(profil.communities);
+  profilCommunities.current = profil.communities;
+  const eigenId = user?.id;
+  const aktuelleAnmeldung = useRef(eigenId);
+  aktuelleAnmeldung.current = eigenId;
+  const pttGlockeSichtbar = area === 'communities' && sub === 'profile' && !overlay
+    && (!sheet || sheet === 'mitteilungen');
+
+  // Die Live-Datenbank veröffentlicht keine Realtime-Ereignisse für Mitteilungen.
+  // Nur die sichtbare Community-Glocke fragt nach neuen PTT-Einladungen.
+  useEffect(() => {
+    if (!pttGlockeSichtbar || !sbClient || !eigenId) return;
+    let aktiv = true;
+    let laeuft = false;
+    let seit: string | undefined;
+    const kanalIds = new Set(profilCommunities.current.flatMap((c) => (c.unterthemen ?? []).map((u) => u.id)));
+    const laden = async () => {
+      if (laeuft || AppState.currentState !== 'active') return;
+      laeuft = true;
+      try {
+        const liste = await ladeMitteilungen(sbClient, eigenId, { seit });
+        if (!aktiv) return;
+        for (const { ziel } of liste) {
+          if (ziel.art !== 'channel' || kanalIds.has(ziel.id)) continue;
+          const community = await ladeCommunityZuUnterthema(sbClient, eigenId, ziel.id);
+          if (!aktiv) return;
+          kanalIds.add(ziel.id);
+          if (community) {
+            for (const u of community.unterthemen ?? []) kanalIds.add(u.id);
+            communityMerken(community, true);
+          }
+        }
+        // Kurze Überlappung für gleichzeitig abgeschlossene Schreibvorgänge.
+        if (liste[0]?.zeitpunkt) seit = new Date(Date.parse(liste[0].zeitpunkt) - 30000).toISOString();
+        pttMitteilungenErgaenzen(liste);
+      } catch (e: any) {
+        if (aktiv) console.warn('PTT-Mitteilungen nachladen fehlgeschlagen:', e?.message ?? e);
+      } finally {
+        laeuft = false;
+      }
+    };
+    void laden();
+    const uhr = setInterval(laden, 5000);
+    const horcher = AppState.addEventListener('change', (z) => {
+      if (z === 'active') void laden();
+    });
+    return () => {
+      aktiv = false;
+      clearInterval(uhr);
+      horcher.remove();
+    };
+  }, [pttGlockeSichtbar, sbClient, eigenId, pttMitteilungenErgaenzen, communityMerken]);
+
+  const setSub = (next: SubKey) => {setEinzelZiel(null);setStartBeitrag(null);setSubs((prev) => ({ ...prev, [area]: next }));};
 
   /*
    * Bereichswechsel unten: jeder Bereich faengt auf seiner Hauptseite an.
@@ -347,6 +408,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * mit unterer Leiste.
    */
   const wechsleBereich = (next: AreaKey) => {
+    setEinzelZiel(null);setStartBeitrag(null);
     // Untere Leiste verlässt das Video-Profil (oder den Beitrag daraus): Reiter zurück.
     if (area === 'videos' && (subs.videos === 'profile' || profilBeitragOffen.current)) profilVerlassen();
     setArea(next);
@@ -647,8 +709,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     chatId ? [...(extraNachrichten[chatId] ?? [])] : [];
 
   /** Chat oeffnen und dabei alles mitgeben, was frueher hineingeteilt wurde. */
-  const oeffneChat = (chat: Chat, zusatz?: Message[]) =>
-    setOverlay({ kind: 'chat', chat, extra: [...(extraNachrichten[chat.id] ?? []), ...(zusatz ?? [])] });
+  const oeffneChat = (chat: Chat, zusatz?: Message[], kanalCommunity?: Community) =>
+    setOverlay({ kind: 'chat', chat, extra: [...(extraNachrichten[chat.id] ?? []), ...(zusatz ?? [])], kanalCommunity });
 
   /**
    * Einen Chat mit dieser Person öffnen — und ihn dabei wirklich anlegen.
@@ -1371,7 +1433,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       preview: unterthema.themen.join(' · '),
       time: '',
       unreadCount: 0,
-    });
+    }, undefined, community);
 
   /* ---------------- Glocke, Plus und Menü im eigenen Profil -------------- */
   /*
@@ -1462,6 +1524,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * bei einer Mitteilung. Vorher gaben alle drei nur einen Hinweistext aus.
    */
   const eintragOeffnen = (art: 'reel' | 'clip' | 'beitrag', id: string) => {
+    setEinzelZiel(id);
     if (art === 'clip') return setOverlay({ kind: 'clip', clipId: id });
     setOverlay(null);
     setArea('videos');
@@ -1482,14 +1545,19 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * Wohin es geht, entscheidet `kind` aus der Datenbank, nicht der Reiter:
    * unter „Reposts" steht ebenso gut ein Querformat-Video wie ein Bild.
    */
-  const kachelOeffnen = (kachel: { id: string; kind?: string }) => {
+  const kachelOeffnen = async (kachel: { id: string; kind?: string;art?:string;eigen?:boolean }) => {
+    const lokal=kachel.eigen && /^[pvq]_\d+$/.test(kachel.id) && [...profil.eigeneBeitraege,...profil.eigeneVideos,...profil.clips].some(p=>p.id===kachel.id);
+    try{if(!lokal && !(await daten.beitragNachladen(kachel.id))){setNotice('Dieser Beitrag ist nicht verfügbar.');return;}}
+    catch{setNotice('Dieser Beitrag konnte nicht geladen werden.');return;}
     // `posts.kind` kennt genau drei Werte (Schema: post, reel, clip).
-    const art = kachel.kind === 'clip' ? 'clip' : kachel.kind === 'reel' ? 'reel' : 'beitrag';
+    const kind=kachel.art||kachel.kind;
+    const art = kind === 'clip' ? 'clip' : kind === 'reel' ? 'reel' : 'beitrag';
     eintragOeffnen(art, kachel.id);
   };
 
   /** Eine Mitteilung fuehrt dorthin, wo sie herkommt. */
   const mitteilungOeffnen = (ziel: MitteilungsZiel, text = '') => {
+    if (ziel.art === 'instant') { setArea('messenger'); setSubs((p) => ({ ...p, messenger: 'chats' })); setInstantSprung((v) => v + 1); return; }
     /*
      * Kasten RS 3: Rechtsmitteilung (Schema 102). Wer betroffen ist, bekommt
      * den Hinweis auf den Kontostatus, wer gemeldet hat, auf „Meine Meldungen“ —
@@ -1523,7 +1591,19 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     if (ziel.art === 'channel') {
       const com = daten.communities.find((c) => (c.unterthemen ?? []).some((u) => u.id === ziel.id));
       const ut = com?.unterthemen?.find((u) => u.id === ziel.id);
-      return com && ut ? oeffneUnterthema(com, ut) : setNotice('Dieses Unterthema gibt es nicht mehr');
+      if (com && ut) return oeffneUnterthema(com, ut);
+      if (!sbClient || !eigenId) return setNotice('Dieses Unterthema gibt es nicht mehr');
+      return void ladeCommunityZuUnterthema(sbClient, eigenId, ziel.id)
+        .then((community) => {
+          if (aktuelleAnmeldung.current !== eigenId) return;
+          const unterthema = community?.unterthemen?.find((u) => u.id === ziel.id);
+          if (!community || !unterthema) return setNotice('Dieses Unterthema gibt es nicht mehr');
+          communityMerken(community, true);
+          oeffneUnterthema(community, unterthema);
+        })
+        .catch(() => {
+          if (aktuelleAnmeldung.current === eigenId) setNotice('Das Unterthema ließ sich nicht öffnen');
+        });
     }
     if (ziel.art === 'community') {
       const community = profil.communities.find((c) => c.id === ziel.id);
@@ -1709,7 +1789,14 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
    * Steht getrennt von `erstelle`, weil es zwei Wege hierher gibt: das
    * Erstellen-Menü und die Kamera, die ihre Aufnahme hierher weiterreicht.
    */
-  const beitragBeschreiben = (punkt: 'post' | 'reels' | 'landscape', uri: string) => {
+  const beitragBeschreiben = (punkt: 'post' | 'reels' | 'landscape', uri: string, sekunden?: number, medien?:Medium[]) => {
+    if (punkt === 'post' && !medien) {
+      // Gegenprüfung R1: auch im Beitragsmodus kann die Kamera ein Video liefern.
+      const video = sekunden != null || /\.(mp4|mov|m4v|webm)(\?|$)/i.test(uri);
+      const mime = !video ? undefined : /\.mov(\?|$)/i.test(uri) ? 'video/quicktime' : /\.webm(\?|$)/i.test(uri) ? 'video/webm' : 'video/mp4';
+      setKarussellStart([{ url: uri, typ: video ? 'video' : 'image', ...(mime ? { mime } : {}), ...(sekunden != null ? { sekunden } : {}) }]);
+      return;
+    }
     const istBild = punkt === 'post';
     const quer = punkt === 'landscape';
     setFormular({
@@ -1770,6 +1857,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
             musik: music,
             soundAb,
             mediaUrl: uri,
+            medien,
+            sekunden,
             art: istBild ? 'post' : quer ? 'clip' : 'reel',
             geplantAb: spaeter,
           });
@@ -1778,8 +1867,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           return null;
         }
 
-        if (istBild) await profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri, music, soundAb });
-        else await profil.videoAnlegen({ beschreibung, ort, quer, mediaUri: uri, music, soundAb });
+        if (istBild) await profil.beitragAnlegen({ beschreibung, ort, mediaUri: uri, medien, music, soundAb });
+        else await profil.videoAnlegen({ beschreibung, ort, quer, mediaUri: uri, music, soundAb, sekunden });
 
         // Gleich dorthin, wo das Neue jetzt steht.
         setArea('videos');
@@ -1847,6 +1936,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       <ChatDetailScreen
         chat={overlay.chat}
         extraMessages={overlay.extra}
+        geoeffneteKanalCommunity={overlay.kanalCommunity}
         onBack={() => {
           setOverlay(null);
           // Kasten 27: die Liste zeigt danach die letzte Nachricht dieses
@@ -1860,7 +1950,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
            * Community-Zweierchat (vorher landete er im Messenger-Chat mit
            * derselben Person) und im Unterthema (vorher gar nicht).
            */
-          const kanal = daten.communities.some((c) =>
+          const kanal = Boolean(overlay.kanalCommunity) || daten.communities.some((c) =>
             (c.unterthemen ?? []).some((u) => u.id === overlay.chat.id)
           );
           const ort = kanal ? { kanalId: overlay.chat.id } : { chatId: overlay.chat.id };
@@ -2129,13 +2219,14 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           zielChat
             ? (uri) => aufnahmeInChat(zielChat, uri)
             : zielBeitrag
-              ? (uri) => {
+              ? (uri, sekunden) => {
                   setOverlay(null);
-                  beitragBeschreiben(zielBeitrag, uri);
+                  beitragBeschreiben(zielBeitrag, uri, sekunden);
                 }
               : undefined
         }
         // Ein Reel und ein Querformat-Video sind Videos, ein Beitrag ist ein Bild.
+        zielVideo={!!zielBeitrag && zielBeitrag !== 'post'}
         startModus={zielBeitrag && zielBeitrag !== 'post' ? 'video' : undefined}
         zielStory={overlay.zielStory}
         onClose={() => setOverlay(null)}
@@ -2417,6 +2508,8 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
       }
       return (
         <ChatListScreen
+          instantSprung={instantSprung}
+          onInstantSprungFertig={sprung => setInstantSprung(v => v === sprung ? 0 : v)}
           allChats={chats}
           stories={stories}
           onOpenChat={(chat) => oeffneChat(chat)}
@@ -2435,6 +2528,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
             onOpenProfile={openPublicProfile}
             onShare={teileVideo}
             startBei={startBeitrag}
+            einzelZiel={einzelZiel}
             onStartErreicht={() => setStartBeitrag(null)}
             startKommentar={startKommentar}
             onNotice={setNotice}
@@ -2487,6 +2581,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           onOpenProfile={openPublicProfile}
           onShare={teileBeitrag}
           startBei={startBeitrag}
+            einzelZiel={einzelZiel}
           onStartErreicht={() => setStartBeitrag(null)}
           startKommentar={startKommentar}
           onNotice={setNotice}
@@ -2826,6 +2921,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
     if (overlay?.kind === 'chat' || overlay?.kind === 'gruppe') {
       const id = overlay.chat.id;
       return !(
+        (overlay.kind === 'chat' && overlay.kanalCommunity) ||
         daten.communityChats.some((c) => c.id === id) ||
         daten.communities.some((c) => c.id === id || (c.unterthemen ?? []).some((u) => u.id === id))
       );
@@ -2861,6 +2957,7 @@ const Shell = ({ setNotice }: { setNotice: (text: string | null) => void }) => {
           unten={formular.unten}
         />
       )}
+      {karussellStart && <KarussellEditor start={karussellStart} onClose={() => setKarussellStart(null)} onFertig={(m) => { setKarussellStart(null); beitragBeschreiben('post', m[0].url, undefined, m); }} />}
 
       {/*
        * Kästen 28/10.2 und 16: die Erstellen-Seite liegt in einem eigenen
@@ -2987,6 +3084,7 @@ const App = () => (
       Themenwechsel neu auf, und das soll wirklich alles betreffen.
     */}
     <ThemeProvider>
+      <UploadAnzeige />
       <SupabaseProvider>
         <AuthProvider>
           {/*

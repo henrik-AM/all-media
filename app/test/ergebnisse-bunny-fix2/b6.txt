@@ -1,0 +1,9 @@
+Beitrag anlegen fehlgeschlagen: Die Medienliste ist ungültig.
+OK 1 Ungültige Liste auf App/Server verständlich abgewiesen: "abc"
+Beitrag anlegen fehlgeschlagen: Eine Aufnahme ist ungültig.
+OK 2 Ungültige Liste auf App/Server verständlich abgewiesen: [null]
+Beitrag anlegen fehlgeschlagen: Die Medienliste ist ungültig.
+OK 3 Ungültige Liste auf App/Server verständlich abgewiesen: null
+Beitrag anlegen fehlgeschlagen: Eine Aufnahme ist ungültig.
+OK 4 Ungültige Liste auf App/Server verständlich abgewiesen: [{"url":"x","typ":"audio"}]
+4/4 Prüfungen bestanden

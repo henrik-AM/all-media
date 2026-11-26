@@ -1,0 +1,85 @@
+b1: erwartetes ROT
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+true !== false
+
+    at /Users/henrik.dikta/allmedia-wt/paket9/app/test/af-fix-b1.js:10:98
+    at async test (/Users/henrik.dikta/allmedia-wt/paket9/app/test/af-fix-b1.js:4:37)
+    at async /Users/henrik.dikta/allmedia-wt/paket9/app/test/af-fix-b1.js:10:2 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: true,
+  expected: false,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+b3: erwartetes ROT
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+0 !== 1
+
+    at /Users/henrik.dikta/allmedia-wt/paket9/app/test/af-fix-b3.js:4:9 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 0,
+  expected: 1,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+b4: erwartetes ROT
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'Der Repost'
+- 'Die Negativreaktion'
+
+    at /Users/henrik.dikta/allmedia-wt/paket9/app/test/af-fix-b4.js:8:67 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'Der Repost',
+  expected: 'Die Negativreaktion',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+b5: erwartetes ROT
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+2 !== 1
+
+    at /Users/henrik.dikta/allmedia-wt/paket9/app/test/af-fix-b5.js:14:218
+    at async test (/Users/henrik.dikta/allmedia-wt/paket9/app/test/af-fix-b5.js:12:37)
+    at async /Users/henrik.dikta/allmedia-wt/paket9/app/test/af-fix-b5.js:14:2 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 2,
+  expected: 1,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+b7: erwartetes ROT
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(!t.includes('bearbeiten · 0'))
+
+    at /Users/henrik.dikta/allmedia-wt/paket9/app/test/af-fix-b7.js:9:159
+    at test (/Users/henrik.dikta/allmedia-wt/paket9/app/test/af-fix-b7.js:2:129)
+    at /Users/henrik.dikta/allmedia-wt/paket9/app/test/af-fix-b7.js:9:8
+    at Object.<anonymous> (/Users/henrik.dikta/allmedia-wt/paket9/app/test/af-fix-b7.js:17:3)
+    at Module._compile (node:internal/modules/cjs/loader:1872:14)
+    at Object..js (node:internal/modules/cjs/loader:2003:10)
+    at Module.load (node:internal/modules/cjs/loader:1594:32)
+    at Module._load (node:internal/modules/cjs/loader:1396:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+

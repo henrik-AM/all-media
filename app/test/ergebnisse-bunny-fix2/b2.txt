@@ -1,0 +1,17 @@
+OK 1 App Feed/Einzelbeitrag mit Schema113=false
+OK 2 Website Feed/Einzelbeitrag mit Schema113=false
+OK 3 App Profilraster mit Schema113=false
+OK 4 Einzelmedium post auf App/Website mit Schema113=false
+OK 5 Einzelmedium reel auf App/Website mit Schema113=false
+OK 6 Einzelmedium clip auf App/Website mit Schema113=false
+OK 7 App Feed/Einzelbeitrag mit Schema113=true
+OK 8 Website Feed/Einzelbeitrag mit Schema113=true
+OK 9 App Profilraster mit Schema113=true
+OK 10 Einzelmedium post auf App/Website mit Schema113=true
+OK 11 Einzelmedium reel auf App/Website mit Schema113=true
+OK 12 Einzelmedium clip auf App/Website mit Schema113=true
+Beitrag anlegen fehlgeschlagen: Hier ist derzeit nur eine Aufnahme je Beitrag möglich. Bitte die übrigen entfernen und erneut versuchen.
+OK 13 Mehrere Aufnahmen ohne Schema werden ausdrücklich abgelehnt, kein stiller Verlust
+OK 14 Andere DB-Fehler werden niemals durch einen zweiten Insert verdeckt
+OK 15 PostgREST-Schemacachefehler wird gezielt erkannt, andere fehlende Spalten nicht
+15/15 Prüfungen bestanden

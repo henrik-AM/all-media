@@ -1,0 +1,4 @@
+OK B12_GIN_Index_mit_jsonb_path_ops
+OK B12_OR_Abfrage_kann_GIN_und_Altindex_kombinieren
+2/2 Rollenprüfungen, verworfen
+Rollback-Kontrolle 1/1

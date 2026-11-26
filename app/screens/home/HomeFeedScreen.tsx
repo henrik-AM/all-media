@@ -1,3 +1,4 @@
+const Einzelbeitrag = require('../../../gemeinsam/einzelbeitrag') as typeof import('../../../gemeinsam/einzelbeitrag');
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Druck } from '../../components/Druck';
@@ -7,6 +8,7 @@ import { Avatar } from '../../components/Avatar';
 import { StoryAvatar } from '../../components/StoryAvatar';
 import { CommentSheet } from '../../components/CommentSheet';
 import { BeitragOptionenSheet, OptionenBeitrag } from '../../components/BeitragOptionenSheet';
+import { Karussell } from '../../components/Karussell';
 import { Motiv } from '../../components/Motiv';
 import { StoryRail } from '../../components/StoryRail';
 import { PersonenVorschlaege } from '../../components/PersonenVorschlaege';
@@ -45,6 +47,7 @@ interface Props {
    * Stelle anfangen.
    */
   startBei?: string | null;
+  einzelZiel?: string | null;
   /** Nachtrag 4.3: Kommentar aus einer Mitteilung — Blatt öffnet sich dort. */
   startKommentar?: { beitrag: string; kommentar: string } | null;
   /** Wird gerufen, sobald dorthin gesprungen wurde — einmal, nicht bei jedem Neubau. */
@@ -60,6 +63,7 @@ export const HomeFeedScreen = ({
   onOpenProfile,
   onShare,
   startBei,
+  einzelZiel,
   startKommentar,
   onStartErreicht,
   onNotice,
@@ -72,6 +76,11 @@ export const HomeFeedScreen = ({
   const aktion = useAktionen(onNotice);
   // Und was gesehen wird, ebenfalls — siehe lib/useImpressionen.ts.
   const { sichtbarWechsel, sichtbarkeit } = useImpressionen('feed');
+  const [sichtbareMedien,setSichtbareMedien]=useState<Set<string>>(new Set());
+  const wechselRef=useRef(sichtbarWechsel);wechselRef.current=sichtbarWechsel;
+  const medienSichtbarWechsel=useRef((info:Parameters<typeof sichtbarWechsel>[0])=>{
+    wechselRef.current(info);setSichtbareMedien(new Set(info.viewableItems.filter(v=>v.isViewable).map(v=>v.item.id)));
+  }).current;
   // Eigene Beitraege stehen oben - sie kommen aus dem gemeinsamen Zustand,
   // damit sie auch im Profilraster auftauchen.
   const { eigeneBeitraege, folgtPerson, folgenUmschalten } = useProfil();
@@ -116,8 +125,8 @@ export const HomeFeedScreen = ({
    * Feed - ausser man kommt ueber genau diesen Beitrag aus dem Profil.
    */
   const sichtbarePosts = useMemo(
-    () => posts.filter((p) => p.id === startBei || !keinInteresse.includes(p.id)),
-    [posts, keinInteresse, startBei]
+    () => posts.filter((p) => Einzelbeitrag.imFeed(p,einzelZiel||startBei,keinInteresse)),
+    [posts, keinInteresse, startBei, einzelZiel]
   );
 
   useEffect(() => {
@@ -346,7 +355,7 @@ export const HomeFeedScreen = ({
           />
         ) : (
         <Pressable style={styles.media} onPress={() => bildGetippt(item)}>
-          {item.mediaUri ? (
+          {item.medien?.length ? <Karussell beitrag={item} sichtbar={sichtbareMedien.has(item.id)}/> : item.mediaUri ? (
             <Image source={{ uri: item.mediaUri }} style={styles.mediaBild} />
           ) : (
             <Motiv id={item.id} bild={item.standbild ?? item.mediaUri} icon="image-outline" iconSize={38} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
@@ -467,7 +476,7 @@ export const HomeFeedScreen = ({
          * spaeteren Feed-Rankings. Sichtbar heisst hier 60 Prozent der
          * Flaeche und mindestens eine Sekunde; siehe lib/impressionen.ts.
          */
-        onViewableItemsChanged={sichtbarWechsel}
+        onViewableItemsChanged={medienSichtbarWechsel}
         viewabilityConfig={sichtbarkeit}
       />
 

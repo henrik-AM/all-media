@@ -42,7 +42,7 @@ const Beitritt = require('../../gemeinsam/beitritt');
 // Kästen 28/10.2 und 16: Community und Unterthema erstellen, Einladung (Schema 99).
 const Erstellen = require('../../gemeinsam/erstellen');
 const syncHandlers = require('./sync-handlers');
-const { signiereMedien, hochladen, hochladenVideo } = require('./medien');
+const { signiereMedien, signiereMeldebeleg, hochladen, hochladenVideo } = require('./medien');
 const StoryRegeln = require('../../gemeinsam/story');
 // Medienadressen nur vom eigenen Projekt (Schema 118, Codex-Review 05.11.2026).
 const MedienAdresse = require('../../gemeinsam/medienadresse');
@@ -246,7 +246,7 @@ app.use(
     handler: (req, res, _next, optionen) => {
       console.warn(
         `[Bremse] ${new Date().toISOString()} — ${req.ip} hat mehr als ` +
-          `${optionen.max} Anfragen in einer Minute gestellt (${req.method} ${req.originalUrl})`
+          `${optionen.max} Anfragen in einer Minute gestellt (${req.method} /api)`
       );
       res.status(optionen.statusCode).json(optionen.message);
     },
@@ -309,6 +309,43 @@ app.use('/api', async (req, _res, next) => {
   }
   next();
 });
+
+// Lesende POSTs: zählen nicht als Schreibaktion (Codex-Gegenprüfung Runde 1/2).
+const LESENDE_POSTS = /^\/(medien\/unterschreiben|messages\/[0-9a-f-]{36}\/stand)$/i;
+
+/*
+ * Zweite Bremse: je KONTO, nur für schreibende Anfragen (Paket 8; Entwurf
+ * Sicherheitsprüfung 17.10.2026).
+ *
+ * Die Bremse oben zählt je Anschluss. Wer ein Konto über mehrere Anschlüsse
+ * steuert, kam an ihr vorbei — und jede schreibende Aktion löst Arbeit und
+ * Egress in Supabase aus, deren Kontingent am 10.10. das ganze Projekt
+ * gesperrt hat. 150 je Minute ist weit mehr, als ein Mensch tippt.
+ * Protokolliert wird das Konto, nie die Adresse (Einladungscodes, A09-001).
+ */
+app.use(
+  '/api',
+  rateLimit({
+    windowMs: 60 * 1000,
+    // Dieselbe Grenze wie je Anschluss: ein Konto bekommt über viele
+    // Anschlüsse nicht mehr als über einen. Lesende POSTs (Unterschreiben)
+    // zählen nicht — sonst brach Teilen an viele Empfänger mit 429 ab
+    // (Codex-Gegenprüfung Paket 8).
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => !req.nutzerId || ['GET', 'HEAD', 'OPTIONS'].includes(req.method) || LESENDE_POSTS.test(req.path),
+    keyGenerator: (req) => `konto:${req.nutzerId}`,
+    message: { ok: false, error: 'Zu viele Aktionen. Bitte kurz warten.' },
+    handler: (req, res, _next, optionen) => {
+      console.warn(
+        `[Bremse] ${new Date().toISOString()} — Konto ${req.nutzerId} hat mehr als ` +
+          `${optionen.max} Aktionen in einer Minute ausgelöst (${req.method} /api)`
+      );
+      res.status(optionen.statusCode).json(optionen.message);
+    },
+  })
+);
 
 // ============================================================================
 // Hilfsmittel
@@ -384,7 +421,8 @@ function route(fn) {
        * vollstaendig; das Verschlucken von Fehlern war ja der urspruengliche
        * Grund fuer diesen Umschlag und bleibt ausgeschlossen.
        */
-      console.error(`${req.method} ${req.path} fehlgeschlagen:`, fehler.message);
+      // Nur die feste Routenschablone: Pfad/Query können Einladungscodes tragen (OWASP A09-001).
+      console.error(`${req.method} ${req.route?.path || '/api'} fehlgeschlagen:`, fehler?.code || 'UNBEKANNT');
       if (!res.headersSent) {
         res.status(500).json({ ok: false, error: 'Das hat nicht geklappt. Bitte noch einmal versuchen.' });
       }
@@ -454,7 +492,7 @@ app.get('/api/zustand', async (req, res) => {
         .select('*', { count: 'exact', head: true });
       ergebnis.supabase.erreichbar = !error;
       ergebnis.supabase.profile = error ? null : count;
-      if (error) ergebnis.supabase.fehler = error.message;
+      if (error) ergebnis.supabase.fehler = syncHandlers.fuerMenschen(error);
 
       const { count: beitraege } = await req.db
         .from('posts')
@@ -462,7 +500,7 @@ app.get('/api/zustand', async (req, res) => {
       ergebnis.supabase.beitraege = beitraege ?? null;
     } catch (fehler) {
       ergebnis.supabase.erreichbar = false;
-      ergebnis.supabase.fehler = fehler.message;
+      ergebnis.supabase.fehler = 'Die Verbindung zur Datenbank ist fehlgeschlagen.';
     }
   } else if (isConfigured()) {
     ergebnis.supabase.erreichbar = null;
@@ -1451,6 +1489,7 @@ app.get('/api/profile/:userId', route(async (req, res) => {
       // Ohne die Adresse zeigt jede Kachel die Ersatzflaeche, auch wenn ein
       // Bild da ist. Bei einem Video steht in mediaUrl eine .mp4 — dann
       // braucht die Kachel das Standbild dazu.
+      medien: b.medien,
       mediaUrl: b.mediaUrl,
       thumbnail: b.thumbnail,
     })),
@@ -1567,6 +1606,12 @@ app.post('/api/vorschlaege/:userId/entfernen', route(async (req) => {
  * /api/insights — dort liegt das Snapchat-Aequivalent, ein voellig anderes
  * Ding mit demselben Namen im Handbuch.
  */
+app.get('/api/kontoanalysen', route(async (req) => {
+  const { data, error } = await req.db.rpc('meine_kontoanalysen');
+  if (error) throw error;
+  return data;
+}));
+
 app.get('/api/statistik', route(async (req) => ({
   ok: true,
   statistik: await supabaseApi.ladeStatistik(req.db, req.nutzerId),
@@ -1705,7 +1750,7 @@ app.post('/api/profile/:userId/aufruf', route(async (req) =>
  */
 app.post('/api/praesenz', route(async (req) => {
   const { error } = await req.db.rpc('hier_bin_ich');
-  return error ? { ok: false, error: error.message } : { ok: true };
+  return error ? { ok: false, error: syncHandlers.fuerMenschen(error) } : { ok: true };
 }));
 
 /*
@@ -1794,7 +1839,7 @@ app.post('/api/lenkung', route(async (req) => {
     },
     { onConflict: 'user_id,art,wert' }
   );
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
   return { ok: true, ...(await supabaseApi.lenkungStand(req.db, req.nutzerId)) };
 }));
 
@@ -1870,9 +1915,8 @@ app.post('/api/moderation/meldungen/:id', route(async (req) => {
 /*
  * Gate 2, Fund 7: das gemeldete Foto/Video hinter einem Klick. Die Adresse
  * wird mit der Sitzung des Moderators unterschrieben und gilt nur fünf
- * Minuten; Supabase gibt sie nur heraus, wenn gemeldetes_medium() ja sagt
- * (offene Meldung, nie Kindesmissbrauch). Klappt das Unterschreiben nicht,
- * geht keine Adresse hinaus.
+ * Minuten. Prüfung und Protokollierung sind an die Meldung gebunden.
+ * Beim Supabase-Speicher greift zusätzlich gemeldetes_medium().
  */
 const MEDIUM_SEKUNDEN = 300;
 app.get('/api/moderation/meldungen/:id/medium', route(async (req) => {
@@ -1882,9 +1926,9 @@ app.get('/api/moderation/meldungen/:id/medium', route(async (req) => {
   // Erst ins Protokoll, dann die Adresse — ohne Eintrag keine Ansicht.
   const vermerk = await syncHandlers.handleMediumVermerken(req.db, req.nutzerId, req.params.id);
   if (!vermerk || vermerk.ok === false || !vermerk.erledigt) return { ok: true, grund: (vermerk && vermerk.grund) || 'medium' };
-  const signiert = await signiereMedien(req.db, { url: r.adresse }, MEDIUM_SEKUNDEN);
-  if (!signiert || !signiert.url || signiert.url === r.adresse) return { ok: true, grund: 'medium' };
-  return { ok: true, url: signiert.url, typ: r.typ, sekunden: MEDIUM_SEKUNDEN };
+  const url = await signiereMeldebeleg(req.db, r.adresse, MEDIUM_SEKUNDEN);
+  if (!url) return { ok: true, grund: 'medium' };
+  return { ok: true, url, typ: r.typ, sekunden: MEDIUM_SEKUNDEN };
 }));
 app.post('/api/moderation/meldungen/:id/nachsenden', route(async (req) => {
   if (!MELDE_ID.test(req.params.id)) return { ok: true, erledigt: false, grund: 'meldung' };
@@ -1982,10 +2026,11 @@ app.post('/api/eigene/profilbild', route(async (req) => {
     .eq('id', req.nutzerId)
     .select('id');
   if (error) {
-    if (['42703', 'PGRST204', '42501'].includes(error.code)) {
+    if (error.code === '42501') return { ok: false, error: syncHandlers.fuerMenschen(error) };
+    if (['42703', 'PGRST204'].includes(error.code)) {
       return { ok: false, error: 'Profilbilder gehen erst, wenn das Datenbank-Update eingespielt ist' };
     }
-    return { ok: false, error: error.message };
+    return { ok: false, error: syncHandlers.fuerMenschen(error) };
   }
   // RLS: ein abgelehntes UPDATE ändert null Zeilen und meldet keinen Fehler.
   if (!data?.length) return { ok: false, error: 'Das Profilbild ließ sich nicht speichern' };
@@ -2014,13 +2059,15 @@ app.post('/api/kontaktbild', route(async (req) => {
       .delete()
       .eq('owner_id', req.nutzerId)
       .eq('kontakt_id', kontaktId);
-    if (error) return { ok: false, error: fehltSchema(error) ? Kontaktbild.FEHLT_SCHEMA : error.message };
+    if (error) return { ok: false, error: fehltSchema(error) ? Kontaktbild.FEHLT_SCHEMA : syncHandlers.fuerMenschen(error) };
     // RLS: ein abgelehntes DELETE meldet Erfolg mit null Zeilen — nachsehen.
-    const { data: rest } = await req.db
+    const { data: rest, error: nachFehler } = await req.db
       .from('kontakt_bilder')
       .select('kontakt_id')
       .eq('owner_id', req.nutzerId)
       .eq('kontakt_id', kontaktId);
+    // Fehlgeschlagene Kontrolle ist kein Erfolg (OWASP 25.10.2026).
+    if (nachFehler) return { ok: false, error: syncHandlers.fuerMenschen(nachFehler) };
     if (rest?.length) return { ok: false, error: Kontaktbild.NICHT_GESPEICHERT };
     return { ok: true, url: null };
   }
@@ -2031,7 +2078,7 @@ app.post('/api/kontaktbild', route(async (req) => {
   if (error) {
     if (fehltSchema(error)) return { ok: false, error: Kontaktbild.FEHLT_SCHEMA };
     if (error.code === '42501') return { ok: false, error: 'Ein eigenes Foto geht nur für Messenger-Kontakte' };
-    return { ok: false, error: error.message };
+    return { ok: false, error: syncHandlers.fuerMenschen(error) };
   }
   if (!data?.length) return { ok: false, error: Kontaktbild.NICHT_GESPEICHERT };
   return { ok: true, url };
@@ -2230,12 +2277,16 @@ const musikAus = (body) => String(body?.music || '').trim() || 'Originalton';
 // Kasten 7.5: ab welcher Sekunde der Beitrag den Sound nutzt (posts.sound_ab, Schema 67).
 const soundAbAus = (body) => SoundStellen.abAus(body?.soundAb, musikAus(body));
 
+app.get('/api/beitraege/:id',route(async req=>{const b=await beitrag(req,req.params.id);return b?{ok:true,beitrag:b}:{ok:false,error:'Dieser Beitrag ist nicht verfügbar.'};}));
+
 app.post('/api/eigene/beitrag', route(async (req) => {
   const beschreibung = String(req.body?.beschreibung || '').trim();
   if (!beschreibung) return { ok: false, error: 'Bitte eine Beschreibung eingeben' };
 
   const e = await syncHandlers.handleCreatePost(req.db, req.nutzerId, {
     art: 'post',
+    mediaUrl: req.body?.mediaUrl,
+    medien: req.body?.medien,
     beschreibung,
     ort: String(req.body?.ort || '').trim(),
     musik: musikAus(req.body),
@@ -2258,6 +2309,10 @@ app.post('/api/eigene/video', route(async (req) => {
   const beschreibung = String(req.body?.beschreibung || '').trim();
   if (!beschreibung) return { ok: false, error: 'Bitte eine Beschreibung eingeben' };
   const quer = req.body?.format === 'quer';
+  // Gegenprüfung R1: ein Video-Beitrag braucht eine hochgeladene Datei.
+  if (!req.body?.mediaUrl) return { ok: false, error: 'Bitte ein Video auswählen.' };
+  const dauerFehler = require('../../gemeinsam/reel').pruefen(req.body?.sekunden);
+  if (dauerFehler) return { ok: false, error: dauerFehler };
 
   const e = await syncHandlers.handleCreatePost(req.db, req.nutzerId, {
     // Querformat ist 'clip', Hochformat 'reel'. Eine eigene Tabelle für
@@ -2268,7 +2323,9 @@ app.post('/api/eigene/video', route(async (req) => {
     ort: String(req.body?.ort || '').trim(),
     musik: musikAus(req.body),
     soundAb: soundAbAus(req.body),
-    dauer: quer ? String(req.body?.dauer || '00:15') : null,
+    dauer: require('../../gemeinsam/reel').zeit(req.body.sekunden),
+    sekunden: req.body.sekunden,
+    mediaUrl: req.body.mediaUrl,
     // „Später posten": ein Zeitpunkt in der Zukunft hält den Beitrag zurück.
     geplantAb: req.body?.geplantAb || null,
     mediaUrl: req.body?.mediaUrl || null,
@@ -2390,6 +2447,11 @@ async function inhaltsAktion(req) {
   if (!vorher) return { fehlt: true };
 
   const handler = {
+    dislike: async () => {
+      const { error } = await req.db.rpc('beitrag_reaktion', { p_post: id, p_art: 'dislike' });
+      if (error) throw error;
+      return { ok: true };
+    },
     like: () => syncHandlers.handleLikeContent(req.db, req.nutzerId, id),
     save: () => syncHandlers.handleSaveContent(req.db, req.nutzerId, id),
     repost: () => syncHandlers.handleRepostContent(req.db, req.nutzerId, id),
@@ -2637,7 +2699,7 @@ app.post('/api/eigene/sammlung/:id/titelbild', route(async (req) => {
     if (error.code === '42703' || error.code === 'PGRST204') {
       return { ok: false, error: 'Titelbilder gehen erst, wenn das Datenbank-Update eingespielt ist' };
     }
-    return { ok: false, error: error.message };
+    return { ok: false, error: syncHandlers.fuerMenschen(error) };
   }
   // RLS: ein abgelehntes UPDATE aendert null Zeilen und meldet keinen Fehler.
   if (!data?.length) return { ok: false, error: 'Diese Sammlung gehört nicht dir' };
@@ -2830,7 +2892,7 @@ app.post('/api/eigene/sammlungsinhalt/:id', route(async (req) => {
     // 42501: Row Level Security — die Sammlung gehört jemand anderem.
     if (error.code === '42501') return { ok: false, error: 'Diese Sammlung gehört nicht dir' };
     // P0001: der Auslöser sammlung_inhalt_pruefen (falsche Gattung).
-    if (error.code === 'P0001') return { ok: false, error: error.message };
+    if (error.code === 'P0001') return { ok: false, error: syncHandlers.fuerMenschen(error) };
     throw error;
   }
   return { ok: true, meldung: 'Hinzugefügt' };
@@ -3127,7 +3189,7 @@ app.post('/api/stories', route(async (req) => {
 app.get('/api/story-markierbar', route(async (req) => {
   const suche = String(req.query?.suche || '').trim().slice(0, 60);
   const { data, error } = await req.db.rpc('story_markierbar', { suche: suche || null });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
   return { ok: true, personen: data || [] };
 }));
 
@@ -3149,7 +3211,7 @@ app.get('/api/markierung/vorschlaege', route(async (req) => {
   const { data, error } = await req.db.rpc('markierung_vorschlaege', {
     p_suche: suche || null, p_chat: chat, p_kanal: kanal,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
   return { ok: true, personen: data || [] };
 }));
 
@@ -3163,7 +3225,7 @@ app.get('/api/markierung/profile', route(async (req) => {
     .from('profiles')
     .select('id, handle, name')
     .in('handle', namen.map((h) => '@' + h));
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
   return { ok: true, profile: data || [] };
 }));
 
@@ -3176,7 +3238,7 @@ app.post('/api/markierungen/melden', route(async (req) => {
   const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(String).filter((k) => UUID.test(k)).slice(0, 20);
   if (!UUID.test(nachricht)) return { ok: false, error: 'Keine Nachricht' };
   const { data, error } = await req.db.rpc('markierungen_melden', { p_nachricht: nachricht, p_ids: ids });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
   return { ok: true, anzahl: Number(data || 0) };
 }));
 
@@ -3205,7 +3267,7 @@ app.post('/api/stories/:id/loeschen', route(async (req) => {
     .eq('id', req.params.id)
     .eq('user_id', req.nutzerId)
     .select('id');
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
   if (!data || data.length === 0) return { ok: false, error: 'Das ist nicht deine Story' };
 
   const listen = await supabaseApi.ladeStorys(req.db, req.nutzerId);
@@ -3234,7 +3296,7 @@ app.get('/api/stories/:id/ansichten', route(async (req) => {
     .select('user_id, viewed_at')
     .eq('story_id', req.params.id)
     .order('viewed_at', { ascending: false });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: syncHandlers.fuerMenschen(error) };
 
   const ids = (data || []).map((z) => z.user_id).filter((id) => id !== req.nutzerId);
   if (ids.length === 0) return { ok: true, seher: [] };
@@ -3689,6 +3751,7 @@ function mitteilungText(m, namen, communityNamen, kanalCommunity = new Map()) {
     beitritt_ok: `${name} hat deine Anfrage für „${community}" angenommen.`,
     // Kasten 28/15.4 (Schema 98) — derselbe Satz wie in der App (ProfilContext).
     freund_anfrage: `${name} möchte mit dir befreundet sein.`,
+    instant: `${name} hat dir ein Instant gesendet.`,
     freund_ok: `Du und ${name} seid jetzt befreundet.`,
     nachricht: `Neue Nachrichten in „${community}".`,
     einladung: `${name} hat dich zu „${community}" eingeladen.`,
@@ -4052,10 +4115,20 @@ app.post('/api/stream/:postId/ende', route(async (req) =>
   )
 ));
 
-app.get('/api/stream/:postId/kommentare', route(async (req) => ({
-  ok: true,
-  kommentare: await supabaseApi.ladeStreamKommentare(req.db, req.params.postId),
-})));
+/*
+ * Mit den Kommentaren kommt die Spendensumme des Streams in Cent — wie
+ * ladeSpendenSumme im LivestreamScreen der App. `donations` sieht nur, wer
+ * Sender oder Empfänger ist (Schema 11): der Host also alle Spenden seines
+ * Streams. Ist sie nicht lesbar, kommen die Kommentare trotzdem (Summe null).
+ */
+app.get('/api/stream/:postId/kommentare', route(async (req) => {
+  const [kommentare, spendenCent] = await Promise.all([
+    supabaseApi.ladeStreamKommentare(req.db, req.params.postId),
+    req.db.from('donations').select('betrag_cent').eq('post_id', req.params.postId)
+      .then(({ data, error }) => (error ? null : (data || []).reduce((s, z) => s + Number(z.betrag_cent || 0), 0)), () => null),
+  ]);
+  return { ok: true, kommentare, spendenCent };
+}));
 
 app.post('/api/stream/:postId/kommentare', route(async (req) =>
   antwort(
@@ -4128,6 +4201,8 @@ app.post('/api/impressionen', route(async (req) =>
  * mit 413; `res.json()` im Browser scheiterte daran, und die Meldung lautete
  * nur „Keine Verbindung". Jetzt steht dort der Grund.
  */
+require("./instants").einhaengen(app,route);
+
 // eslint-disable-next-line no-unused-vars
 app.use((fehler, req, res, next) => {
   if (fehler && (fehler.type === 'entity.too.large' || fehler.status === 413)) {
@@ -4139,7 +4214,7 @@ app.use((fehler, req, res, next) => {
         : 'Die Daten sind zu groß.',
     });
   }
-  console.error(`${req.method} ${req.path} fehlgeschlagen:`, fehler && fehler.message);
+  console.error(`${req.method} ${req.route?.path || '/api'} fehlgeschlagen:`, fehler?.code || 'UNBEKANNT');
   if (res.headersSent) return next(fehler);
   return res.status(fehler && fehler.status ? fehler.status : 500).json({ ok: false, error: 'Das hat nicht geklappt. Bitte noch einmal versuchen.' });
 });

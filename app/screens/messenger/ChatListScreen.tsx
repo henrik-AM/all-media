@@ -1,3 +1,4 @@
+import {InstantsBereich} from '../../components/InstantsBereich';
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { Druck } from '../../components/Druck';
@@ -28,6 +29,8 @@ const mediaIcon = (media?: string) =>
   media === 'image' ? 'image-outline' : media === 'audio' ? 'mic-outline' : null;
 
 interface Props {
+  instantSprung?: number;
+  onInstantSprungFertig?: (sprung: number) => void;
   allChats: Chat[];
   stories: Story[];
   onOpenChat: (chat: Chat) => void;
@@ -45,6 +48,8 @@ interface Props {
 }
 
 export const ChatListScreen = ({
+  instantSprung,
+  onInstantSprungFertig,
   allChats,
   stories,
   onOpenChat,
@@ -59,7 +64,7 @@ export const ChatListScreen = ({
    * hinter dem eingespeicherten Namen. Bis zum 01.09.2026 gab es sie
    * nirgends.
    */
-  const { insightStreaks, insights, neuLaden } = useDaten();
+  const { ichId, insightStreaks, insights, neuLaden } = useDaten();
   /*
    * „Vorschau anzeigen" aus den Einstellungen. Der Schalter stand seit Anfang
    * an in der Liste und wurde gespeichert, ohne dass ihn jemals etwas gelesen
@@ -221,6 +226,7 @@ export const ChatListScreen = ({
     <View style={styles.container}>
       {/* Reihenfolge wie im Prototyp: Story-Leiste, Suche, Filter, Liste. */}
       <StoryRail stories={stories} onPress={onOpenStory} />
+      <InstantsBereich key={ichId} sprung={instantSprung} onSprungFertig={onInstantSprungFertig}/>
 
       <View style={styles.header}>
         <SearchBar
