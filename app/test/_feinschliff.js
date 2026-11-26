@@ -163,28 +163,13 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
   });
 
   await pruefe('Ein Profilbild ohne Story führt zum Profil statt zu einem Hinweis', async () => {
-    // Eine Person ohne Story suchen und ihren Ring antippen.
-    const ohneStory = await page.evaluate(() => {
-      const ringe = [...document.querySelectorAll('[data-story-user]')];
-      const treffer = ringe.find((r) => !window.state?.stories?.some((s) => s.userId === r.dataset.storyUser));
-      return treffer ? treffer.dataset.storyUser : ringe[0]?.dataset.storyUser;
-    });
-    if (!ohneStory) throw new Error('kein Story-Ring im Feed');
-
-    await page.click(`[data-story-user="${ohneStory}"]`);
-    // Auf das Ergebnis warten, nicht auf eine feste Zeit: /api/profile braucht
-    // 1,5–4 s. Mit 700 ms ging das Profil erst NACH der Pruefung auf und lag
-    // ueber allen folgenden Klicks (30.09.2026, zehn Folgefehler). Seit
-    // Kasten 11.5 zaehlt die Messenger-Story des Testbestands unter Videos
-    // nicht mehr, der Ring fuehrt deshalb zum Profil statt zur Story.
-    await page.waitForSelector('#profBack, .viewer', { timeout: 10000 }).catch(() => null);
-    // Entweder das Profil oder der Story-Betrachter - nur ein Hinweis waere
-    // falsch.
-    const profil = await page.$('#profBack');
-    const story = await page.$('.viewer');
-    if (!profil && !story) throw new Error('es geht nichts auf, es kommt nur ein Hinweis');
-    await page.click(profil ? '#profBack' : '#storyClose');
-    await page.waitForTimeout(400);
+    const bildOhneStory = page.locator('.post__head:has(.post__bell) [data-story-user].is-ohne').first();
+    try {
+      await bildOhneStory.click();
+      await page.locator('#profBack').waitFor({ state: 'visible', timeout: 10000 });
+    } finally {
+      if (await page.locator('#overlay').isVisible()) await page.keyboard.press('Escape');
+    }
   });
 
   /* ------------------------------------------------ Fremdes Profil */
@@ -192,21 +177,18 @@ const ZIEL = process.env.ZIEL || 'http://localhost:3000/';
 
   await pruefe('Der Story-Ring eines fremden Profils lässt sich öffnen', async () => {
     await page.click('[data-area="videos"]');
-    await page.waitForTimeout(200);
     await page.click('[data-sub="home"]');
-    await page.waitForTimeout(400);
-    // u1 hat eine Story (s1).
-    await page.click(`[data-profile="${K.person('u1')}"]`);
-    await page.waitForSelector('#profBack');
-    await page.waitForTimeout(500);
-
-    const ring = await page.$('[data-profilstory]');
-    if (!ring) throw new Error('der Ring ist kein Knopf');
-    await ring.click();
-    await page.waitForTimeout(800);
-    if (!(await page.$('.viewer'))) throw new Error('die Story geht nicht auf');
-    await page.click('#storyClose');
-    await page.waitForTimeout(400);
+    try {
+      // Anna ist das Beispielprofil mit einer Videos-Story.
+      await page.locator(`.post__name[data-profile="${K.person('u1')}"]`).first().click();
+      await page.locator('#profBack').waitFor({ state: 'visible', timeout: 10000 });
+      await page.locator('[data-profilstory]').click();
+      await page.locator('.viewer').waitFor({ state: 'visible' });
+      await page.click('#storyClose');
+    } finally {
+      // Auch beim Fehler zum Hauptbereich zurück, damit er keine Folgetests blockiert.
+      if (await page.locator('#overlay').isVisible()) await page.keyboard.press('Escape');
+    }
   });
 
   /* ------------------------------------------------ Communitys */
