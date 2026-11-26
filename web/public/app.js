@@ -11127,6 +11127,10 @@ function nachladenLeer(name) {
 }
 
 function renderSettings() {
+  // Nachladeantworten zeichnen die Einstellungen auch dann neu, wenn
+  // „Profil bearbeiten“ darüber geöffnet wurde und der Bereich noch Konto ist.
+  if (state.profilSeite) return;
+
   /*
    * Ein einzelner Abschnitt als eigene Seite - das Ziel der Ueberschrift mit
    * Pfeil. Bis zum 24.09.2026 war "Konto →" usw. ein totes <div>; Henrik am

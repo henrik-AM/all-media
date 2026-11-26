@@ -200,7 +200,22 @@ async function teilBC() {
 
   console.log('\nB  Website');
   await pruefeAsync('Einstellungen → Konto → „Profil bearbeiten“ öffnet die Seite mit Bild und fünf Zeilen', async () => {
-    await zurSeite();
+    // Die Statistik-Antwort erst nach dem Öffnen des Profils durchlassen.
+    // Das Nachladen darf die Profilseite nicht durch die Einstellungen ersetzen.
+    const statistik = '**/api/statistik';
+    const freigabe = Promise.withResolvers();
+    await page.route(statistik, async (route) => {
+      await freigabe.promise;
+      await route.continue();
+    }, { times: 1 });
+    const antwort = page.waitForResponse(statistik);
+    try {
+      await zurSeite();
+    } finally {
+      freigabe.resolve();
+      await antwort;
+    }
+    await page.waitForFunction(() => einstellungNachgeladen.statistik !== 'laeuft');
     const profilseite = page.locator('[data-testid="profilseite"]');
     await profilseite.locator('[data-psfeld="links"]').waitFor();
     const zeilen = await profilseite.locator('[data-psfeld]').evaluateAll(
