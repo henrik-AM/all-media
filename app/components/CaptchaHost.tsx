@@ -100,6 +100,9 @@ function Pruefung({ offen }: { offen: Offen }) {
         <WebView
           source={{ uri: offen.adresse }}
           style={styles.web}
+          // Ohne flex: 0 am Behälter fällt die Ansicht auf ~0 Höhe zusammen (Doku containerStyle;
+          // Simulator 26.11.2026: interaktives Widget unsichtbar).
+          containerStyle={styles.webBehaelter}
           onMessage={empfangen}
           originWhitelist={[herkunft, 'https://challenges.cloudflare.com']}
           onShouldStartLoadWithRequest={(r) =>
@@ -166,7 +169,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   titel: { ...typography.body, fontWeight: '600', textAlign: 'center', color: '#111' },
-  web: { height: 200, backgroundColor: 'transparent' },
+  web: { flex: 0, height: 200, backgroundColor: 'transparent' },
+  webBehaelter: { flex: 0, height: 200, width: '100%' },
   knopf: { alignItems: 'center', paddingVertical: spacing.sm },
   knopfText: { ...typography.body, color: '#555' },
   schicht: { zIndex: 100, elevation: 100 },
