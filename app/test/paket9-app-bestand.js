@@ -7,6 +7,7 @@
  * Nur die zwei eigenen Testkonten. Uploads über den lokalen Server (3000).
  */
 const fs = require('fs');
+const { pruefAnmelden } = require('./_anmelden');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const { TESTKONTO_PASS, PRUEFKONTO_PASS } = require('./_testpasswoerter');
@@ -19,7 +20,7 @@ const MEDIEN = path.join(__dirname, 'ergebnisse-paket9', 'medien');
 
 async function konto(email, pass) {
   const c = createClient(wert('EXPO_PUBLIC_SUPABASE_URL'), wert('EXPO_PUBLIC_SUPABASE_ANON_KEY'), { auth: { persistSession: false } });
-  const { data, error } = await c.auth.signInWithPassword({ email, password: pass });
+  const { data, error } = await pruefAnmelden(c, { email, password: pass });
   if (error) throw error;
   const t = data.session.access_token;
   const api = async (p, { json, roh, typ } = {}) => (await fetch(BASIS + p, { method: 'POST', headers: { Authorization: 'Bearer ' + t, 'Content-Type': json ? 'application/json' : typ }, body: json ? JSON.stringify(json) : roh })).json();

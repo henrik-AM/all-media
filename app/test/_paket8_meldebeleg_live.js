@@ -2,6 +2,7 @@
 // Echte, kleine Bunny-Datei unter einem eigenen Testpfad. Moderationsrolle
 // vorübergehend nur für das zweite, sonst unbeteiligte Prüfkonto.
 const assert = require('node:assert/strict');
+const { pruefAnmelden } = require('./_anmelden');
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -29,7 +30,7 @@ function ok(name, bedingung) {
 
 async function anmelden(email, password, id) {
   const c = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data, error } = await c.auth.signInWithPassword({ email, password });
+  const { data, error } = await pruefAnmelden(c, { email, password });
   assert.ok(!error && data.user?.id === id, 'Testkonto bestätigt');
   return { c, token: data.session.access_token };
 }

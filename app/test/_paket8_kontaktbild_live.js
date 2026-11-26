@@ -12,6 +12,7 @@
  * Start: node test/_paket8_kontaktbild_live.js   (aus app/)
  */
 require('./_ki_belegung').pruefeBelegung('testbestand');
+const { pruefAnmelden } = require('./_anmelden');
 const fs = require('fs');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
@@ -34,7 +35,7 @@ const pruefe = (name, wahr, zusatz = '') => {
 
 async function konto(mail, pass) {
   const c = createClient(URL_, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data, error } = await c.auth.signInWithPassword({ email: mail, password: pass });
+  const { data, error } = await pruefAnmelden(c, { email: mail, password: pass });
   if (error) throw new Error(`Anmeldung ${mail}: ${error.message}`);
   return { c, id: data.user.id };
 }

@@ -85,7 +85,7 @@ async function api(route, body, typ = 'application/json') {
     await warte(250);
   }
   check('Eigener Server 3300 bereit', server.exitCode === null);
-  const auth = await fetch(supabaseUrl + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: supabaseKey, Authorization: `Bearer ${dienst}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'test@all-media.app', password: TESTKONTO_PASS }), signal: AbortSignal.timeout(15000) });
+  const auth = await fetch(supabaseUrl + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: dienst || supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'test@all-media.app', password: TESTKONTO_PASS }), signal: AbortSignal.timeout(15000) });
   check('Testkonto-Anmeldung', auth.ok);
   const login = await auth.json(); token = login.access_token;
   check('Sitzung hat Rolle authenticated', JSON.parse(Buffer.from(token.split('.')[1], 'base64url')).role === 'authenticated');

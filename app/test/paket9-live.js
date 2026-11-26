@@ -17,6 +17,7 @@
  * Braucht: Belegung testbestand, SUPABASE_TOKEN (Testpaar), Server auf 3000.
  */
 const fs = require('fs');
+const { pruefAnmelden } = require('./_anmelden');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const { TESTKONTO_PASS, PRUEFKONTO_PASS } = require('./_testpasswoerter');
@@ -38,7 +39,7 @@ const pruefe = (name, wahr, zusatz = '') => {
 
 async function konto(email, passwort) {
   const client = createClient(URL_, KEY, { auth: { persistSession: false } });
-  const { data, error } = await client.auth.signInWithPassword({ email, password: passwort });
+  const { data, error } = await pruefAnmelden(client, { email, password: passwort });
   if (error) throw new Error(email + ': ' + error.message);
   const token = data.session.access_token;
   const api = async (pfad, { methode = 'POST', json, roh, typ } = {}) => {
