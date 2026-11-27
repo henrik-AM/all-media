@@ -199,29 +199,31 @@ async function teilBC() {
   /* -------------------------------------------------- C Profilbild, 2 Konten */
   console.log('\nC  Profilbild mit zwei Konten');
   // Die eigene Kennung des Prüfkontos — die Seite führt sich selbst als 'me'.
-  let meineId = null;
-  let vorher = null;
-  let anderer = null;
+  let meineId;
+  let vorher;
+  let anderer;
   try {
-    if (URL && KEY) {
-      const selbst = createClient(URL, KEY);
-      const an = await selbst.auth.signInWithPassword({
-        email: nurTestkonto(process.env.AM_TEST_MAIL || 'all.media.prueflauf@web.de'),
-        password: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,
-      });
-      if (an.error) throw an.error;
-      meineId = an.data.user.id;
-      anderer = createClient(URL, KEY);
-      const { error } = await anderer.auth.signInWithPassword({ email: KONTENPOOL.partner, password: TESTKONTO_PASS });
-      if (error) throw error;
-      if (meineId) {
-        const { data } = await anderer.from('profiles').select('avatar_url').eq('id', meineId).maybeSingle();
-        vorher = data?.avatar_url ?? null;
-      }
-    }
+    if (!URL || !KEY) throw new Error('Supabase-Konfiguration fehlt');
+    const selbst = createClient(URL, KEY);
+    const an = await selbst.auth.signInWithPassword({
+      email: nurTestkonto(KONTENPOOL.pruef),
+      password: process.env.AM_TEST_PASS || PRUEFKONTO_PASS,
+    });
+    if (an.error) throw an.error;
+    meineId = an.data.user.id;
+    if (meineId !== KONTENPOOL.pruefId) throw new Error('Prüfkonto gehört nicht zum belegten Platz');
+    const original = await selbst.from('profiles').select('avatar_url').eq('id', meineId).single();
+    if (original.error) throw original.error;
+    vorher = original.data.avatar_url;
+    anderer = createClient(URL, KEY);
+    const anPartner = await anderer.auth.signInWithPassword({ email: KONTENPOOL.partner, password: TESTKONTO_PASS });
+    if (anPartner.error) throw anPartner.error;
+    if (anPartner.data.user.id !== KONTENPOOL.partnerId) throw new Error('Partnerkonto gehört nicht zum belegten Platz');
   } catch (e) {
-    pruefe('Zweites Konto (@test) meldet sich an', false, e.message);
-    anderer = null;
+    // Ohne bestätigten Ausgangswert und beide Konten keinen Upload anfangen.
+    pruefe('Zwei Testkonten und ursprüngliches Profilbild verfügbar', false, e.message);
+    await schliesse(browser);
+    return;
   }
 
   const bild = 'data:image/png;base64,' + fs.readFileSync(path.join(__dirname, '_testbild.png')).toString('base64');
@@ -232,7 +234,8 @@ async function teilBC() {
       fetch('/api/hochladen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ordner: 'avatars', aufnahme }) }).then((r) => r.json()), bild);
     if (!hoch.ok) throw new Error('hochladen: ' + (hoch.error || JSON.stringify(hoch)));
     neueUrl = hoch.url;
-    neuerPfad = new globalThis.URL(hoch.url).pathname.split('/media/').at(-1);
+    neuerPfad = hoch.pfad;
+    if (!neuerPfad?.startsWith(`avatars/${meineId}-`)) throw new Error('Uploadpfad gehört nicht zum eigenen Konto');
     const set = await page.evaluate((url) =>
       fetch('/api/eigene/profilbild', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }).then((r) => r.json()), hoch.url);
     if (!set.ok) throw new Error('profilbild: ' + (set.error || JSON.stringify(set)));
@@ -252,12 +255,14 @@ async function teilBC() {
 
   // Zurück auf den vorigen Stand — und gegenprüfen.
   if (neueUrl) {
-    await page.evaluate((url) =>
-      fetch('/api/eigene/profilbild', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }).then((r) => r.json()), vorher);
-    if (anderer && meineId) {
-      const { data } = await anderer.from('profiles').select('avatar_url').eq('id', meineId).maybeSingle();
-      pruefe('Aufräumen: voriges Profilbild wiederhergestellt', (data?.avatar_url ?? null) === vorher, `steht: ${data?.avatar_url}`);
-    }
+    await pruefeAsync('Aufräumen: voriges Profilbild wiederhergestellt', async () => {
+      const gesetzt = await page.evaluate((url) =>
+        fetch('/api/eigene/profilbild', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }).then((r) => r.json()), vorher);
+      if (!gesetzt.ok) throw new Error('Rücksetzen des Profilbilds fehlgeschlagen');
+      const { data, error } = await anderer.from('profiles').select('avatar_url').eq('id', meineId).single();
+      if (error) throw error;
+      if (data.avatar_url !== vorher) throw new Error('Gegenkonto sieht den Ausgangswert noch nicht');
+    });
     if (neuerPfad?.startsWith('avatars/' + meineId + '-')) {
       await pruefeAsync('Aufräumen: eigener Upload gelöscht', async () => {
         const weg = await page.evaluate((pfad) =>
