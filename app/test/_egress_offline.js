@@ -224,6 +224,7 @@ test('Prüfbrowser: _konto schützt neue Seiten und Kontexte, Service Worker ble
       if (name === './_testpasswoerter') return { PRUEFKONTO_PASS: 'lokale-attrappe' };
       if (name === 'playwright-core') return { chromium };
       if (name === './_medien_egressschutz') return { medienEgressSchuetzen };
+      if (name === './_anmelden') return { seiteAnmelden: async () => {} }; // Captcha C8
       throw new Error(`Unerwarteter Import: ${name}`);
     },
   });
